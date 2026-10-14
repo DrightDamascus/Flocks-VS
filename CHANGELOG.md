@@ -1,5 +1,14 @@
 ﻿# Changelog
 
+## 0.4.1
+- Terrain clearance: every 0.3 s a flock samples the ground (rain map, so trees count) from the tail of its formation to
+  320 blocks ahead, across its full width. It climbs (up to 6 blocks/s) to keep the lowest bird 35 blocks above it,
+  starting just early enough for the climb rate, then sinks back to cruising height gently (1.5 blocks/s). A flock that
+  starts over known high ground starts above it. Unloaded chunks are skipped (too far away to be drawn anyway).
+- Gentle turns: the heading drifts on two slow sines (~12 deg over ~60 s, ~5 deg over ~23 s) around the migration
+  heading; the formation turns with it. Birds bank into turns and lift their nose while climbing (both slightly
+  exaggerated to read from the ground), and each weaves +-3 deg off the flock heading.
+
 ## 0.4.0
 - Automatic migration. Each in-game day is planned from the world seed and day number (same plan on every reload):
   per species, a migration strength 0..1 from the season (sine over each window, peak mid-window), times flocks per peak

@@ -7,17 +7,23 @@ namespace Flocks
 {
     public class Bird
     {
-        public Vec3d Offset; // slot relative to leader (blocks)
+        public Vec3d Offset; // slot relative to the leader in the flock's own frame: X = along (+ ahead), Y = up, Z = across
         public float Phase;  // animation phase offset (s)
+        public float YawJitter; // each bird weaves a few degrees off the flock heading
         public int FlapBeats, SoarLoops; // wingbeats before gliding, soar loops before flapping again
     }
 
     public class Flock
     {
         public Species Species;
-        public Vec3d Start; public Vec3d Dir; public double Speed; public double Travel; public double Length;
-        public float Yaw; public List<Bird> Birds = new();
-        public double Age;
+        public Vec3d Pos;                             // leader position
+        public double BaseHeading, Heading, TurnRate; // radians, rad/s; dir = (sin, 0, cos)
+        public double Wander1, Wander2;               // phases of the slow heading drift
+        public double Speed, Travel, Length, Age;
+        public double CruiseY, TargetY, ClimbRate;
+        public double Tail, HalfWidth, Drop;          // formation extent: behind the leader, to either side, below the leader
+        public double NextSample;
+        public List<Bird> Birds = new();
     }
 
     /// <summary>Client-only renderer: draws baked bird meshes at flock positions. No entities, nothing sent to the server.</summary>
@@ -27,6 +33,14 @@ namespace Flocks
         private readonly List<Flock> flocks = new();
         private readonly Random rand = new();
         private readonly Matrixf mat = new();
+
+        /// <summary>The lowest bird keeps at least this far above the highest ground under or near the flock.</summary>
+        public double Clearance = 35;
+        /// <summary>How far ahead (blocks) a flock looks for rising ground.</summary>
+        public double LookAhead = 320;
+        public double MaxClimb = 6, MaxSink = 1.5; // blocks/s
+        /// <summary>Slow course drift: two sines, ~12 deg over ~60 s and ~5 deg over ~23 s.</summary>
+        public double WanderBig = 12 * GameMath.DEG2RAD, WanderSmall = 5 * GameMath.DEG2RAD;
 
         public FlockRenderer(ICoreClientAPI capi) { this.capi = capi; }
         public double RenderOrder => 0.45;
@@ -50,37 +64,87 @@ namespace Flocks
             double reach = VisibleRange(sp), alt = y - plr.Y;
             double horiz = Math.Sqrt(Math.Max(reach * reach - alt * alt, 100 * 100));
             double looseR = span * (1.5 + Math.Sqrt(count)); // a loose group spreads over a disc this wide
-            double tail = sp.Loose ? 2 * looseR : (count / 2) * back + span; // the last bird trails the leader by this much
             var f = new Flock
             {
-                Species = sp, Dir = dir, Speed = sp.SpeedMin + rand.NextDouble() * (sp.SpeedMax - sp.SpeedMin), Length = 2 * horiz + tail,
-                Start = new Vec3d(plr.X - dir.X * horiz + perp.X * side, y, plr.Z - dir.Z * horiz + perp.Z * side),
-                // bird shapes have their head at -X; RotateY(a) turns -X into (-cos a, sin a), which equals dir for a = atan2(x, z) + pi/2
-                Yaw = (float)(Math.Atan2(dir.X, dir.Z) + Math.PI / 2)
+                Species = sp, Speed = sp.SpeedMin + rand.NextDouble() * (sp.SpeedMax - sp.SpeedMin),
+                BaseHeading = ang, Wander1 = rand.NextDouble() * Math.PI * 2, Wander2 = rand.NextDouble() * Math.PI * 2,
+                Pos = new Vec3d(plr.X - dir.X * horiz + perp.X * side, y, plr.Z - dir.Z * horiz + perp.Z * side),
+                CruiseY = y, TargetY = y,
             };
+            f.Heading = WanderedHeading(f);
             for (int i = 0; i < count; i++)
             {
-                Vec3d off;
+                double along, up, across;
                 if (sp.Loose)
                 {
                     // uniform over a disc centred one radius behind the leader, with some height spread
                     double r = looseR * Math.Sqrt(rand.NextDouble()), a = rand.NextDouble() * Math.PI * 2;
-                    double along = -looseR + r * Math.Cos(a), across = r * Math.Sin(a);
-                    off = new Vec3d(dir.X * along + perp.X * across, (rand.NextDouble() - 0.5) * span * 2, dir.Z * along + perp.Z * across);
+                    along = -looseR + r * Math.Cos(a); across = r * Math.Sin(a); up = (rand.NextDouble() - 0.5) * span * 2;
                 }
                 else
                 {
                     int rank = (i + 1) / 2; int s = i == 0 ? 0 : (i % 2 == 0 ? 1 : -1);
-                    off = new Vec3d(-dir.X * rank * back + perp.X * s * rank * outward, rank * 0.2 + (rand.NextDouble() - 0.5), -dir.Z * rank * back + perp.Z * s * rank * outward);
-                    off.Add((rand.NextDouble() - 0.5) * span * 0.2, 0, (rand.NextDouble() - 0.5) * span * 0.2);
+                    along = -rank * back + (rand.NextDouble() - 0.5) * span * 0.2;
+                    across = s * rank * outward + (rand.NextDouble() - 0.5) * span * 0.2;
+                    up = rank * 0.2 + (rand.NextDouble() - 0.5);
                 }
+                f.Tail = Math.Max(f.Tail, -along); f.HalfWidth = Math.Max(f.HalfWidth, Math.Abs(across)); f.Drop = Math.Max(f.Drop, -up);
                 f.Birds.Add(new Bird
                 {
-                    Offset = off, Phase = (float)rand.NextDouble() * 3,
+                    Offset = new Vec3d(along, up, across), Phase = (float)rand.NextDouble() * 3,
+                    YawJitter = (float)((rand.NextDouble() * 2 - 1) * 3 * GameMath.DEG2RAD),
                     FlapBeats = rand.Next(sp.FlapBeatsMin, sp.FlapBeatsMax + 1), SoarLoops = rand.Next(sp.SoarLoopsMin, sp.SoarLoopsMax + 1)
                 });
             }
+            f.Length = 2 * horiz + f.Tail + span;
+            // if it starts over known high ground, start already clear of it rather than climbing out of a hillside
+            SampleTerrain(f);
+            f.Pos.Y = Math.Max(f.Pos.Y, f.TargetY);
             flocks.Add(f);
+        }
+
+        private double WanderedHeading(Flock f)
+            => f.BaseHeading + WanderBig * Math.Sin(f.Age * 0.105 + f.Wander1) + WanderSmall * Math.Sin(f.Age * 0.27 + f.Wander2);
+
+        /// <summary>
+        /// Sets TargetY: cruising height, or higher where the ground ahead, under, behind (for the V's tail) or to either
+        /// side of the flock needs it. Ground further ahead counts for less by however much the flock can climb before
+        /// it gets there, so it starts climbing just early enough. Unloaded chunks read as height 0 and are skipped;
+        /// they are too far away to be drawn anyway.
+        /// </summary>
+        private void SampleTerrain(Flock f)
+        {
+            var ba = capi.World.BlockAccessor;
+            double dx = Math.Sin(f.Heading), dz = Math.Cos(f.Heading);
+            double climbPerBlock = MaxClimb * 0.6 / f.Speed;
+            double need = f.CruiseY;
+            for (double d = -f.Tail; d <= LookAhead; d += 16)
+            {
+                for (int s = -1; s <= 1; s++)
+                {
+                    double x = f.Pos.X + dx * d + dz * s * f.HalfWidth, z = f.Pos.Z + dz * d - dx * s * f.HalfWidth;
+                    int h = ba.GetRainMapHeightAt((int)x, (int)z);
+                    if (h <= 0) continue;
+                    need = Math.Max(need, h + Clearance + f.Drop - Math.Max(0, d) * climbPerBlock);
+                }
+            }
+            f.TargetY = Math.Min(need, ba.MapSizeY + 100);
+        }
+
+        private void Move(Flock f, float dt)
+        {
+            f.Age += dt;
+            double h = WanderedHeading(f);
+            f.TurnRate = (h - f.Heading) / dt;
+            f.Heading = h;
+            f.Pos.X += Math.Sin(h) * f.Speed * dt;
+            f.Pos.Z += Math.Cos(h) * f.Speed * dt;
+            f.Travel += f.Speed * dt;
+            if (f.Age >= f.NextSample) { SampleTerrain(f); f.NextSample = f.Age + 0.3; }
+            // ease toward the target height: climb briskly, sink back to cruise gently
+            double want = GameMath.Clamp((f.TargetY - f.Pos.Y) * 0.4, -MaxSink, MaxClimb);
+            f.ClimbRate += (want - f.ClimbRate) * Math.Min(1, dt * 1.5);
+            f.Pos.Y += f.ClimbRate * dt;
         }
 
         /// <summary>
@@ -98,7 +162,7 @@ namespace Flocks
         public void OnRenderFrame(float dt, EnumRenderStage stage)
         {
             if (flocks.Count == 0) return;
-            if (capi.IsGamePaused) dt = 0; // render frames keep coming while paused; freeze the flock
+            bool paused = capi.IsGamePaused || dt <= 0; // render frames keep coming while paused; freeze the flock
             var rapi = capi.Render; var cam = capi.World.Player.Entity.CameraPos;
             var prog = rapi.PreparedStandardShader((int)cam.X, (int)cam.Y + 80, (int)cam.Z);
             prog.ViewMatrix = rapi.CameraMatrixOriginf;
@@ -110,17 +174,27 @@ namespace Flocks
             for (int fi = flocks.Count - 1; fi >= 0; fi--)
             {
                 var f = flocks[fi]; var sp = f.Species;
-                f.Age += dt; f.Travel = f.Age * f.Speed;
+                if (!paused) Move(f, dt);
                 if (f.Travel > f.Length || !sp.Meshes.Ok) { flocks.RemoveAt(fi); continue; }
+                double dx = Math.Sin(f.Heading), dz = Math.Cos(f.Heading);
+                // Bank into turns: heading increasing is a left turn, and +RotateX drops the left (+Z) wing.
+                // Lift the nose while climbing: +RotateZ drops the head (-X), so climbing gives a negative angle.
+                // Both are exaggerated a little so they read from the ground.
+                float roll = (float)GameMath.Clamp(f.TurnRate * 8, -0.3, 0.3);
+                float pitch = (float)GameMath.Clamp(-f.ClimbRate * 0.05, -0.25, 0.25);
                 for (int i = 0; i < f.Birds.Count; i++)
                 {
                     var b = f.Birds[i];
                     float t = (float)f.Age + b.Phase;
-                    double x = f.Start.X + f.Dir.X * f.Travel + b.Offset.X + Math.Sin(t * 0.7) * 0.4;
-                    double y = f.Start.Y + b.Offset.Y + Math.Sin(t * 0.9) * 0.3;
-                    double z = f.Start.Z + f.Dir.Z * f.Travel + b.Offset.Z + Math.Cos(t * 0.6) * 0.4;
+                    var o = b.Offset;
+                    double x = f.Pos.X + dx * o.X + dz * o.Z + Math.Sin(t * 0.7) * 0.4;
+                    double y = f.Pos.Y + o.Y + Math.Sin(t * 0.9) * 0.3;
+                    double z = f.Pos.Z + dz * o.X - dx * o.Z + Math.Cos(t * 0.6) * 0.4;
                     var mesh = PoseFor(sp, b, t);
-                    prog.ModelMatrix = mat.Identity().Translate(x - cam.X, y - cam.Y, z - cam.Z).RotateY(f.Yaw).Scale(sp.Scale, sp.Scale, sp.Scale).Values;
+                    // bird shapes have their head at -X; RotateY(a) turns -X into (-cos a, sin a), which equals dir for a = heading + pi/2
+                    float yaw = (float)(f.Heading + Math.PI / 2 + b.YawJitter * Math.Sin(t * 0.4));
+                    prog.ModelMatrix = mat.Identity().Translate(x - cam.X, y - cam.Y, z - cam.Z).RotateY(yaw).RotateX(roll).RotateZ(pitch)
+                        .Scale(sp.Scale, sp.Scale, sp.Scale).Values;
                     rapi.RenderMultiTextureMesh(mesh, "tex");
                 }
             }
