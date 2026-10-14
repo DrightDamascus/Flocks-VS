@@ -64,9 +64,10 @@ namespace Flocks
             if (baseShape.Textures == null || baseShape.Textures.Count == 0) { capi.Logger.Warning("[Flocks] {0}: shape has no textures", name); return false; }
             foreach (var kv in baseShape.Textures)
             {
-                var loc = kv.Value.Clone().WithPathPrefixOnce("textures/").WithPathAppendixOnce(".png");
-                if (!capi.Assets.Exists(loc) && texOverride != null) loc = new AssetLocation("game", "textures/" + texOverride + ".png");
-                if (!capi.Assets.Exists(loc)) { capi.Logger.Warning("[Flocks] {0}: texture '{1}' missing at {2}", name, kv.Key, loc); return false; }
+                // the atlas adds "textures/" and ".png" itself, so keep the bare path for it and only check the full one
+                var loc = kv.Value.Clone();
+                if (!capi.Assets.Exists(TexFile(loc)) && texOverride != null) loc = new AssetLocation("game", texOverride);
+                if (!capi.Assets.Exists(TexFile(loc))) { capi.Logger.Warning("[Flocks] {0}: texture '{1}' missing at {2}", name, kv.Key, TexFile(loc)); return false; }
                 textures[kv.Key] = loc;
             }
             Animation flap = Find(baseShape, flapCode);
@@ -80,6 +81,8 @@ namespace Flocks
                 name, shapeLoc, FlapFrames, flap != null, soar != null, string.Join(",", textures.Values));
             return true;
         }
+        private static AssetLocation TexFile(AssetLocation loc) => loc.Clone().WithPathPrefixOnce("textures/").WithPathAppendixOnce(".png");
+
         private static Animation Find(Shape s, string code)
         {
             if (s.Animations == null) return null;

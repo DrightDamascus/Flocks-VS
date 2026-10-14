@@ -1,5 +1,13 @@
 ﻿# Changelog
 
+## 0.2.4
+- Fix: birds rendered white. The atlas prefixes `textures/` itself, so passing `game:textures/...png` became
+  `game:textures/textures/...` (client-main.log 23:14:23 "Texture asset ... not found") and the unknown texture was used.
+  The atlas now gets the bare shape path; only the existence check uses the full file path.
+- Fix: birds faced sideways. The hawk shape's head points to -X, so the yaw is now atan2(dir) + 90 deg.
+- Fix: flocks kept moving while the game was paused (render frames still tick); movement freezes when paused.
+- Faster flight: 18-24 blocks/s (was 10-14). Flocks now enter ~190 blocks out and despawn ~210 past to keep similar screen time.
+
 ## 0.2.3
 - Fix: `/flocks send` threw NullReferenceException on the server (server-main.log 23:07:41, FlocksModSystem.cs:54).
   A 0.2.1 edit put the client spawn code into the server command handler, so the server touched client-only meshes.

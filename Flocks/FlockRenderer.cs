@@ -45,9 +45,10 @@ namespace Flocks
             double side = (rand.NextDouble() - 0.5) * 40; // pass slightly off-centre
             var f = new Flock
             {
-                Dir = dir, Speed = 10 + rand.NextDouble() * 4, Length = 320,
-                Start = new Vec3d(plr.X - dir.X * 150 + perp.X * side, y, plr.Z - dir.Z * 150 + perp.Z * side),
-                Yaw = (float)Math.Atan2(dir.X, dir.Z)
+                Dir = dir, Speed = 18 + rand.NextDouble() * 6, Length = 400,
+                Start = new Vec3d(plr.X - dir.X * 190 + perp.X * side, y, plr.Z - dir.Z * 190 + perp.Z * side),
+                // hawk shape has its head at -X; RotateY(a) turns -X into (-cos a, sin a), which equals dir for a = atan2(x, z) + pi/2
+                Yaw = (float)(Math.Atan2(dir.X, dir.Z) + Math.PI / 2)
             };
             for (int i = 0; i < count; i++)
             {
@@ -62,6 +63,7 @@ namespace Flocks
         public void OnRenderFrame(float dt, EnumRenderStage stage)
         {
             if (flocks.Count == 0 || !meshes.Ok) return;
+            if (capi.IsGamePaused) dt = 0; // render frames keep coming while paused; freeze the flock
             var rapi = capi.Render; var cam = capi.World.Player.Entity.CameraPos;
             var prog = rapi.PreparedStandardShader((int)cam.X, (int)cam.Y + 80, (int)cam.Z);
             prog.ViewMatrix = rapi.CameraMatrixOriginf;
