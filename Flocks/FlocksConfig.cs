@@ -17,6 +17,9 @@ namespace Flocks
         public bool ForceMigration = false;
         /// <summary>Write each day's plan to client-main.log.</summary>
         public bool LogSchedule = true;
+        /// <summary>Volume of the distant calls of flying flocks (0 = silent, 1 = default). Landed geese use the game's
+        /// normal entity sounds and volume.</summary>
+        public float FlockCallVolume = 1f;
         /// <summary>Species that migrate on their own (false = never scheduled; /flocks send still works).</summary>
         public bool Geese = true, Cranes = true, Hawks = true;
         /// <summary>Reserved: enables fantasy creatures (the amphithere). Not read anywhere yet; the amphithere ships as

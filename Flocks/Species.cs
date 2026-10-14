@@ -29,6 +29,11 @@ namespace Flocks
         /// <summary>V formation, or a loose scattered group.</summary>
         public bool Loose;
 
+        /// <summary>Distant calls from the flying flock: sound path prefix in the flocks domain (variants 1..CallVariants),
+        /// and the gap between calls in seconds. Null = silent (the hawk).</summary>
+        public string CallSound; public int CallVariants;
+        public float CallGapMin = 6, CallGapMax = 15;
+
         /// <summary>Wingspan in blocks as drawn; formation spacing scales from it so wingtips never overlap.</summary>
         public double SpanBlocks => (Meshes.Span > 0 ? Meshes.Span : 1) * Scale;
 
@@ -46,6 +51,7 @@ namespace Flocks
                 // geese move late in autumn and early in spring, mornings and late afternoons, in V's of 7-25
                 SpringStart = GooseSpringStart, SpringEnd = 0.22f, AutumnStart = GooseAutumnStart, AutumnEnd = 0.85f,
                 Hours = new float[] { 6.5f, 10, 15.5f, 19 }, MaxFlocksPerDay = 3, CountMin = 7, CountMax = 25,
+                CallSound = "goose/flight", CallVariants = 3, CallGapMin = 6, CallGapMax = 15,
                 Meshes = new BirdMeshes(capi, "goose", new BirdMeshes.Candidate("greylag", new AssetLocation("flocks", "shapes/entity/bird/greylag.json"), "fly-flap", "fly-soar")),
             },
             // Our own model (tools/make_crane.py). Cranes beat slower and deeper than geese, glide more, and fly higher.
@@ -58,6 +64,7 @@ namespace Flocks
                 SpringStart = 0.02f, SpringEnd = 0.18f, AutumnStart = 0.55f, AutumnEnd = 0.75f,
                 Hours = new float[] { 8, 17 }, MaxFlocksPerDay = 2, CountMin = 7, CountMax = 25,
                 AltitudeMin = 75, AltitudeMax = 140,
+                CallSound = "crane/call", CallVariants = 6, CallGapMin = 8, CallGapMax = 20,
                 Meshes = new BirdMeshes(capi, "crane", new BirdMeshes.Candidate("crane", new AssetLocation("flocks", "shapes/entity/bird/crane.json"), "fly-flap", "fly-soar")),
             },
             // Vanilla's unused hawk shape, with sparrow and chicken fallbacks in case an update removes it.

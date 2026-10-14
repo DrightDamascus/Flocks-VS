@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.0
+- Sounds (assets/flocks/sounds; sources, authors and licenses in CREDITS.md, attribution in modinfo.json):
+  - goose/honk1-6: greylag calls (xeno-canto XC436358, Joost van Bruggen, CC BY-SA 4.0).
+  - goose/hurt and goose/death: greylag calls from the same recording, pitched up / down.
+  - goose/flight1-3: Canada geese flyover (Extemporalist, CC0).
+  - wings/flap1-2: mute swan wingbeats (XC434964, Joost van Bruggen, CC BY-SA 4.0).
+  - crane/call1-5: common crane (Wikimalte, CC BY-SA 4.0); crane/call6: common crane (V. P. Volkov, CC0).
+  - 19 short mono Ogg clips, about 390 KB in total.
+- Landed geese (entities/greylag.json): idle honks (idleSoundChance 0.02, range 32, slight pitch variation), plus
+  hurt and death sounds. On takeoff about half the birds play a wingbeat burst and about a third a flight call
+  (Waterfowl.cs), so a group doesn't play one sound per bird.
+- Flying visual flocks: every 6-15 s (geese) or 8-20 s (cranes) one random bird calls, positioned at that bird.
+  Volume is 0.6 times the config value, fading out over 220 blocks, so high or distant flocks are faint or silent.
+  Hawks stay silent. No landing sound: since 0.7.1 geese appear through vanilla spawning and don't land.
+- Client config: FlockCallVolume (default 1, 0 = silent) for the flying flocks' calls.
+- New CREDITS.md.
+
 ## 0.7.1
 - Resident geese now spawn through vanilla's spawner, like wolves and fish. The 0.7.0 lake manager, the 40-goose
   server cap, the lake cooldowns and the fly-in arrivals are gone.

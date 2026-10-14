@@ -90,7 +90,7 @@ namespace Flocks
             capi = api;
             config = LoadConfig(api);
             species = Species.Create(api);
-            renderer = new FlockRenderer(api);
+            renderer = new FlockRenderer(api) { CallVolume = Math.Max(0, config.FlockCallVolume) };
             scheduler = new MigrationScheduler(api, renderer, species, config);
             api.Event.RegisterGameTickListener(scheduler.Tick, 1000);
             api.Event.LevelFinalize += () =>

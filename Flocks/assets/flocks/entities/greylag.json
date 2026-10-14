@@ -72,7 +72,10 @@
 		}
 	},
 	sounds: {
-		hurt: "game:creature/chicken/hurt",
-		death: "game:creature/chicken/hurt"
-	}
+		hurt: "flocks:goose/hurt",
+		death: "flocks:goose/death",
+		idle: { path: "flocks:goose/honk*", pitch: { avg: 1, var: 0.15 }, range: 32 }
+	},
+	// vanilla's idle sound roll (chickens use 0.05); geese on the water call now and then
+	idleSoundChance: 0.02
 }

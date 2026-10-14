@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Vintagestory.API.Client;
+using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 
 namespace Flocks
@@ -23,6 +24,7 @@ namespace Flocks
         public double CruiseY, TargetY, ClimbRate;
         public double Tail, HalfWidth, Drop;          // formation extent: behind the leader, to either side, below the leader
         public double NextSample;
+        public double NextCall;                       // flock age (s) of its next distant call
         public List<Bird> Birds = new();
     }
 
@@ -41,6 +43,11 @@ namespace Flocks
         public double MaxClimb = 6, MaxSink = 1.5; // blocks/s
         /// <summary>Slow course drift: two sines, ~12 deg over ~60 s and ~5 deg over ~23 s.</summary>
         public double WanderBig = 12 * GameMath.DEG2RAD, WanderSmall = 5 * GameMath.DEG2RAD;
+
+        /// <summary>Volume of the flying flocks' distant calls (client config FlockCallVolume; 0 = silent).</summary>
+        public float CallVolume = 1f;
+        /// <summary>Calls fade out linearly over this many blocks from the calling bird.</summary>
+        public float CallRange = 220;
 
         public FlockRenderer(ICoreClientAPI capi) { this.capi = capi; }
         public double RenderOrder => 0.45;
@@ -101,6 +108,22 @@ namespace Flocks
             SampleTerrain(f);
             f.Pos.Y = Math.Max(f.Pos.Y, f.TargetY);
             flocks.Add(f);
+        }
+
+        /// <summary>Every CallGapMin-Max seconds one random bird calls, positioned at that bird, quiet and range-limited
+        /// so a flock high up and far off is faint or silent. The first call waits a few seconds after the flock appears.</summary>
+        private void Call(Flock f)
+        {
+            var sp = f.Species;
+            if (sp.CallSound == null || sp.CallVariants <= 0 || CallVolume <= 0) return;
+            if (f.NextCall == 0) f.NextCall = 3 + rand.NextDouble() * sp.CallGapMax;
+            if (f.Age < f.NextCall) return;
+            f.NextCall = f.Age + sp.CallGapMin + rand.NextDouble() * (sp.CallGapMax - sp.CallGapMin);
+            var b = f.Birds[rand.Next(f.Birds.Count)];
+            double dx = Math.Sin(f.Heading), dz = Math.Cos(f.Heading);
+            double x = f.Pos.X + dx * b.Offset.X + dz * b.Offset.Z, y = f.Pos.Y + b.Offset.Y, z = f.Pos.Z + dz * b.Offset.X - dx * b.Offset.Z;
+            var loc = new AssetLocation("flocks", sp.CallSound + (1 + rand.Next(sp.CallVariants)));
+            capi.World.PlaySoundAt(loc, x, y, z, null, true, CallRange, 0.6f * CallVolume);
         }
 
         private double WanderedHeading(Flock f)
@@ -174,7 +197,7 @@ namespace Flocks
             for (int fi = flocks.Count - 1; fi >= 0; fi--)
             {
                 var f = flocks[fi]; var sp = f.Species;
-                if (!paused) Move(f, dt);
+                if (!paused) { Move(f, dt); Call(f); }
                 if (f.Travel > f.Length || !sp.Meshes.Ok) { flocks.RemoveAt(fi); continue; }
                 double dx = Math.Sin(f.Heading), dz = Math.Cos(f.Heading);
                 // Bank into turns: heading increasing is a left turn, and +RotateX drops the left (+Z) wing.

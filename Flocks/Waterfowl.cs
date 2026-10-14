@@ -136,6 +136,10 @@ namespace Flocks
             if (flying || !entity.Alive) return;
             flying = true; flyTime = 0; takeoffHeading = towards;
             SetAnim("fly-flap");
+            // a burst of wingbeats and an alarm call from some of the group, not every bird at once
+            var w = entity.World;
+            if (rand.NextDouble() < 0.5) w.PlaySoundAt(new AssetLocation("flocks", "wings/flap" + (1 + rand.Next(2))), entity, null, true, 32, 0.9f);
+            if (rand.NextDouble() < 0.35) w.PlaySoundAt(new AssetLocation("flocks", "goose/flight" + (1 + rand.Next(3))), entity, null, true, 48, 0.7f);
         }
 
         private void SetAnim(string code)
