@@ -29,7 +29,11 @@ namespace Flocks
         private float fleeRange = 14, takeoffRange = 7, lifeHours = 6, flySeconds = 8, sink = 0.15f;
         private double driftSpeed = 0.004, paddleSpeed = 0.025, flySpeed = 0.07, climbSpeed = 0.045;
 
+        /// <summary>A taking-off goose despawns once no player is within VanishRange, or after MaxFlySeconds regardless.</summary>
+        private const float VanishRange = 48, MaxFlySeconds = 40;
+
         private bool flying;
+        private Entity scarer;
         private float flyTime, nextCheck;
         private double heading, takeoffHeading;
         private string anim;
@@ -64,7 +68,8 @@ namespace Flocks
                 flyTime += dt;
                 pos.Motion.Set(Math.Sin(takeoffHeading) * flySpeed, climbSpeed, Math.Cos(takeoffHeading) * flySpeed);
                 pos.Yaw = (float)takeoffHeading;
-                if (flyTime > flySeconds) entity.Die(EnumDespawnReason.Expire);
+                // vanish only once no player is near enough to watch it pop out (or it's stuck against a hill for long)
+                if (flyTime > flySeconds && (flyTime > MaxFlySeconds || NearestPlayer(VanishRange) == null)) entity.Die(EnumDespawnReason.Expire);
                 return;
             }
             if (!Resident && now - attrs.GetDouble(SpawnKey) > lifeHours) { Takeoff(rand.NextDouble() * Math.PI * 2); return; }
@@ -81,9 +86,9 @@ namespace Flocks
                 }
             }
 
-            nextCheck -= dt;
-            var player = nextCheck <= 0 ? NearestPlayer() : null;
-            if (nextCheck <= 0) nextCheck = 0.25f;
+            // the nearest player is looked up 4 times a second and kept in between, so fleeing is continuous
+            if ((nextCheck -= dt) <= 0) { nextCheck = 0.25f; scarer = NearestPlayer(fleeRange); }
+            var player = scarer;
             double speed = driftSpeed;
             if (player != null)
             {
@@ -95,10 +100,15 @@ namespace Flocks
             else heading += (rand.NextDouble() - 0.5) * 0.15; // slow wandering drift
 
             bool inWater = entity.Swimming || entity.FeetInLiquid;
+            // A bank flush with the water is only ~0.3 blocks above a floating goose, well within stepHeight, so it
+            // would never collide and could paddle ashore and wander inland. Look ahead and turn back at the edge
+            // instead (a goose already ashore just heads back toward water).
+            if (inWater && !WaterAt(heading, 0.8)) heading = TowardWater(heading);
+            else if (!inWater) heading = TowardWater(heading);
             pos.Motion.X = Math.Sin(heading) * speed;
             pos.Motion.Z = Math.Cos(heading) * speed;
             if (inWater) pos.Motion.Y = SurfaceMotion();
-            if (entity.CollidedHorizontally) heading += Math.PI * (0.5 + rand.NextDouble()); // turn away from the shore
+            if (entity.CollidedHorizontally) heading += Math.PI * (0.5 + rand.NextDouble()); // turn away from a wall
             pos.Yaw = (float)heading;
             SetAnim(inWater ? "swim" : (speed > driftSpeed ? "walk" : "idle-stand"));
         }
@@ -119,8 +129,42 @@ namespace Flocks
             return GameMath.Clamp((target - entity.Pos.Y) * 0.15, -0.03, 0.03);
         }
 
-        private Entity NearestPlayer() =>
-            entity.World.GetNearestEntity(entity.Pos.XYZ, fleeRange, fleeRange, e => e is EntityPlayer && e.Alive);
+        /// <summary>Nearest living player within range, ignoring spectators (they can't be seen).</summary>
+        private Entity NearestPlayer(float range) =>
+            entity.World.GetNearestEntity(entity.Pos.XYZ, range, range, e => e is EntityPlayer ep && ep.Alive
+                && ep.Player?.WorldData?.CurrentGameMode != EnumGameMode.Spectator);
+
+        /// <summary>Water at the goose's level (or one below, for a goose standing ashore) dist blocks along heading.</summary>
+        private bool WaterAt(double towards, double dist)
+        {
+            var ba = entity.World.BlockAccessor;
+            int x = (int)Math.Floor(entity.Pos.X + Math.Sin(towards) * dist), z = (int)Math.Floor(entity.Pos.Z + Math.Cos(towards) * dist);
+            int y = (int)Math.Floor(entity.Pos.Y);
+            for (int dy = 0; dy >= -1; dy--)
+            {
+                var b = ba.GetBlock(new BlockPos(x, y + dy, z), BlockLayersAccess.Fluid);
+                if (b != null && b.IsLiquid() && b.LiquidCode == "water") return true;
+            }
+            return false;
+        }
+
+        /// <summary>The heading itself if there's water just ahead, else the direction of the nearest water within 6
+        /// blocks (closest to the current heading on ties), else a random turn.</summary>
+        private double TowardWater(double current)
+        {
+            if (WaterAt(current, 0.8)) return current;
+            for (int dist = 1; dist <= 6; dist++)
+            {
+                double best = double.NaN, bestTurn = double.MaxValue;
+                for (int i = 0; i < 8; i++)
+                {
+                    double h = current + i * Math.PI / 4, turn = Math.Abs(GameMath.AngleRadDistance((float)current, (float)h));
+                    if (turn < bestTurn && WaterAt(h, dist)) { best = h; bestTurn = turn; }
+                }
+                if (!double.IsNaN(best)) return best;
+            }
+            return current + Math.PI * (0.5 + rand.NextDouble());
+        }
 
         /// <summary>This bird and the rest of its group on the lake take off together.</summary>
         private void TakeoffGroup(double away)

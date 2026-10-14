@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.3
+Landed geese (Waterfowl.cs), from a review of 0.4.2-0.8.0:
+- Fleeing now works. The nearest player was looked up every 0.25 s but dropped on every tick in between, so a fleeing
+  goose drifted and wandered on most ticks and paddled away only now and then. The lookup is now kept between checks,
+  so the 7-block takeoff check also runs every tick.
+- Geese stay on the water. A bank flush with the lake is only ~0.3 blocks above a floating goose (stepHeight 0.6), so
+  the "turn away from the shore" collision check never fired and geese could paddle ashore and wander inland. They now
+  look 0.8 blocks ahead and turn along the shore, and a goose already ashore heads back to water within 6 blocks.
+- Taking-off geese no longer vanish mid-air in plain view (8 s after takeoff, ~40 blocks away). They keep flying
+  until no player is within 48 blocks, or 40 s at most.
+- Spectators no longer scare geese.
+
 ## 0.8.2
 - /flocks land no longer puts geese right next to the player. It used the water nearest the player (from 6 blocks
   out), well inside the goose's fleeRange (14) and often its takeoffRange (7), so the group paddled off or took off
