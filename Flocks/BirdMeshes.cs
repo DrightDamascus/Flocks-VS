@@ -9,7 +9,7 @@ namespace Flocks
     /// <summary>Bakes hawk fly-flap / fly-soar poses into static meshes (one per frame) so no animator or entity is needed.</summary>
     public class BirdMeshes : ITexPositionSource
     {
-        public static readonly AssetLocation HawkShape = new AssetLocation("survival", "shapes/entity/animal/bird/raptor/hawk/hawk.json");
+        public static readonly AssetLocation HawkShape = new AssetLocation("game", "shapes/entity/animal/bird/raptor/hawk/hawk.json");
         public const int FlapFrames = 10;
 
         private readonly ICoreClientAPI capi;
@@ -35,11 +35,11 @@ namespace Flocks
 
         public void Load()
         {
+            if (Ok) return;
             Shape baseShape = Shape.TryGet(capi, HawkShape);
             if (baseShape == null) { capi.Logger.Error("[Flocks] hawk shape not found at {0}", HawkShape); return; }
             foreach (var kv in baseShape.Textures)
                 textures[kv.Key] = kv.Value.Clone().WithPathPrefixOnce("textures/").WithPathAppendixOnce(".png");
-            if (textures.Count > 0) foreach (var k in new List<string>(textures.Keys)) if (textures[k].Domain == "game") textures[k].Domain = "survival";
 
             Animation flap = Find(baseShape, "fly-flap");
             Animation soar = Find(baseShape, "fly-soar");
@@ -118,3 +118,4 @@ namespace Flocks
         }
     }
 }
+
