@@ -1,4 +1,4 @@
-﻿namespace Flocks
+namespace Flocks
 {
     /// <summary>Client config, ModConfig/flocks.json. Written with defaults on first run.</summary>
     public class FlocksConfig
@@ -17,5 +17,8 @@
         public bool ForceMigration = false;
         /// <summary>Write each day's plan to client-main.log.</summary>
         public bool LogSchedule = true;
+        /// <summary>Reserved: enables fantasy creatures (the amphithere). Not read anywhere yet; the amphithere ships as
+        /// assets only (shapes/entity/amphithere.json) with no entity, spawning or AI.</summary>
+        public bool FantasyCreatures = false;
     }
 }
