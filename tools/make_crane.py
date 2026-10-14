@@ -17,6 +17,7 @@ Species.Scale. A negative rotationX raises the +Z (left) wing.
 """
 import hashlib, json, math, os, random, sys
 from PIL import Image, ImageDraw
+from make_greylag import complete_axes   # shared keyframe fix-up
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..", "Flocks", "assets", "flocks")
@@ -412,7 +413,7 @@ def main():
         "textureWidth": SHEET_W // PX, "textureHeight": height // PX,
         "textures": {TEX: "flocks:entity/bird/" + TEX},
         "elements": [root.json()],
-        "animations": animations(),
+        "animations": complete_axes(animations()),
     }
     with open(os.path.join(shapes, TEX + ".json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, indent=1)

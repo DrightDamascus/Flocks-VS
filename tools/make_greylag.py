@@ -360,6 +360,22 @@ def ground_key(frame, **parts):
     return {"frame": frame, "elements": els}
 
 
+AXES = {"offset": 0, "rotation": 0, "stretch": 1}
+
+
+def complete_axes(anims):
+    """The game casts every keyframe component of a set group (offset, rotation, stretch) straight to float, so an
+    element that sets one axis must set all three or the client crashes the first time the animation plays."""
+    for anim in anims:
+        for kf in anim["keyframes"]:
+            for el in kf["elements"].values():
+                for group, rest in AXES.items():
+                    axes = [group + a for a in "XYZ"]
+                    if any(a in el for a in axes):
+                        for a in axes: el.setdefault(a, rest)
+    return anims
+
+
 def animations():
     # The hand lags the arm: it trails low on the upstroke and high on the downstroke, so the beat reads as a whip.
     flap = [
@@ -409,7 +425,7 @@ def main():
         "textureWidth": SHEET_W // PX, "textureHeight": height // PX,
         "textures": {TEX: "flocks:entity/bird/" + TEX},
         "elements": [root.json()],
-        "animations": animations(),
+        "animations": complete_axes(animations()),
     }
     with open(os.path.join(shapes, TEX + ".json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, indent=1)

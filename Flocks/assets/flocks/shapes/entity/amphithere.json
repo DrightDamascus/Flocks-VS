@@ -4331,49 +4331,69 @@
      "frame": 0,
      "elements": {
       "ArmL": {
-       "rotationX": -6.0
+       "rotationX": -6.0,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "ArmR": {
-       "rotationX": 6.0
+       "rotationX": 6.0,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "WingL": {
-       "rotationX": 14.26
+       "rotationX": 14.26,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "WingR": {
-       "rotationX": -14.26
+       "rotationX": -14.26,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "Body": {
-       "offsetY": -0.0
+       "offsetY": -0.0,
+       "offsetX": 0,
+       "offsetZ": 0
       },
       "Tail1": {
        "rotationY": 6.0,
-       "rotationZ": 3.73
+       "rotationZ": 3.73,
+       "rotationX": 0
       },
       "Tail2": {
        "rotationY": 0.17,
-       "rotationZ": 1.18
+       "rotationZ": 1.18,
+       "rotationX": 0
       },
       "Tail3": {
        "rotationY": -12.74,
-       "rotationZ": -2.26
+       "rotationZ": -2.26,
+       "rotationX": 0
       },
       "Tail4": {
        "rotationY": -14.27,
-       "rotationZ": -3.99
+       "rotationZ": -3.99,
+       "rotationX": 0
       },
       "Tail5": {
        "rotationY": -2.57,
-       "rotationZ": -2.7
+       "rotationZ": -2.7,
+       "rotationX": 0
       },
       "Tail6": {
        "rotationY": 15.78,
-       "rotationZ": 0.63
+       "rotationZ": 0.63,
+       "rotationX": 0
       },
       "TailFin": {
-       "rotationZ": 5.23
+       "rotationZ": 5.23,
+       "rotationX": 0,
+       "rotationY": 0
       },
       "Neck": {
-       "rotationY": -6.01
+       "rotationY": -6.01,
+       "rotationX": 0,
+       "rotationZ": 0
       }
      }
     },
@@ -4381,49 +4401,69 @@
      "frame": 6,
      "elements": {
       "ArmL": {
-       "rotationX": -27.21
+       "rotationX": -27.21,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "ArmR": {
-       "rotationX": 27.21
+       "rotationX": 27.21,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "WingL": {
-       "rotationX": 4.95
+       "rotationX": 4.95,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "WingR": {
-       "rotationX": -4.95
+       "rotationX": -4.95,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "Body": {
-       "offsetY": -0.106
+       "offsetY": -0.106,
+       "offsetX": 0,
+       "offsetZ": 0
       },
       "Tail1": {
        "rotationY": 13.07,
-       "rotationZ": 3.66
+       "rotationZ": 3.66,
+       "rotationX": 0
       },
       "Tail2": {
        "rotationY": 6.86,
-       "rotationZ": 3.54
+       "rotationZ": 3.54,
+       "rotationX": 0
       },
       "Tail3": {
        "rotationY": -11.49,
-       "rotationZ": 0.74
+       "rotationZ": 0.74,
+       "rotationX": 0
       },
       "Tail4": {
        "rotationY": -19.41,
-       "rotationZ": -2.62
+       "rotationZ": -2.62,
+       "rotationX": 0
       },
       "Tail5": {
        "rotationY": -10.21,
-       "rotationZ": -4.0
+       "rotationZ": -4.0,
+       "rotationX": 0
       },
       "Tail6": {
        "rotationY": 11.42,
-       "rotationZ": -2.35
+       "rotationZ": -2.35,
+       "rotationX": 0
       },
       "TailFin": {
-       "rotationZ": 1.62
+       "rotationZ": 1.62,
+       "rotationX": 0,
+       "rotationY": 0
       },
       "Neck": {
-       "rotationY": -6.98
+       "rotationY": -6.98,
+       "rotationX": 0,
+       "rotationZ": 0
       }
      }
     },
@@ -4431,49 +4471,69 @@
      "frame": 12,
      "elements": {
       "ArmL": {
-       "rotationX": -36.0
+       "rotationX": -36.0,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "ArmR": {
-       "rotationX": 36.0
+       "rotationX": 36.0,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "WingL": {
-       "rotationX": -7.26
+       "rotationX": -7.26,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "WingR": {
-       "rotationX": 7.26
+       "rotationX": 7.26,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "Body": {
-       "offsetY": -0.15
+       "offsetY": -0.15,
+       "offsetX": 0,
+       "offsetZ": 0
       },
       "Tail1": {
        "rotationY": 16.0,
-       "rotationZ": 1.45
+       "rotationZ": 1.45,
+       "rotationX": 0
       },
       "Tail2": {
        "rotationY": 14.22,
-       "rotationZ": 3.82
+       "rotationZ": 3.82,
+       "rotationX": 0
       },
       "Tail3": {
        "rotationY": -5.27,
-       "rotationZ": 3.3
+       "rotationZ": 3.3,
+       "rotationX": 0
       },
       "Tail4": {
        "rotationY": -19.04,
-       "rotationZ": 0.28
+       "rotationZ": 0.28,
+       "rotationX": 0
       },
       "Tail5": {
        "rotationY": -15.97,
-       "rotationZ": -2.95
+       "rotationZ": -2.95,
+       "rotationX": 0
       },
       "Tail6": {
        "rotationY": 3.89,
-       "rotationZ": -3.95
+       "rotationZ": -3.95,
+       "rotationX": 0
       },
       "TailFin": {
-       "rotationZ": -2.94
+       "rotationZ": -2.94,
+       "rotationX": 0,
+       "rotationY": 0
       },
       "Neck": {
-       "rotationY": -9.72
+       "rotationY": -9.72,
+       "rotationX": 0,
+       "rotationZ": 0
       }
      }
     },
@@ -4481,49 +4541,69 @@
      "frame": 18,
      "elements": {
       "ArmL": {
-       "rotationX": -27.21
+       "rotationX": -27.21,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "ArmR": {
-       "rotationX": 27.21
+       "rotationX": 27.21,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "WingL": {
-       "rotationX": -15.21
+       "rotationX": -15.21,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "WingR": {
-       "rotationX": 15.21
+       "rotationX": 15.21,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "Body": {
-       "offsetY": -0.106
+       "offsetY": -0.106,
+       "offsetX": 0,
+       "offsetZ": 0
       },
       "Tail1": {
        "rotationY": 13.07,
-       "rotationZ": -1.61
+       "rotationZ": -1.61,
+       "rotationX": 0
       },
       "Tail2": {
        "rotationY": 17.93,
-       "rotationZ": 1.87
+       "rotationZ": 1.87,
+       "rotationX": 0
       },
       "Tail3": {
        "rotationY": 2.28,
-       "rotationZ": 3.93
+       "rotationZ": 3.93,
+       "rotationX": 0
       },
       "Tail4": {
        "rotationY": -13.37,
-       "rotationZ": 3.02
+       "rotationZ": 3.02,
+       "rotationX": 0
       },
       "Tail5": {
        "rotationY": -16.47,
-       "rotationZ": -0.18
+       "rotationZ": -0.18,
+       "rotationX": 0
       },
       "Tail6": {
        "rotationY": -2.4,
-       "rotationZ": -3.24
+       "rotationZ": -3.24,
+       "rotationX": 0
       },
       "TailFin": {
-       "rotationZ": -5.78
+       "rotationZ": -5.78,
+       "rotationX": 0,
+       "rotationY": 0
       },
       "Neck": {
-       "rotationY": -12.62
+       "rotationY": -12.62,
+       "rotationX": 0,
+       "rotationZ": 0
       }
      }
     },
@@ -4531,49 +4611,69 @@
      "frame": 24,
      "elements": {
       "ArmL": {
-       "rotationX": -6.0
+       "rotationX": -6.0,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "ArmR": {
-       "rotationX": 6.0
+       "rotationX": 6.0,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "WingL": {
-       "rotationX": -14.26
+       "rotationX": -14.26,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "WingR": {
-       "rotationX": 14.26
+       "rotationX": 14.26,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "Body": {
-       "offsetY": -0.0
+       "offsetY": -0.0,
+       "offsetX": 0,
+       "offsetZ": 0
       },
       "Tail1": {
        "rotationY": 6.0,
-       "rotationZ": -3.73
+       "rotationZ": -3.73,
+       "rotationX": 0
       },
       "Tail2": {
        "rotationY": 15.83,
-       "rotationZ": -1.18
+       "rotationZ": -1.18,
+       "rotationX": 0
       },
       "Tail3": {
        "rotationY": 6.74,
-       "rotationZ": 2.26
+       "rotationZ": 2.26,
+       "rotationX": 0
       },
       "Tail4": {
        "rotationY": -5.73,
-       "rotationZ": 3.99
+       "rotationZ": 3.99,
+       "rotationX": 0
       },
       "Tail5": {
        "rotationY": -11.43,
-       "rotationZ": 2.7
+       "rotationZ": 2.7,
+       "rotationX": 0
       },
       "Tail6": {
        "rotationY": -3.78,
-       "rotationZ": -0.63
+       "rotationZ": -0.63,
+       "rotationX": 0
       },
       "TailFin": {
-       "rotationZ": -5.23
+       "rotationZ": -5.23,
+       "rotationX": 0,
+       "rotationY": 0
       },
       "Neck": {
-       "rotationY": -13.99
+       "rotationY": -13.99,
+       "rotationX": 0,
+       "rotationZ": 0
       }
      }
     },
@@ -4581,49 +4681,69 @@
      "frame": 30,
      "elements": {
       "ArmL": {
-       "rotationX": 15.21
+       "rotationX": 15.21,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "ArmR": {
-       "rotationX": -15.21
+       "rotationX": -15.21,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "WingL": {
-       "rotationX": -4.95
+       "rotationX": -4.95,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "WingR": {
-       "rotationX": 4.95
+       "rotationX": 4.95,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "Body": {
-       "offsetY": 0.106
+       "offsetY": 0.106,
+       "offsetX": 0,
+       "offsetZ": 0
       },
       "Tail1": {
        "rotationY": -1.07,
-       "rotationZ": -3.66
+       "rotationZ": -3.66,
+       "rotationX": 0
       },
       "Tail2": {
        "rotationY": 9.14,
-       "rotationZ": -3.54
+       "rotationZ": -3.54,
+       "rotationX": 0
       },
       "Tail3": {
        "rotationY": 5.49,
-       "rotationZ": -0.74
+       "rotationZ": -0.74,
+       "rotationX": 0
       },
       "Tail4": {
        "rotationY": -0.59,
-       "rotationZ": 2.62
+       "rotationZ": 2.62,
+       "rotationX": 0
       },
       "Tail5": {
        "rotationY": -3.79,
-       "rotationZ": 4.0
+       "rotationZ": 4.0,
+       "rotationX": 0
       },
       "Tail6": {
        "rotationY": 0.58,
-       "rotationZ": 2.35
+       "rotationZ": 2.35,
+       "rotationX": 0
       },
       "TailFin": {
-       "rotationZ": -1.62
+       "rotationZ": -1.62,
+       "rotationX": 0,
+       "rotationY": 0
       },
       "Neck": {
-       "rotationY": -13.02
+       "rotationY": -13.02,
+       "rotationX": 0,
+       "rotationZ": 0
       }
      }
     },
@@ -4631,49 +4751,69 @@
      "frame": 36,
      "elements": {
       "ArmL": {
-       "rotationX": 24.0
+       "rotationX": 24.0,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "ArmR": {
-       "rotationX": -24.0
+       "rotationX": -24.0,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "WingL": {
-       "rotationX": 7.26
+       "rotationX": 7.26,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "WingR": {
-       "rotationX": -7.26
+       "rotationX": -7.26,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "Body": {
-       "offsetY": 0.15
+       "offsetY": 0.15,
+       "offsetX": 0,
+       "offsetZ": 0
       },
       "Tail1": {
        "rotationY": -4.0,
-       "rotationZ": -1.45
+       "rotationZ": -1.45,
+       "rotationX": 0
       },
       "Tail2": {
        "rotationY": 1.78,
-       "rotationZ": -3.82
+       "rotationZ": -3.82,
+       "rotationX": 0
       },
       "Tail3": {
        "rotationY": -0.73,
-       "rotationZ": -3.3
+       "rotationZ": -3.3,
+       "rotationX": 0
       },
       "Tail4": {
        "rotationY": -0.96,
-       "rotationZ": -0.28
+       "rotationZ": -0.28,
+       "rotationX": 0
       },
       "Tail5": {
        "rotationY": 1.97,
-       "rotationZ": 2.95
+       "rotationZ": 2.95,
+       "rotationX": 0
       },
       "Tail6": {
        "rotationY": 8.11,
-       "rotationZ": 3.95
+       "rotationZ": 3.95,
+       "rotationX": 0
       },
       "TailFin": {
-       "rotationZ": 2.94
+       "rotationZ": 2.94,
+       "rotationX": 0,
+       "rotationY": 0
       },
       "Neck": {
-       "rotationY": -10.28
+       "rotationY": -10.28,
+       "rotationX": 0,
+       "rotationZ": 0
       }
      }
     },
@@ -4681,49 +4821,69 @@
      "frame": 42,
      "elements": {
       "ArmL": {
-       "rotationX": 15.21
+       "rotationX": 15.21,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "ArmR": {
-       "rotationX": -15.21
+       "rotationX": -15.21,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "WingL": {
-       "rotationX": 15.21
+       "rotationX": 15.21,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "WingR": {
-       "rotationX": -15.21
+       "rotationX": -15.21,
+       "rotationY": 0,
+       "rotationZ": 0
       },
       "Body": {
-       "offsetY": 0.106
+       "offsetY": 0.106,
+       "offsetX": 0,
+       "offsetZ": 0
       },
       "Tail1": {
        "rotationY": -1.07,
-       "rotationZ": 1.61
+       "rotationZ": 1.61,
+       "rotationX": 0
       },
       "Tail2": {
        "rotationY": -1.93,
-       "rotationZ": -1.87
+       "rotationZ": -1.87,
+       "rotationX": 0
       },
       "Tail3": {
        "rotationY": -8.28,
-       "rotationZ": -3.93
+       "rotationZ": -3.93,
+       "rotationX": 0
       },
       "Tail4": {
        "rotationY": -6.63,
-       "rotationZ": -3.02
+       "rotationZ": -3.02,
+       "rotationX": 0
       },
       "Tail5": {
        "rotationY": 2.47,
-       "rotationZ": 0.18
+       "rotationZ": 0.18,
+       "rotationX": 0
       },
       "Tail6": {
        "rotationY": 14.4,
-       "rotationZ": 3.24
+       "rotationZ": 3.24,
+       "rotationX": 0
       },
       "TailFin": {
-       "rotationZ": 5.78
+       "rotationZ": 5.78,
+       "rotationX": 0,
+       "rotationY": 0
       },
       "Neck": {
-       "rotationY": -7.38
+       "rotationY": -7.38,
+       "rotationX": 0,
+       "rotationZ": 0
       }
      }
     }

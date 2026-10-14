@@ -278,7 +278,7 @@ def main():
     root = shape(); height = cl.pack(root)
     data = {"textureWidth": cl.SHEET_W // cl.PX, "textureHeight": height // cl.PX,
             "textures": {TEX: "flocks:entity/" + TEX},
-            "elements": [root.json()], "animations": animations()}
+            "elements": [root.json()], "animations": cl.complete_axes(animations())}
     with open(os.path.join(shapes, TEX + ".json"), "w", newline="\n") as f: json.dump(data, f, indent=1)
     img = cl.paint(root, height); img.save(os.path.join(textures, TEX + ".png"))
     cl.uv_guide(root, img).save(os.path.join(HERE, "amphithere_uv_guide.png"))

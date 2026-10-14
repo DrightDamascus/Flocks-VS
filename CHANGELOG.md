@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.1
+- Fixed a client crash ("Nullable object must have a value" in Animation.lerpKeyFrameElement) the first time a
+  landed goose was animated. The game reads all three axes of any offset, rotation or stretch a keyframe element
+  sets, and the greylag, crane and amphithere shapes set only some (e.g. rotationX alone). The generators now fill
+  in the missing axes (0, or 1 for stretch) via complete_axes() in tools/make_greylag.py, and the shipped shapes are
+  regenerated to match. The animations look the same.
+
 ## 0.8.0
 - Sounds (assets/flocks/sounds; sources, authors and licenses in CREDITS.md, attribution in modinfo.json):
   - goose/honk1-6: greylag calls (xeno-canto XC436358, Joost van Bruggen, CC BY-SA 4.0).
