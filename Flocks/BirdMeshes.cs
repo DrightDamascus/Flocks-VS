@@ -26,33 +26,60 @@ namespace Flocks
         {
             get
             {
-                if (!textures.TryGetValue(code, out var loc)) textures.TryGetValue("hawk-redtail-male1", out loc);
+                if (!textures.TryGetValue(code, out var loc)) foreach (var v in textures.Values) { loc = v; break; }
                 if (loc == null) return capi.EntityTextureAtlas.UnknownTexturePosition;
                 capi.EntityTextureAtlas.GetOrInsertTexture(loc, out _, out var pos);
                 return pos ?? capi.EntityTextureAtlas.UnknownTexturePosition;
             }
         }
 
+        private AssetLocation shapeLoc;
+        public string Loaded { get; private set; }
+
+        private static readonly (string name, string shape, string flap, string soar, string texOverride)[] Candidates =
+        {
+            ("hawk", "shapes/entity/animal/bird/raptor/hawk/hawk.json", "fly-flap", "fly-soar", null),
+            // the sparrow shape points at bird/sparrow/..., but the file ships in bird/passerine/
+            ("treesparrow", "shapes/entity/animal/bird/passerine/treesparrow-adult-male.json", "flap", "soar", "entity/animal/bird/passerine/treesparrow-adult-male"),
+            ("chicken", "shapes/entity/animal/bird/chicken/chicken-hen.json", "fly", "fly", null),
+        };
+
         public void Load()
         {
             if (Ok) return;
-            Shape baseShape = Shape.TryGet(capi, HawkShape);
-            if (baseShape == null) { capi.Logger.Error("[Flocks] hawk shape not found at {0}", HawkShape); return; }
-            foreach (var kv in baseShape.Textures)
-                textures[kv.Key] = kv.Value.Clone().WithPathPrefixOnce("textures/").WithPathAppendixOnce(".png");
-
-            Animation flap = Find(baseShape, "fly-flap");
-            Animation soar = Find(baseShape, "fly-soar");
-            Flap = new MultiTextureMeshRef[FlapFrames];
-            for (int i = 0; i < FlapFrames; i++)
+            foreach (var c in Candidates)
             {
-                float frame = flap == null ? 0 : i * flap.QuantityFrames / (float)FlapFrames;
-                Flap[i] = Bake(flap, frame);
+                try { if (TryLoad(c.name, c.shape, c.flap, c.soar, c.texOverride)) return; }
+                catch (Exception ex) { capi.Logger.Error("[Flocks] {0} mesh bake threw: {1}", c.name, ex); Dispose(); Flap = null; Soar = null; }
             }
-            Soar = Bake(soar, 0);
-            capi.Logger.Notification("[Flocks] baked hawk meshes: {0} flap frames, flap anim {1}, soar anim {2}", FlapFrames, flap != null, soar != null);
+            capi.Logger.Error("[Flocks] no bird shape could be loaded (tried hawk, treesparrow, chicken); /flocks send disabled");
         }
 
+        private bool TryLoad(string name, string path, string flapCode, string soarCode, string texOverride)
+        {
+            shapeLoc = new AssetLocation("game", path);
+            Shape baseShape = Shape.TryGet(capi, shapeLoc);
+            if (baseShape == null) { capi.Logger.Warning("[Flocks] {0}: shape not found at {1}", name, shapeLoc); return false; }
+            textures.Clear();
+            if (baseShape.Textures == null || baseShape.Textures.Count == 0) { capi.Logger.Warning("[Flocks] {0}: shape has no textures", name); return false; }
+            foreach (var kv in baseShape.Textures)
+            {
+                var loc = kv.Value.Clone().WithPathPrefixOnce("textures/").WithPathAppendixOnce(".png");
+                if (!capi.Assets.Exists(loc) && texOverride != null) loc = new AssetLocation("game", "textures/" + texOverride + ".png");
+                if (!capi.Assets.Exists(loc)) { capi.Logger.Warning("[Flocks] {0}: texture '{1}' missing at {2}", name, kv.Key, loc); return false; }
+                textures[kv.Key] = loc;
+            }
+            Animation flap = Find(baseShape, flapCode);
+            Animation soar = Find(baseShape, soarCode);
+            Flap = new MultiTextureMeshRef[FlapFrames];
+            for (int i = 0; i < FlapFrames; i++)
+                Flap[i] = Bake(flap, flap == null ? 0 : i * flap.QuantityFrames / (float)FlapFrames);
+            Soar = Bake(soar, 0);
+            Loaded = name;
+            capi.Logger.Notification("[Flocks] baked {0} meshes from {1}: {2} flap frames, flap anim {3}, soar anim {4}, textures {5}",
+                name, shapeLoc, FlapFrames, flap != null, soar != null, string.Join(",", textures.Values));
+            return true;
+        }
         private static Animation Find(Shape s, string code)
         {
             if (s.Animations == null) return null;
@@ -62,7 +89,7 @@ namespace Flocks
 
         private MultiTextureMeshRef Bake(Animation anim, float frame)
         {
-            Shape shape = Shape.TryGet(capi, HawkShape); // fresh copy per pose
+            Shape shape = Shape.TryGet(capi, shapeLoc); // fresh copy per pose
             if (anim?.KeyFrames != null && anim.KeyFrames.Length > 0)
             {
                 var byName = new Dictionary<string, ShapeElement>();
@@ -118,4 +145,5 @@ namespace Flocks
         }
     }
 }
+
 

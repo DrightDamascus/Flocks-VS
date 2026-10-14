@@ -1,5 +1,11 @@
 ﻿# Changelog
 
+## 0.2.2
+- Robust bird mesh loading: tries hawk, then tree sparrow (its shape points at bird/sparrow/ but the texture ships
+  in bird/passerine/, so that path is overridden), then chicken hen. Checks every texture exists before baking,
+  catches bake exceptions, and logs which model loaded or why each one was skipped.
+- Note: the "hawk shape not found" errors Dright saw were from 0.2.0 (wrong `survival` domain); 0.2.1 was not installed yet.
+
 ## 0.2.1
 - Fix: `/flocks` "command does not exist". 0.2.0 registered it only as a client command, which VS runs with a dot
   (`.flocks`). Now `/flocks send [count] [species]` is a server command that tells your client (network channel
@@ -17,4 +23,5 @@
 
 ## 0.1.0
 - Skeleton: client logs season, latitude and migration direction once per in-game day. DESIGN.md.
+
 
