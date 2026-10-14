@@ -27,7 +27,7 @@
 
 ## Open questions
 1. Calls/sounds: vanilla has none for these species - record/license our own or go silent?
-2. Models: new low-poly shapes per species, or reuse the vanilla hawk/sparrow rigs as a start?
+2. Models: answered - own low-poly shapes per migrant (greylag goose done in 0.3.0); the vanilla hawk stays as a hawk species.
 3. Should flocks follow the global latitude or be world-wide synchronized per hemisphere for multiplayer consistency?
 4. Night migration (many songbirds migrate at night) - show silhouettes against the moon or skip?
 5. Integrate Continental Terrain climate in step 2 or later?

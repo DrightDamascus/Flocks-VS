@@ -14,6 +14,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="modinfo.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="assets\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
 

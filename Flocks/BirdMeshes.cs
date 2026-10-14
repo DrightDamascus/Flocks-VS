@@ -6,19 +6,31 @@ using Vintagestory.API.MathTools;
 
 namespace Flocks
 {
-    /// <summary>Bakes hawk fly-flap / fly-soar poses into static meshes (one per frame) so no animator or entity is needed.</summary>
+    /// <summary>
+    /// Bakes a bird shape's flap / soar poses into static meshes so no animator or entity is needed: a full flap cycle,
+    /// a full soar cycle, and blend poses from flap frame 0 to soar frame 0 so birds ease between flapping and gliding.
+    /// Keyframes are joined with a cyclic Catmull-Rom spline instead of straight lines, so wings do not snap at the
+    /// top and bottom of a stroke (the hawk flap has only three keyframes).
+    /// </summary>
     public class BirdMeshes : ITexPositionSource
     {
-        public static readonly AssetLocation HawkShape = new AssetLocation("game", "shapes/entity/animal/bird/raptor/hawk/hawk.json");
-        public const int FlapFrames = 10;
+        public const int FlapFrames = 48, SoarFrames = 32, BlendFrames = 12;
 
         private readonly ICoreClientAPI capi;
         private readonly Dictionary<string, AssetLocation> textures = new();
-        public MultiTextureMeshRef[] Flap;
-        public MultiTextureMeshRef Soar;
-        public bool Ok => Flap != null && Soar != null;
+        public MultiTextureMeshRef[] Flap, Soar, Blend;
+        public bool Ok => Flap != null && Soar != null && Blend != null;
 
-        public BirdMeshes(ICoreClientAPI capi) { this.capi = capi; }
+        /// <summary>A shape to try; texOverride replaces a texture path the shape gets wrong.</summary>
+        public record Candidate(string Name, AssetLocation Shape, string Flap, string Soar, string TexOverride = null);
+
+        private readonly string species;
+        private readonly Candidate[] candidates;
+
+        public BirdMeshes(ICoreClientAPI capi, string species, params Candidate[] candidates)
+        {
+            this.capi = capi; this.species = species; this.candidates = candidates;
+        }
 
         public Size2i AtlasSize => capi.EntityTextureAtlas.Size;
 
@@ -34,30 +46,34 @@ namespace Flocks
         }
 
         private AssetLocation shapeLoc;
+        private Shape shape;
+        private readonly Dictionary<string, ShapeElement> byName = new();
+        private readonly Dictionary<string, Rot> baseRot = new();
         public string Loaded { get; private set; }
+        /// <summary>Largest width of any baked pose (wingspan, or body length if larger), in blocks before BirdScale.</summary>
+        public float Span { get; private set; }
 
-        private static readonly (string name, string shape, string flap, string soar, string texOverride)[] Candidates =
+        private struct Rot
         {
-            ("hawk", "shapes/entity/animal/bird/raptor/hawk/hawk.json", "fly-flap", "fly-soar", null),
-            // the sparrow shape points at bird/sparrow/..., but the file ships in bird/passerine/
-            ("treesparrow", "shapes/entity/animal/bird/passerine/treesparrow-adult-male.json", "flap", "soar", "entity/animal/bird/passerine/treesparrow-adult-male"),
-            ("chicken", "shapes/entity/animal/bird/chicken/chicken-hen.json", "fly", "fly", null),
-        };
+            public double X, Y, Z;
+            public Rot(double x, double y, double z) { X = x; Y = y; Z = z; }
+        }
 
         public void Load()
         {
             if (Ok) return;
-            foreach (var c in Candidates)
+            foreach (var c in candidates)
             {
-                try { if (TryLoad(c.name, c.shape, c.flap, c.soar, c.texOverride)) return; }
-                catch (Exception ex) { capi.Logger.Error("[Flocks] {0} mesh bake threw: {1}", c.name, ex); Dispose(); Flap = null; Soar = null; }
+                try { if (TryLoad(c.Name, c.Shape, c.Flap, c.Soar, c.TexOverride)) return; }
+                catch (Exception ex) { capi.Logger.Error("[Flocks] {0} mesh bake threw: {1}", c.Name, ex); Dispose(); Flap = null; Soar = null; Blend = null; }
             }
-            capi.Logger.Error("[Flocks] no bird shape could be loaded (tried hawk, treesparrow, chicken); /flocks send disabled");
+            capi.Logger.Error("[Flocks] no shape could be loaded for {0} (tried {1}); that species is disabled",
+                species, string.Join(", ", Array.ConvertAll(candidates, c => c.Name)));
         }
 
-        private bool TryLoad(string name, string path, string flapCode, string soarCode, string texOverride)
+        private bool TryLoad(string name, AssetLocation path, string flapCode, string soarCode, string texOverride)
         {
-            shapeLoc = new AssetLocation("game", path);
+            shapeLoc = path;
             Shape baseShape = Shape.TryGet(capi, shapeLoc);
             if (baseShape == null) { capi.Logger.Warning("[Flocks] {0}: shape not found at {1}", name, shapeLoc); return false; }
             textures.Clear();
@@ -70,17 +86,24 @@ namespace Flocks
                 if (!capi.Assets.Exists(TexFile(loc))) { capi.Logger.Warning("[Flocks] {0}: texture '{1}' missing at {2}", name, kv.Key, TexFile(loc)); return false; }
                 textures[kv.Key] = loc;
             }
+            // one shape object for every pose: each bake sets absolute rotations (base + animation), so nothing accumulates
+            shape = baseShape;
+            byName.Clear(); baseRot.Clear(); Span = 0;
+            Index(shape.Elements, byName);
+            foreach (var kv in byName) baseRot[kv.Key] = new Rot(kv.Value.RotationX, kv.Value.RotationY, kv.Value.RotationZ);
             Animation flap = Find(baseShape, flapCode);
             Animation soar = Find(baseShape, soarCode);
-            Flap = new MultiTextureMeshRef[FlapFrames];
-            for (int i = 0; i < FlapFrames; i++)
-                Flap[i] = Bake(flap, flap == null ? 0 : i * flap.QuantityFrames / (float)FlapFrames);
-            Soar = Bake(soar, 0);
+            Flap = BakeCycle(flap, FlapFrames);
+            Soar = BakeCycle(soar, SoarFrames);
+            var from = Pose(flap, 0); var to = Pose(soar, 0);
+            Blend = new MultiTextureMeshRef[BlendFrames];
+            for (int i = 0; i < BlendFrames; i++) Blend[i] = Bake(Mix(from, to, i / (float)(BlendFrames - 1)));
             Loaded = name;
-            capi.Logger.Notification("[Flocks] baked {0} meshes from {1}: {2} flap frames, flap anim {3}, soar anim {4}, textures {5}",
-                name, shapeLoc, FlapFrames, flap != null, soar != null, string.Join(",", textures.Values));
+            capi.Logger.Notification("[Flocks] baked {0} meshes from {1}: {2} flap, {3} soar, {4} blend frames, flap anim {5}, soar anim {6}, textures {7}",
+                name, shapeLoc, FlapFrames, SoarFrames, BlendFrames, flap != null, soar != null, string.Join(",", textures.Values));
             return true;
         }
+
         private static AssetLocation TexFile(AssetLocation loc) => loc.Clone().WithPathPrefixOnce("textures/").WithPathAppendixOnce(".png");
 
         private static Animation Find(Shape s, string code)
@@ -90,23 +113,56 @@ namespace Flocks
             return null;
         }
 
-        private MultiTextureMeshRef Bake(Animation anim, float frame)
+        private MultiTextureMeshRef[] BakeCycle(Animation anim, int frames)
         {
-            Shape shape = Shape.TryGet(capi, shapeLoc); // fresh copy per pose
-            if (anim?.KeyFrames != null && anim.KeyFrames.Length > 0)
+            var meshes = new MultiTextureMeshRef[frames];
+            int n = anim != null && anim.QuantityFrames > 0 ? anim.QuantityFrames : 30;
+            for (int i = 0; i < frames; i++) meshes[i] = Bake(Pose(anim, i * n / (float)frames));
+            return meshes;
+        }
+
+        /// <summary>Animation rotation per element at a (fractional) frame; elements the animation never touches are left out.</summary>
+        private Dictionary<string, Rot> Pose(Animation anim, float frame)
+        {
+            var pose = new Dictionary<string, Rot>();
+            if (anim?.KeyFrames == null || anim.KeyFrames.Length == 0) return pose;
+            foreach (var name in byName.Keys)
+                if (Sample(anim, name, frame, out var r)) pose[name] = r;
+            return pose;
+        }
+
+        private static Dictionary<string, Rot> Mix(Dictionary<string, Rot> a, Dictionary<string, Rot> b, float w)
+        {
+            var pose = new Dictionary<string, Rot>();
+            var names = new HashSet<string>(a.Keys); names.UnionWith(b.Keys);
+            foreach (var k in names)
             {
-                var byName = new Dictionary<string, ShapeElement>();
-                Index(shape.Elements, byName);
-                foreach (var name in byName.Keys)
-                {
-                    if (!Sample(anim, name, frame, out double rx, out double ry, out double rz)) continue;
-                    var el = byName[name];
-                    el.RotationX += rx; el.RotationY += ry; el.RotationZ += rz;
-                }
+                a.TryGetValue(k, out var p); b.TryGetValue(k, out var q);
+                pose[k] = new Rot(p.X + (q.X - p.X) * w, p.Y + (q.Y - p.Y) * w, p.Z + (q.Z - p.Z) * w);
             }
-            capi.Tesselator.TesselateShape("flocks-hawk", shape, out MeshData mesh, this);
+            return pose;
+        }
+
+        private MultiTextureMeshRef Bake(Dictionary<string, Rot> pose)
+        {
+            foreach (var kv in byName)
+            {
+                var r = baseRot[kv.Key];
+                if (pose.TryGetValue(kv.Key, out var d)) r = new Rot(r.X + d.X, r.Y + d.Y, r.Z + d.Z);
+                kv.Value.RotationX = r.X; kv.Value.RotationY = r.Y; kv.Value.RotationZ = r.Z;
+            }
+            capi.Tesselator.TesselateShape("flocks-" + species, shape, out MeshData mesh, this);
             mesh.Translate(-0.5f, 0, -0.5f);
+            Span = Math.Max(Span, Extent(mesh, 0)); Span = Math.Max(Span, Extent(mesh, 2));
             return capi.Render.UploadMultiTextureMesh(mesh);
+        }
+
+        /// <summary>Size of the mesh along one axis (0 = x, 2 = z), in blocks.</summary>
+        private static float Extent(MeshData mesh, int axis)
+        {
+            float min = float.MaxValue, max = float.MinValue;
+            for (int i = axis; i < mesh.XyzCount; i += 3) { min = Math.Min(min, mesh.xyz[i]); max = Math.Max(max, mesh.xyz[i]); }
+            return max > min ? max - min : 0;
         }
 
         private static void Index(ShapeElement[] els, Dictionary<string, ShapeElement> d)
@@ -115,38 +171,40 @@ namespace Flocks
             foreach (var e in els) { if (e.Name != null) d[e.Name] = e; Index(e.Children, d); }
         }
 
-        /// <summary>Linear interpolation of rotation between the keyframes that mention this element (wrapping).</summary>
-        private static bool Sample(Animation anim, string name, float frame, out double rx, out double ry, out double rz)
+        /// <summary>Cyclic Catmull-Rom through the keyframes that mention this element, so motion eases through each key.</summary>
+        private static bool Sample(Animation anim, string name, float frame, out Rot r)
         {
-            rx = ry = rz = 0;
+            r = default;
             var keys = new List<(float f, AnimationKeyFrameElement e)>();
             foreach (var kf in anim.KeyFrames)
                 if (kf.Elements != null && kf.Elements.TryGetValue(name, out var e) && e != null && (e.RotationX != null || e.RotationY != null || e.RotationZ != null))
                     keys.Add((kf.Frame, e));
             if (keys.Count == 0) return false;
+            keys.Sort((p, q) => p.f.CompareTo(q.f));
             int n = anim.QuantityFrames > 0 ? anim.QuantityFrames : 30;
-            var a = keys[keys.Count - 1]; var b = keys[0];
-            for (int i = 0; i < keys.Count; i++)
-            {
-                if (keys[i].f <= frame) a = keys[i];
-                if (keys[i].f > frame) { b = keys[i]; break; }
-                if (i == keys.Count - 1) b = keys[0];
-            }
-            float span = b.f - a.f; if (span <= 0) span += n;
-            float t = frame - a.f; if (t < 0) t += n;
-            float w = span <= 0 ? 0 : GameMath.Clamp(t / span, 0, 1);
-            rx = Lerp(a.e.RotationX, b.e.RotationX, w); ry = Lerp(a.e.RotationY, b.e.RotationY, w); rz = Lerp(a.e.RotationZ, b.e.RotationZ, w);
+            int c = keys.Count;
+            // segment i runs from keys[i] to keys[i+1] (wrapping); frames before the first key belong to the last segment
+            int i = c - 1;
+            for (int k = 0; k < c; k++) if (keys[k].f <= frame) i = k;
+            var k0 = keys[(i - 1 + c) % c].e; var k1 = keys[i].e; var k2 = keys[(i + 1) % c].e; var k3 = keys[(i + 2) % c].e;
+            float span = keys[(i + 1) % c].f - keys[i].f; if (span <= 0) span += n;
+            float t = frame - keys[i].f; if (t < 0) t += n;
+            float w = GameMath.Clamp(t / span, 0, 1);
+            r = new Rot(Spline(k0.RotationX, k1.RotationX, k2.RotationX, k3.RotationX, w),
+                        Spline(k0.RotationY, k1.RotationY, k2.RotationY, k3.RotationY, w),
+                        Spline(k0.RotationZ, k1.RotationZ, k2.RotationZ, k3.RotationZ, w));
             return true;
         }
 
-        private static double Lerp(double? a, double? b, float w) => (a ?? 0) + ((b ?? 0) - (a ?? 0)) * w;
+        private static double Spline(double? a, double? b, double? c, double? d, float t)
+        {
+            double p0 = a ?? 0, p1 = b ?? 0, p2 = c ?? 0, p3 = d ?? 0;
+            return 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (3 * p1 - p0 - 3 * p2 + p3) * t * t * t);
+        }
 
         public void Dispose()
         {
-            if (Flap != null) foreach (var m in Flap) m?.Dispose();
-            Soar?.Dispose();
+            foreach (var set in new[] { Flap, Soar, Blend }) if (set != null) foreach (var m in set) m?.Dispose();
         }
     }
 }
-
-

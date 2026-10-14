@@ -2,3 +2,5 @@
 obj/
 dist/
 
+tools/greylag_preview.png
+__pycache__/
