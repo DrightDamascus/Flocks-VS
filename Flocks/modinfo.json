@@ -1,0 +1,12 @@
+﻿{
+  "type": "code",
+  "modid": "flocks",
+  "name": "Flocks",
+  "version": "0.1.0",
+  "authors": ["Dright"],
+  "description": "Client-side migrating bird flocks that signal the changing seasons.",
+  "side": "Universal",
+  "requiredOnClient": true,
+  "requiredOnServer": false,
+  "dependencies": { "game": "1.22.7" }
+}
