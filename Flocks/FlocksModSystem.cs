@@ -10,6 +10,8 @@ namespace Flocks
     {
         private ICoreClientAPI capi;
         private int lastDay = int.MinValue;
+        private BirdMeshes meshes;
+        private FlockRenderer renderer;
 
         public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Client;
 
@@ -17,6 +19,23 @@ namespace Flocks
         {
             capi = api;
             api.Event.RegisterGameTickListener(OnTick, 5000);
+            meshes = new BirdMeshes(api);
+            renderer = new FlockRenderer(api, meshes);
+            api.Event.LevelFinalize += () => { meshes.Load(); api.Event.RegisterRenderer(renderer, EnumRenderStage.Opaque, "flocks"); };
+            var p = api.ChatCommands.Parsers;
+            api.ChatCommands.Create("flocks").WithDescription("Flocks (client-only birds)")
+                .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [species]")
+                .WithArgs(p.OptionalInt("count", 12), p.OptionalWord("species"))
+                .HandleWith(args =>
+                {
+                    int n = GameMath.Clamp((int)args[0], 1, 60);
+                    string sp = (args[1] as string) ?? "hawk";
+                    if (sp != "hawk") return TextCommandResult.Error("Only 'hawk' exists so far.");
+                    if (!meshes.Ok) return TextCommandResult.Error("Hawk meshes failed to load; see client-main.log.");
+                    renderer.Send(n);
+                    return TextCommandResult.Success($"Sent {n} hawks overhead ({renderer.Count} flock(s) in the sky).");
+                })
+                .EndSubCommand();
             api.Logger.Notification("[Flocks] client loaded");
         }
 
@@ -52,5 +71,7 @@ namespace Flocks
             bool headNorth = poleward == north;
             return (headNorth ? "north" : "south") + (spring ? " (spring, poleward)" : " (autumn, equatorward)");
         }
+        public override void Dispose() { meshes?.Dispose(); }
     }
 }
+
