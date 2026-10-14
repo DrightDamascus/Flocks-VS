@@ -1,5 +1,10 @@
 ﻿# Changelog
 
+## 0.2.3
+- Fix: `/flocks send` threw NullReferenceException on the server (server-main.log 23:07:41, FlocksModSystem.cs:54).
+  A 0.2.1 edit put the client spawn code into the server command handler, so the server touched client-only meshes.
+  The server handler now only relays a packet to the caller's client; `.flocks send` runs the spawn locally.
+
 ## 0.2.2
 - Robust bird mesh loading: tries hawk, then tree sparrow (its shape points at bird/sparrow/ but the texture ships
   in bird/passerine/, so that path is overridden), then chicken hen. Checks every texture exists before baking,
@@ -23,5 +28,6 @@
 
 ## 0.1.0
 - Skeleton: client logs season, latitude and migration direction once per in-game day. DESIGN.md.
+
 
 

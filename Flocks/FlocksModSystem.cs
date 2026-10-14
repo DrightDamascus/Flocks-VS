@@ -39,8 +39,9 @@ namespace Flocks
                 .WithArgs(p.OptionalInt("count", 12), p.OptionalWord("species"))
                 .HandleWith(args =>
                 {
-                    string msg = TrySend((int)args[0], args[1] as string, out bool ok);
-                    return ok ? TextCommandResult.Success(msg) : TextCommandResult.Error(msg);
+                    // Server side only relays: the client owns meshes and renderer.
+                    ch.SendPacket(new SendFlockPacket { Count = (int)args[0], Species = args[1] as string }, (IServerPlayer)args.Caller.Player);
+                    return TextCommandResult.Success();
                 })
                 .EndSubCommand();
         }
@@ -51,6 +52,7 @@ namespace Flocks
             string sp = species ?? "hawk";
             ok = false;
             if (sp != "hawk") return "Only 'hawk' exists so far.";
+            if (meshes == null || renderer == null) return "Flocks client part not running.";
             if (!meshes.Ok) return "No bird meshes loaded; see [Flocks] lines in client-main.log.";
             renderer.Send(n); ok = true;
             return $"Sent {n} birds ({meshes.Loaded}) overhead ({renderer.Count} flock(s) in the sky).";
@@ -78,12 +80,8 @@ namespace Flocks
                 .WithArgs(p.OptionalInt("count", 12), p.OptionalWord("species"))
                 .HandleWith(args =>
                 {
-                    int n = GameMath.Clamp((int)args[0], 1, 60);
-                    string sp = (args[1] as string) ?? "hawk";
-                    if (sp != "hawk") return TextCommandResult.Error("Only 'hawk' exists so far.");
-                    if (!meshes.Ok) return TextCommandResult.Error("No bird meshes loaded; see [Flocks] lines in client-main.log.");
-                    renderer.Send(n);
-                    return TextCommandResult.Success($"Sent {n} hawks overhead ({renderer.Count} flock(s) in the sky).");
+                    string msg = TrySend((int)args[0], args[1] as string, out bool ok);
+                    return ok ? TextCommandResult.Success(msg) : TextCommandResult.Error(msg);
                 })
                 .EndSubCommand();
             api.Logger.Notification("[Flocks] client loaded");
@@ -124,6 +122,7 @@ namespace Flocks
         public override void Dispose() { meshes?.Dispose(); }
     }
 }
+
 
 
 
