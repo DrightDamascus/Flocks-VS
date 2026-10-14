@@ -353,6 +353,21 @@ def key(frame, arm, hand, extra=None):
     return {"frame": frame, "elements": els}
 
 
+# ---------------------------------------------------------------- ground poses (0.5.1; not used by the mod yet)
+# Wings fold by rotating the existing planes: the arm swings back along the body (rotationY) and droops a little
+# onto the flank (rotationX); the hand folds back over the arm. No new elements, so the flight shape is unchanged.
+FOLDED = {"ArmL": {"rotationX": -10, "rotationY": 95}, "ArmR": {"rotationX": 10, "rotationY": -95},
+          "WingL": {"rotationY": 170}, "WingR": {"rotationY": -170}}
+
+
+def ground_key(frame, **parts):
+    """A ground pose keyframe: folded wings plus the given element rotations, e.g. Neck=(0, 0, -75)."""
+    els = {k: dict(v) for k, v in FOLDED.items()}
+    for name, (rx, ry, rz) in parts.items():
+        els[name] = {"rotationX": rx, "rotationY": ry, "rotationZ": rz}
+    return {"frame": frame, "elements": els}
+
+
 def animations():
     # Cranes beat slower and deeper than geese (Species.FlapSeconds sets the speed): a long, deep downstroke with the
     # hand lagging the arm, and a quick, high upstroke. Neck and legs ride steady; the body bobs a touch.
@@ -366,6 +381,20 @@ def animations():
     return [
         {"name": "fly-flap", "code": "fly-flap", "quantityframes": 30, "onAnimationEnd": "Repeat", "keyframes": flap},
         {"name": "fly-soar", "code": "fly-soar", "quantityframes": 30, "onAnimationEnd": "Repeat", "keyframes": soar},
+    ] + ground_animations()
+
+
+def ground_animations():
+    """Standing: wings folded, neck up in a shallow S (neck tipped up, head back level), legs straight down with the
+    toes forward. Walking: legs swing alternately about the hip, with a small head bob in step."""
+    def stand(frame, leg_l=0.0, leg_r=0.0, neck=0.0, body=0.0):
+        return ground_key(frame, Neck=(0, 0, -72 + neck), Head=(0, 0, 58 - neck), Body=(0, 0, body),
+                          LegL=(0, 0, -88 + leg_l), LegR=(0, 0, -88 + leg_r), FootL=(0, 0, -90), FootR=(0, 0, -90))
+    idle = [stand(0), stand(20, neck=2)]
+    walk = [stand(0, 18, -18, 0, 1), stand(8, 0, 0, 4, 0), stand(15, -18, 18, 0, 1), stand(23, 0, 0, 4, 0)]
+    return [
+        {"name": "idle-stand", "code": "idle-stand", "quantityframes": 40, "onAnimationEnd": "Repeat", "keyframes": idle},
+        {"name": "walk", "code": "walk", "quantityframes": 30, "onAnimationEnd": "Repeat", "keyframes": walk},
     ]
 
 

@@ -269,7 +269,13 @@ def shape():
     tail = El("Tail", [12.5, 5.2, 6.0], [16.5, 5.2, 10.0], m_tail, faces=("up",), origin=[12.5, 5.2, 8], rot=(0, 0, 4))
     feet_l = El("FootL", [13.0, 3.6, 8.3], [14.8, 4.1, 9.1], m_feet)
     feet_r = El("FootR", [13.0, 3.6, 6.9], [14.8, 4.1, 7.7], m_feet)
-    body.add(breast, rump, neck.add(head.add(bill)), tail, feet_l, feet_r, wing("L"), wing("R"))
+    # Legs for the ground poses (0.5.1). In flight they lie tucked along the belly, hidden under the body and rump.
+    # They borrow the feet's UVs (uv_from), so the texture layout and any hand edits stay exactly as they were;
+    # the feet hang off them so they swing down with the legs when standing.
+    leg_l = El("LegL", [10.5, 3.6, 8.45], [13.0, 4.1, 8.95], m_feet, origin=[10.5, 3.85, 8.7], uv_from=feet_l)
+    leg_r = El("LegR", [10.5, 3.6, 7.05], [13.0, 4.1, 7.55], m_feet, origin=[10.5, 3.85, 7.3], uv_from=feet_r)
+    leg_l.add(feet_l); leg_r.add(feet_r)
+    body.add(breast, rump, neck.add(head.add(bill)), tail, leg_l, leg_r, wing("L"), wing("R"))
     return body
 
 
@@ -339,6 +345,21 @@ def key(frame, arm, hand, extra=None):
     return {"frame": frame, "elements": els}
 
 
+# ---------------------------------------------------------------- ground poses (0.5.1; not used by the mod yet)
+# Wings fold by rotating the existing planes: the arm swings back along the body (rotationY) and droops a little
+# onto the flank (rotationX); the hand folds back over the arm. No new elements, so the flight shape is unchanged.
+FOLDED = {"ArmL": {"rotationX": -10, "rotationY": 95}, "ArmR": {"rotationX": 10, "rotationY": -95},
+          "WingL": {"rotationY": 170}, "WingR": {"rotationY": -170}}
+
+
+def ground_key(frame, **parts):
+    """A ground pose keyframe: folded wings plus the given element rotations, e.g. Neck=(0, 0, -75)."""
+    els = {k: dict(v) for k, v in FOLDED.items()}
+    for name, (rx, ry, rz) in parts.items():
+        els[name] = {"rotationX": rx, "rotationY": ry, "rotationZ": rz}
+    return {"frame": frame, "elements": els}
+
+
 def animations():
     # The hand lags the arm: it trails low on the upstroke and high on the downstroke, so the beat reads as a whip.
     flap = [
@@ -351,6 +372,20 @@ def animations():
     return [
         {"name": "fly-flap", "code": "fly-flap", "quantityframes": 30, "onAnimationEnd": "Repeat", "keyframes": flap},
         {"name": "fly-soar", "code": "fly-soar", "quantityframes": 30, "onAnimationEnd": "Repeat", "keyframes": soar},
+    ] + ground_animations()
+
+
+def ground_animations():
+    """Swimming: wings folded, neck upright, legs left tucked so the feet stay under the waterline; a slow bob.
+    Standing: the same upper body with the legs swung straight down and the feet forward."""
+    def swim(frame, bob=0.0):
+        return ground_key(frame, Neck=(0, 0, -70 + bob), Head=(0, 0, 68 - bob), Body=(0, 0, bob * 0.5))
+    def stand(frame, neck=0.0):
+        return ground_key(frame, Neck=(0, 0, -80 + neck), Head=(0, 0, 75 - neck),
+                          LegL=(0, 0, -90), LegR=(0, 0, -90), FootL=(0, 0, -90), FootR=(0, 0, -90))
+    return [
+        {"name": "swim", "code": "swim", "quantityframes": 40, "onAnimationEnd": "Repeat", "keyframes": [swim(0), swim(20, 3)]},
+        {"name": "idle-stand", "code": "idle-stand", "quantityframes": 40, "onAnimationEnd": "Repeat", "keyframes": [stand(0), stand(20, 2)]},
     ]
 
 
@@ -374,7 +409,8 @@ def main():
         json.dump(data, f, indent=1)
 
     img = paint(root, height)
-    layout = hashlib.md5(json.dumps({e.name: e.uv for e in root.walk()}, sort_keys=True).encode()).hexdigest()
+    # LegL/LegR (0.5.1) borrow the feet's UVs; leaving them out keeps the stamp equal to the painted texture's layout
+    layout = hashlib.md5(json.dumps({e.name: e.uv for e in root.walk() if e.name not in ("LegL", "LegR")}, sort_keys=True).encode()).hexdigest()
     stamp = os.path.join(HERE, "greylag_uv_layout.txt")
     old = open(stamp).read().strip() if os.path.exists(stamp) else None
     if repaint or not os.path.exists(tex_path):

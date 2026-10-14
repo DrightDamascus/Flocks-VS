@@ -4,7 +4,8 @@
 
 Builds the model straight from make_greylag.py (geometry, UV layout, animations) and reads the texture PNG, so
 hand-painted texture edits show up. Small orthographic software renderer: z-buffer, alpha cut-out, double-sided
-faces, simple face shading. Rows: flap frames 0/8/16/24 and the glide; columns: below, 3/4 below, side, above.
+faces, simple face shading.
+Also renders the ground poses (not used in game yet) on a ground or water plane: 3/4 and side views. Rows: flap frames 0/8/16/24 and the glide; columns: below, 3/4 below, side, above.
 """
 import math, os, sys
 import numpy as np
@@ -101,7 +102,39 @@ def render(qs, tex, view):
     return Image.fromarray(img.clip(0, 255).astype(np.uint8))
 
 
+def with_plane(qs, tex, y, colour, half=40.0, centre=(6.0, 8.0)):
+    """Adds a flat ground or water plane at height y, coloured from a strip appended to the texture."""
+    th, tw = tex.shape[:2]
+    strip = np.zeros((2, tw, 4)); strip[..., :3] = colour; strip[..., 3] = 255
+    tex = np.concatenate([tex, strip])
+    cx, cz = centre
+    corners = np.array([[cx - half, y, cz - half], [cx + half, y, cz - half], [cx + half, y, cz + half], [cx - half, y, cz + half]])
+    uvs = np.array([[0, th], [tw - 1, th], [tw - 1, th + 1], [0, th + 1]], float)
+    return qs + [(corners, uvs, "up")], tex
+
+
+def lowest(qs):
+    return min(c[:, 1].min() for c, _, _ in qs)
+
+
+def ground_sheet(root, tex, rows, out, plane):
+    """rows: (label, anim, frame); plane: (colour, y or None for 'just under the feet'). Columns: 3/4 and side."""
+    views = [("3/4", (35, 22)), ("side", (0, 4))]
+    sheet = Image.new("RGB", (CELL * len(views), CELL * len(rows)), SKY)
+    dr = ImageDraw.Draw(sheet)
+    for ri, (label, anim, fr) in enumerate(rows):
+        qs = quads(root, pose(anim, fr))
+        colour, y = plane
+        qs2, tex2 = with_plane(qs, tex, lowest(qs) + 0.05 if y is None else y, colour)
+        for ci, (vlabel, view) in enumerate(views):
+            sheet.paste(render(qs2, tex2, view), (ci * CELL, ri * CELL))
+            dr.text((ci * CELL + 4, ri * CELL + 4), f"{label} - {vlabel}", fill=(20, 20, 40))
+    sheet.save(out)
+    print("wrote", out)
+
+
 def main():
+    global CELL
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "greylag_preview.png")
     root = mg.shape(); mg.pack(root)
     tex = np.array(Image.open(os.path.join(mg.ROOT, "textures", "entity", "bird", mg.TEX + ".png")).convert("RGBA"), float)
@@ -118,6 +151,12 @@ def main():
             dr.text((ci * CELL + 4, ri * CELL + 4), f"{label} - {vlabel}", fill=(20, 20, 40))
     sheet.save(out)
     print("wrote", out)
+
+    CELL = 360
+    here = os.path.dirname(os.path.abspath(out))
+    # water at 4.0: the body sits low and the tucked feet stay under the surface
+    ground_sheet(root, tex, [("swim", anims["swim"], 0), ("swim 20", anims["swim"], 20)], os.path.join(here, "greylag_float_preview.png"), ((70, 110, 170), 4.0))
+    ground_sheet(root, tex, [("stand", anims["idle-stand"], 0)], os.path.join(here, "greylag_stand_preview.png"), ((96, 140, 64), None))
 
 
 if __name__ == "__main__":
