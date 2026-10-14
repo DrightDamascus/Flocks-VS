@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.2
+- /flocks land no longer puts geese right next to the player. It used the water nearest the player (from 6 blocks
+  out), well inside the goose's fleeRange (14) and often its takeoffRange (7), so the group paddled off or took off
+  at once. It now lands a compact group on the nearest water at least 20 blocks away (Landing.Clear), skipping
+  ponds that have no such water, and searches up to 2000 columns per lake (was 600).
+
 ## 0.8.1
 - Fixed a client crash ("Nullable object must have a value" in Animation.lerpKeyFrameElement) the first time a
   landed goose was animated. The game reads all three axes of any offset, rotation or stretch a keyframe element

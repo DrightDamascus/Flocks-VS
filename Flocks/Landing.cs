@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
@@ -10,7 +11,10 @@ namespace Flocks
     /// <summary>/flocks land: finds open fresh water near the player and spawns a group of greylag geese on it.</summary>
     public static class Landing
     {
-        public const int Radius = 64, MinPatch = 36, MaxFill = 600;
+        public const int Radius = 64, MinPatch = 36, MaxFill = 2000;
+        /// <summary>Geese land at least this far from the player: past the goose's fleeRange (14 in entities/greylag.json),
+        /// otherwise the group paddles off or takes off on the first tick.</summary>
+        public const double Clear = 20;
 
         public static TextCommandResult Land(ICoreServerAPI sapi, Entity caller, int count)
         {
@@ -20,13 +24,18 @@ namespace Flocks
             var rand = sapi.World.Rand;
             int n = count > 0 ? GameMath.Clamp(count, 1, 30) : 5 + rand.Next(8);
             var patch = FindPatch(sapi.World.BlockAccessor, caller.Pos.AsBlockPos);
-            if (patch == null) return TextCommandResult.Error($"No open water of at least {MinPatch} surface blocks within {Radius} blocks.");
+            if (patch == null) return TextCommandResult.Error($"No open water with {MinPatch}+ surface blocks at least {Clear:0} blocks from you (the geese would flee at once) within {Radius} blocks.");
 
-            // spread over the patch, preferring the first-filled (central) columns
+            // a compact group on the nearest water past Clear: the columns closest to the first such column
+            double px = caller.Pos.X, pz = caller.Pos.Z;
+            double Dist(BlockPos c) => Math.Sqrt((c.X + 0.5 - px) * (c.X + 0.5 - px) + (c.Z + 0.5 - pz) * (c.Z + 0.5 - pz));
+            var spots = patch.Where(c => Dist(c) >= Clear).ToList();
+            var anchor = spots.OrderBy(Dist).First();
+            spots = spots.OrderBy(c => (c.X - anchor.X) * (c.X - anchor.X) + (c.Z - anchor.Z) * (c.Z - anchor.Z)).Take(Math.Max(MinPatch, n * 4)).ToList();
             int spawned = 0;
             for (int i = 0; i < n; i++)
             {
-                var c = patch[rand.Next(Math.Min(patch.Count, Math.Max(MinPatch, n * 4)))];
+                var c = spots[rand.Next(spots.Count)];
                 var e = sapi.World.ClassRegistry.CreateEntity(type);
                 e.WatchedAttributes.SetBool(EntityBehaviorWaterfowl.TestKey, true); // test geese leave after lifeHours
                 e.Pos.SetPos(c.X + 0.2 + rand.NextDouble() * 0.6, c.Y + 0.75, c.Z + 0.2 + rand.NextDouble() * 0.6);
@@ -34,12 +43,11 @@ namespace Flocks
                 sapi.World.SpawnEntity(e);
                 spawned++;
             }
-            var a = patch[0];
-            double dist = Math.Sqrt(Math.Pow(a.X - caller.Pos.X, 2) + Math.Pow(a.Z - caller.Pos.Z, 2));
-            return TextCommandResult.Success($"Landed {spawned} greylag geese on water at {a.X}, {a.Y}, {a.Z} (~{dist:0} blocks away, patch of {patch.Count}+ blocks).");
+            return TextCommandResult.Success($"Landed {spawned} greylag geese on water at {anchor.X}, {anchor.Y}, {anchor.Z} (~{Dist(anchor):0} blocks away, patch of {patch.Count}+ blocks).");
         }
 
-        /// <summary>Nearest fresh-water surface patch (rain-map top is still water) of at least MinPatch columns.</summary>
+        /// <summary>Nearest fresh-water surface patch (rain-map top is still water) with at least MinPatch columns
+        /// Clear or more blocks from <paramref name="center"/>.</summary>
         private static List<BlockPos> FindPatch(IBlockAccessor ba, BlockPos center)
         {
             var seen = new HashSet<long>();
@@ -67,7 +75,7 @@ namespace Flocks
                         if (Surface(ba, nx, nz, out int ny) && ny == y) { seen.Add(Key(nx, nz)); queue.Enqueue((nx, nz)); }
                     }
                 }
-                if (patch.Count >= MinPatch) return patch;
+                if (patch.Count(c => Math.Sqrt((c.X - center.X) * (c.X - center.X) + (c.Z - center.Z) * (c.Z - center.Z)) >= Clear) >= MinPatch) return patch;
             }
             return null;
         }
