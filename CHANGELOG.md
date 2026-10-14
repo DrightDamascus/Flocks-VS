@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.7.1
+- Resident geese now spawn through vanilla's spawner, like wolves and fish. The 0.7.0 lake manager, the 40-goose
+  server cap, the lake cooldowns and the fly-in arrivals are gone.
+  - entities/greylag.json gets spawnconditions modelled on freshwater fish and wolves:
+    - Both: inside still water at the surface (game:water-still-7, tryOnlySurface), groups of about 6
+      (verynarrowgaussian avg 6 var 3), climate minTemp -8, maxTemp 26, minRain 0.3.
+    - Runtime: group "passive", chance 0.0003, maxQuantity 12 (vanilla's per-player-area limit),
+      MinDistanceToPlayer 32.
+    - Worldgen: TriesPerChunk 0.03.
+  - Vanilla spawnconditions don't know seasons or lake size. A server OnTrySpawnEntity handler vetoes goose
+    spawns when ResidentGeese is off, outside the resident season (spring window to autumn window, all year near
+    the equator), on lakes under MinLakeSize surface blocks, or with MaxGeeseNearby+ geese within NearbyRadius.
+  - Autumn departure unchanged: residents check the season every 30 s and the group takes off toward the equator.
+- Every goose is a resident except `/flocks land` test geese, which are now tagged and still leave after 6 game
+  hours. Geese spawned by 0.7.0 (and untagged 0.6.0 test geese) count as residents.
+- Server config flocks-server.json is now ResidentGeese, MinLakeSize (36), MaxGeeseNearby (30), NearbyRadius (96).
+  Dropped: LakeChance, MinPerLake, MaxPerLake, MaxResidents, RespawnDelayDays, CheckSeconds, ScanRadius,
+  ArriveByAir, MinPlayerDistance. Old keys left in an existing file are ignored.
+- `/flocks residents` now shows spawn checks allowed and vetoed (by reason), loaded geese, and geese and season
+  near each player. The `check` option is gone.
+
 ## 0.7.0
 - Resident geese (server). Real flocks:greylag groups settle on some lakes near players from the start of the goose's
   spring window (seasonRel 0.03) until the start of its autumn window (0.62), with the same latitude shift as the

@@ -42,7 +42,34 @@
 				{ type: "item", code: "game:feather", quantity: { avg: 14, var: 2 } }
 			] },
 			{ code: "floatupwhenstuck", onlyWhenDead: true }
-		]
+		],
+		// Vanilla spawning, modelled on freshwater fish (inside still water at the surface) and wolves (runtime group,
+		// MinDistanceToPlayer, maxQuantity per player area). Season, lake size and crowding are vetoed in Residents.cs.
+		spawnconditions: {
+			worldgen: {
+				TriesPerChunk: { avg: 0.03, var: 0 },
+				tryOnlySurface: true,
+				minLightLevel: 6,
+				groupSize: { dist: "verynarrowgaussian", avg: 6, var: 3 },
+				insideBlockCodes: ["game:water-still-7"],
+				minTemp: -8,
+				maxTemp: 26,
+				minRain: 0.3
+			},
+			runtime: {
+				group: "passive",
+				MinDistanceToPlayer: 32,
+				chance: 0.0003,
+				maxQuantity: 12,
+				tryOnlySurface: true,
+				minLightLevel: 6,
+				groupSize: { dist: "verynarrowgaussian", avg: 6, var: 3 },
+				insideBlockCodes: ["game:water-still-7"],
+				minTemp: -8,
+				maxTemp: 26,
+				minRain: 0.3
+			}
+		}
 	},
 	sounds: {
 		hurt: "game:creature/chicken/hurt",

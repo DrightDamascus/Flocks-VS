@@ -37,11 +37,11 @@ namespace Flocks
         }
 
         /// <summary>/flocks (typed with a slash) goes to the server; it only relays the subcommand to the caller's client.</summary>
-        private ResidentManager residents;
+        private ResidentGeese residents;
 
         public override void StartServerSide(ICoreServerAPI sapi)
         {
-            residents = new ResidentManager(sapi, LoadServerConfig(sapi));
+            residents = new ResidentGeese(sapi, LoadServerConfig(sapi));
             var ch = sapi.Network.GetChannel("flocks");
             var p = sapi.ChatCommands.Parsers;
             sapi.ChatCommands.Create("flocks").WithDescription("Flocks (client-side birds)").RequiresPrivilege(Privilege.chat)
@@ -65,14 +65,9 @@ namespace Flocks
                 .WithArgs(p.OptionalInt("count", 0))
                 .HandleWith(args => Landing.Land(sapi, args.Caller.Entity, (int)args[0]))
                 .EndSubCommand()
-                .BeginSubCommand("residents").WithDescription("Debug: resident geese state (lakes, counts, cooldowns); /flocks residents check runs a check now")
+                .BeginSubCommand("residents").WithDescription("Debug: resident geese state (spawn checks and vetoes, geese near each player, season)")
                 .RequiresPrivilege(Privilege.controlserver)
-                .WithArgs(p.OptionalWord("action"))
-                .HandleWith(args =>
-                {
-                    if ((args[0] as string) == "check") residents.Check();
-                    return TextCommandResult.Success(residents.Report());
-                })
+                .HandleWith(args => TextCommandResult.Success(residents.Report()))
                 .EndSubCommand();
         }
 

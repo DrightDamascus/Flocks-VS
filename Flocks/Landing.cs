@@ -28,6 +28,7 @@ namespace Flocks
             {
                 var c = patch[rand.Next(Math.Min(patch.Count, Math.Max(MinPatch, n * 4)))];
                 var e = sapi.World.ClassRegistry.CreateEntity(type);
+                e.WatchedAttributes.SetBool(EntityBehaviorWaterfowl.TestKey, true); // test geese leave after lifeHours
                 e.Pos.SetPos(c.X + 0.2 + rand.NextDouble() * 0.6, c.Y + 0.75, c.Z + 0.2 + rand.NextDouble() * 0.6);
                 e.Pos.Yaw = (float)(rand.NextDouble() * Math.PI * 2);
                 sapi.World.SpawnEntity(e);
