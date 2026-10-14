@@ -33,54 +33,30 @@
 4. Night migration (many songbirds migrate at night) - show silhouettes against the moon or skip?
 5. Integrate Continental Terrain climate in step 2 or later?
 
-## Landing (design only, not implemented)
+## Landing
 Goal: geese (later cranes) come down on lakes, float, take off and land again, until migration moves them on.
 
-Recommendation: keep landed birds client-only visuals, like the flying flocks.
-- Real server entities would give hunting and one shared truth in multiplayer. But they cost server ticks, network
-  traffic and chunk loading/saving, they need AI, pathing and despawn rules, and they would turn a visual mod into a
-  gameplay one. That is a much bigger change.
-- Client-only keeps it cheap: a flock of 7-25 birds is one renderer entry with baked meshes, and nothing is saved.
-  The cost is that each player sees their own birds, and you can't hunt them. Plans already come from the world seed
-  and day number, so players near each other get the same flocks at the same times. Picking the lake from the seed as
-  well would put them on the same water, but players arriving at different times won't see identical birds. That is
-  fine for ambience.
-- Huntable birds, if wanted later, should be a separate opt-in: an entity spawned only when a player gets close to a
-  landed flock, not a change to the visual system.
+Decision (Dright, 0.6.0): landed birds are real server entities, huntable animals. Flying migration flocks stay
+client-only visuals. So the mod is required on the server as well as on clients.
+- Why: they must be huntable (arrows and other mods' guns), drop items, and be the same for every player.
+- Costs we accept: server ticks and entity sync per bird, chunk saves, and despawn rules. Keep groups small (5-12),
+  give them a lifetime (lifeHours) and make takeoff end in a despawn, so they never pile up.
+- Combat rule: ranged projectiles kill; thrown spears and melee are dodged (damage zeroed in flocks.waterfowl before
+  the health behaviour runs) and the group takes off. Geese are a wild feather source, so the harvest drops plenty.
 
-Picking a lake (client, at descent time, from loaded chunks only):
-- Sample the rain map along the flock's path from ~150 to ~400 blocks ahead and to either side. A column counts as
-  water when its top block is still fresh water (lakes, not ocean). Flood-fill from a hit and accept it at roughly
-  12x12 surface blocks or more. Prefer open water, at least 64 blocks from the player, within ~45 deg of the heading,
-  and seeded per day/flock so it is reproducible. No lake found: the flock just flies on as now.
+Done in 0.6.0 (first step): entity flocks:greylag, behaviour flocks.waterfowl (float, drift, paddle away, takeoff,
+despawn, spear/melee dodge), and `/flocks land` (finds a fresh-water patch near the player, spawns a group).
 
-Descent and landing:
-- Leave cruise height early and glide down at a few blocks per second (soar poses, wide shallow circle over the lake).
-  Do the last ~8 blocks with flaps and the nose up, then a short skid onto the surface while the wings fold
-  (flap -> blend -> swim). The formation loosens into a raft over the last ~20 blocks. Terrain clearance stays on
-  until the final approach.
-
-Floating:
-- Each bird drifts slowly (0.1-0.3 blocks/s) with small random turns, bobbing in the swim pose. A circle around the
-  landing point keeps them on the water and they push away from the shore. Cranes would use idle-stand/walk in
-  shallows or on the shore. No collisions, no pathing: positions only.
-
-Takeoff triggers:
-- Player within ~24 blocks (sooner when sprinting or mounted), a storm at the lake (the same Stormy check), a timer
-  (seeded, ~1-4 game hours afloat), or the flight-hours window ending. Takeoff: run along the surface into the wind
-  with fast flaps, climb out, re-form the V, then either circle to another lake or continue on the migration heading.
-
-Repeat loop and the planner:
-- PlannedFlock gets an optional stop list. Each plan entry still starts as a flying pass, but on a migration day a
-  goose flock may have one or two stops (chance from strength, a flight-hours cap). After each stop the flock
-  continues on its heading. A flock that is still afloat when the hours window ends either stays the night
-  (resumes the next morning if that day still has migration strength) or leaves at dusk.
-- Once a species' window ends (strength 0), resident flocks leave and no new stops are planned. "Migration moves them
-  on" falls out of the existing Strength().
-- The renderer only allows one flock in the sky at a time; a landed flock counts as on the ground, so it does not
-  hold up the next planned flyover.
-
-First step (small, testable): `/flocks land` (debug only). It sends one goose flock that picks the nearest qualifying
-lake in loaded chunks, glides down, floats there with the swim pose (bake the swim cycle like fly-soar), and takes
-off again when the player comes within 24 blocks. No planner changes yet. That proves out the lake check, the pose
-baking and the landing transitions before any scheduling.
+Next steps:
+- Hand-off from the sky: when a planned goose flock passes a suitable lake (fresh water, 36+ surface blocks, 64+
+  blocks from the player, near its heading), the client asks the server to land it. The server checks the lake
+  and spawns the group. The client fades the flying flock out over the lake as the entities appear. The server owns
+  the spawn so every player sees the same birds.
+- Descent: spawn the entities in the air above the lake in fly-flap/soar, glide them down, then switch to swim. Until
+  that exists, they appear on the water.
+- Floating stays as now. Cranes would use idle-stand/walk in shallows or on the shore.
+- Takeoff triggers: player close (7 blocks), any hit, a storm at the lake (the Migration Stormy check), lifetime or
+  the end of flying hours. After takeoff a flock may re-land on another lake (server spawns again) or leave on the
+  migration heading.
+- Planner: PlannedFlock gets optional stops. Strength() drives how many; once a species' window ends, no new stops
+  and resident groups leave. The server should cap total landed geese per area (e.g. 30 within 128 blocks).

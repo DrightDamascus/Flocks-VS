@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.6.0
+- **The mod must now be installed on the server as well as every client** (modinfo side Universal, required on both).
+  Landed geese are real server entities. Flying migration flocks are still client-only visuals.
+- New entity `flocks:greylag` (assets/flocks/entities/greylag.json): a huntable greylag goose using the goose shape
+  and its swim, idle-stand, walk and fly-flap animations. 4 HP. When killed it leaves a carcass to harvest (vanilla
+  harvestable) for 1.5-2.5 raw poultry (game:poultry-raw) and 12-16 feathers (game:feather), so geese are a reliable
+  wild feather source. The carcass decays after 48 h. No breeding, no natural spawning yet.
+- New behaviour `flocks.waterfowl` (Waterfowl.cs, server side):
+  - Floats at the water surface and drifts slowly. It turns away when it bumps the shore.
+  - Paddles away from a player within 14 blocks.
+  - Takes off within 7 blocks, together with the rest of its group: a fly-flap climb away, then it despawns after
+    8 s. Without a player nearby it does the same after 6 game hours on the water.
+  - Damage: arrows and other ranged projectiles (thrown stones, modded shot) hurt it normally. Thrown spears and
+    any melee hit (spear, sword, fist) do no damage; the goose dodges and the group takes off, much as fish slip
+    spears. Being hit by anything scares the rest of the group into the air.
+  - Vanilla's land-creature AI tasks are not used: the pathfinder avoids water and getoutofwater would walk the
+    birds ashore. Movement is set directly and vanilla controlledphysics does the rest.
+- Goose shape gains a walk animation (waddle). Flight poses are unchanged.
+- `/flocks land [count]` (server, controlserver privilege): finds the nearest fresh-water surface patch of at least
+  36 blocks within 64 blocks (6+ blocks away) and spawns 5-12 geese on it (or [count], max 30). Not tied to the
+  migration planner yet.
+- Not yet checked in game; server load smoke-tested only.
+
 ## 0.5.1
 - Ground poses for a later landing feature. They are art only: nothing in the mod plays them yet, and the flying
   birds look and animate exactly as in 0.5.0.

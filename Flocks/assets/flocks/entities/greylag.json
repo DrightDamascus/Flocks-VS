@@ -1,0 +1,51 @@
+{
+	code: "greylag",
+	class: "EntityAgent",
+	tags: ["animal", "huntable", "adult", "habitat-water"],
+	hitboxSize: { x: 0.6, y: 0.5 },
+	deadHitboxSize: { x: 0.6, y: 0.3 },
+	eyeHeight: 0.45,
+	fallDamageMultiplier: 0.5,
+	drops: [],
+	attributes: {
+		handbook: { exclude: true }
+	},
+	client: {
+		renderer: "Shape",
+		shape: { base: "flocks:entity/bird/greylag" },
+		textures: { "greylag": { base: "flocks:entity/bird/greylag" } },
+		size: 0.55,
+		behaviors: [
+			{ code: "repulseagents" },
+			{ code: "controlledphysics", stepHeight: 0.6 },
+			{ code: "floatupwhenstuck", onlyWhenDead: true },
+			{ code: "interpolateposition" },
+			{ code: "harvestable" }
+		],
+		animations: [
+			{ code: "swim", animation: "swim", blendMode: "Average", easeInSpeed: 4, easeOutSpeed: 4, triggeredBy: { defaultAnim: true } },
+			{ code: "idle-stand", animation: "idle-stand", blendMode: "Average", easeInSpeed: 4, easeOutSpeed: 4 },
+			{ code: "walk", animation: "walk", blendMode: "Average", easeInSpeed: 4, easeOutSpeed: 4 },
+			{ code: "fly-flap", animation: "fly-flap", animationSpeed: 1.6, blendMode: "Average", weight: 10, easeInSpeed: 8, easeOutSpeed: 8 }
+		]
+	},
+	server: {
+		behaviors: [
+			{ code: "repulseagents" },
+			{ code: "controlledphysics", stepHeight: 0.6 },
+			// before "health": it zeroes spear and melee damage before health applies it
+			{ code: "flocks.waterfowl", fleeRange: 14, takeoffRange: 7, lifeHours: 6, flySeconds: 8, sink: 0.15 },
+			{ code: "health", currenthealth: 4, maxhealth: 4 },
+			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
+			{ code: "harvestable", drops: [
+				{ type: "item", code: "game:poultry-raw", quantity: { avg: 2, var: 0.5 } },
+				{ type: "item", code: "game:feather", quantity: { avg: 14, var: 2 } }
+			] },
+			{ code: "floatupwhenstuck", onlyWhenDead: true }
+		]
+	},
+	sounds: {
+		hurt: "game:creature/chicken/hurt",
+		death: "game:creature/chicken/hurt"
+	}
+}

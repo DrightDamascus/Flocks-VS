@@ -33,6 +33,7 @@ namespace Flocks
         public override void Start(ICoreAPI api)
         {
             api.Network.RegisterChannel("flocks").RegisterMessageType<SendFlockPacket>();
+            api.RegisterEntityBehaviorClass(EntityBehaviorWaterfowl.Code, typeof(EntityBehaviorWaterfowl));
         }
 
         /// <summary>/flocks (typed with a slash) goes to the server; it only relays the subcommand to the caller's client.</summary>
@@ -55,6 +56,11 @@ namespace Flocks
                     ch.SendPacket(new SendFlockPacket { Command = "schedule" }, (IServerPlayer)args.Caller.Player);
                     return TextCommandResult.Success();
                 })
+                .EndSubCommand()
+                .BeginSubCommand("land").WithDescription("Debug: spawn 5-12 greylag geese on open water near you: /flocks land [count]")
+                .RequiresPrivilege(Privilege.controlserver)
+                .WithArgs(p.OptionalInt("count", 0))
+                .HandleWith(args => Landing.Land(sapi, args.Caller.Entity, (int)args[0]))
                 .EndSubCommand();
         }
 

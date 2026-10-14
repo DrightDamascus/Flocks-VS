@@ -377,15 +377,21 @@ def animations():
 
 def ground_animations():
     """Swimming: wings folded, neck upright, legs left tucked so the feet stay under the waterline; a slow bob.
-    Standing: the same upper body with the legs swung straight down and the feet forward."""
+    Standing: the same upper body with the legs swung straight down and the feet forward. Walking: a waddle."""
     def swim(frame, bob=0.0):
         return ground_key(frame, Neck=(0, 0, -70 + bob), Head=(0, 0, 68 - bob), Body=(0, 0, bob * 0.5))
     def stand(frame, neck=0.0):
         return ground_key(frame, Neck=(0, 0, -80 + neck), Head=(0, 0, 75 - neck),
                           LegL=(0, 0, -90), LegR=(0, 0, -90), FootL=(0, 0, -90), FootR=(0, 0, -90))
+    def walk(frame, leg_l, leg_r, neck):
+        """Waddle: legs swing alternately about the hip, a little head bob in step."""
+        return ground_key(frame, Neck=(0, 0, -80 + neck), Head=(0, 0, 75 - neck), Body=(-neck, 0, 0),
+                          LegL=(0, 0, -90 + leg_l), LegR=(0, 0, -90 + leg_r), FootL=(0, 0, -90), FootR=(0, 0, -90))
     return [
         {"name": "swim", "code": "swim", "quantityframes": 40, "onAnimationEnd": "Repeat", "keyframes": [swim(0), swim(20, 3)]},
         {"name": "idle-stand", "code": "idle-stand", "quantityframes": 40, "onAnimationEnd": "Repeat", "keyframes": [stand(0), stand(20, 2)]},
+        {"name": "walk", "code": "walk", "quantityframes": 30, "onAnimationEnd": "Repeat", "keyframes": [
+            walk(0, 22, -22, 0), walk(8, 0, 0, 3), walk(15, -22, 22, 0), walk(23, 0, 0, 3)]},
     ]
 
 

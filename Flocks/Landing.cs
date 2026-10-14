@@ -1,0 +1,84 @@
+using System;
+using System.Collections.Generic;
+using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
+using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
+
+namespace Flocks
+{
+    /// <summary>/flocks land: finds open fresh water near the player and spawns a group of greylag geese on it.</summary>
+    public static class Landing
+    {
+        public const int Radius = 64, MinPatch = 36, MaxFill = 600;
+
+        public static TextCommandResult Land(ICoreServerAPI sapi, Entity caller, int count)
+        {
+            if (caller == null) return TextCommandResult.Error("Needs a player.");
+            var type = sapi.World.GetEntityType(new AssetLocation("flocks", "greylag"));
+            if (type == null) return TextCommandResult.Error("Entity type flocks:greylag is not loaded; see server-main.log.");
+            var rand = sapi.World.Rand;
+            int n = count > 0 ? GameMath.Clamp(count, 1, 30) : 5 + rand.Next(8);
+            var patch = FindPatch(sapi.World.BlockAccessor, caller.Pos.AsBlockPos);
+            if (patch == null) return TextCommandResult.Error($"No open water of at least {MinPatch} surface blocks within {Radius} blocks.");
+
+            // spread over the patch, preferring the first-filled (central) columns
+            int spawned = 0;
+            for (int i = 0; i < n; i++)
+            {
+                var c = patch[rand.Next(Math.Min(patch.Count, Math.Max(MinPatch, n * 4)))];
+                var e = sapi.World.ClassRegistry.CreateEntity(type);
+                e.Pos.SetPos(c.X + 0.2 + rand.NextDouble() * 0.6, c.Y + 0.75, c.Z + 0.2 + rand.NextDouble() * 0.6);
+                e.Pos.Yaw = (float)(rand.NextDouble() * Math.PI * 2);
+                sapi.World.SpawnEntity(e);
+                spawned++;
+            }
+            var a = patch[0];
+            double dist = Math.Sqrt(Math.Pow(a.X - caller.Pos.X, 2) + Math.Pow(a.Z - caller.Pos.Z, 2));
+            return TextCommandResult.Success($"Landed {spawned} greylag geese on water at {a.X}, {a.Y}, {a.Z} (~{dist:0} blocks away, patch of {patch.Count}+ blocks).");
+        }
+
+        /// <summary>Nearest fresh-water surface patch (rain-map top is still water) of at least MinPatch columns.</summary>
+        private static List<BlockPos> FindPatch(IBlockAccessor ba, BlockPos center)
+        {
+            var seen = new HashSet<long>();
+            var starts = new List<(double d, int x, int z)>();
+            for (int dx = -Radius; dx <= Radius; dx += 3)
+                for (int dz = -Radius; dz <= Radius; dz += 3)
+                {
+                    double d = Math.Sqrt(dx * dx + dz * dz);
+                    if (d <= Radius && d >= 6) starts.Add((d, center.X + dx, center.Z + dz));
+                }
+            starts.Sort((p, q) => p.d.CompareTo(q.d));
+            foreach (var (_, sx, sz) in starts)
+            {
+                if (seen.Contains(Key(sx, sz)) || !Surface(ba, sx, sz, out int y)) continue;
+                var patch = new List<BlockPos>();
+                var queue = new Queue<(int x, int z)>();
+                queue.Enqueue((sx, sz)); seen.Add(Key(sx, sz));
+                while (queue.Count > 0 && patch.Count < MaxFill)
+                {
+                    var (x, z) = queue.Dequeue();
+                    patch.Add(new BlockPos(x, y, z));
+                    foreach (var (nx, nz) in new[] { (x + 1, z), (x - 1, z), (x, z + 1), (x, z - 1) })
+                    {
+                        if (seen.Contains(Key(nx, nz))) continue;
+                        if (Surface(ba, nx, nz, out int ny) && ny == y) { seen.Add(Key(nx, nz)); queue.Enqueue((nx, nz)); }
+                    }
+                }
+                if (patch.Count >= MinPatch) return patch;
+            }
+            return null;
+        }
+
+        private static long Key(int x, int z) => ((long)x << 32) ^ (uint)z;
+
+        private static bool Surface(IBlockAccessor ba, int x, int z, out int y)
+        {
+            y = ba.GetRainMapHeightAt(x, z);
+            if (y <= 0) return false;                 // unloaded
+            var b = ba.GetBlock(new BlockPos(x, y, z), BlockLayersAccess.Fluid);
+            return b != null && b.IsLiquid() && b.LiquidCode == "water";
+        }
+    }
+}
