@@ -85,6 +85,7 @@ namespace Flocks
             double lat = cal.OnGetLatitude(pos.Z);
             foreach (var sp in species.Values)
             {
+                if (!cfg.SpeciesEnabled(sp.Code)) continue;
                 double strength = Strength(sp, rel, lat, out bool spring);
                 if (cfg.ForceMigration) { strength = 1; spring = false; }
                 if (strength <= 0) continue;
@@ -99,7 +100,7 @@ namespace Flocks
                     {
                         Species = sp, Hour = PickHour(sp, rnd), Count = rnd.Next(sp.CountMin, sp.CountMax + 1),
                         Heading = baseHeading + (rnd.NextDouble() * 2 - 1) * 20 * GameMath.DEG2RAD,
-                        Altitude = 60 + rnd.NextDouble() * 60,
+                        Altitude = sp.AltitudeMin + rnd.NextDouble() * (sp.AltitudeMax - sp.AltitudeMin),
                     });
                 }
             }
@@ -188,6 +189,7 @@ namespace Flocks
             foreach (var sp in species.Values)
             {
                 double s = Strength(sp, rel, lat, out bool spring);
+                if (!cfg.SpeciesEnabled(sp.Code)) { sb.Append($"\n{sp.Code}: off in flocks.json"); continue; }
                 sb.Append($"\n{sp.Code}: " + (s > 0 ? $"{(spring ? "spring" : "autumn")} migration, strength {s:0.00}" : "not migrating today"));
             }
             sb.Append("\nToday: " + (plan.Count == 0 ? "no flocks" : Describe().Replace("; ", "\n  ")));

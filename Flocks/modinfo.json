@@ -2,7 +2,7 @@
   "type": "code",
   "modid": "flocks",
   "name": "Flocks",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "authors": ["Dright"],
   "description": "Client-side migrating bird flocks that signal the changing seasons.",
   "side": "Universal",

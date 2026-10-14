@@ -41,7 +41,7 @@ namespace Flocks
             var ch = sapi.Network.GetChannel("flocks");
             var p = sapi.ChatCommands.Parsers;
             sapi.ChatCommands.Create("flocks").WithDescription("Flocks (client-side birds)").RequiresPrivilege(Privilege.chat).RequiresPlayer()
-                .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [goose|hawk]")
+                .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [goose|crane|hawk]")
                 .WithArgs(p.OptionalInt("count", 12), p.OptionalWord("species"))
                 .HandleWith(args =>
                 {
@@ -92,7 +92,7 @@ namespace Flocks
             });
             var p = api.ChatCommands.Parsers;
             api.ChatCommands.Create("flocks").WithDescription("Flocks (client-only birds)")
-                .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [goose|hawk]")
+                .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [goose|crane|hawk]")
                 .WithArgs(p.OptionalInt("count", 12), p.OptionalWord("species"))
                 .HandleWith(args =>
                 {

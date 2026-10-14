@@ -17,8 +17,15 @@ namespace Flocks
         public bool ForceMigration = false;
         /// <summary>Write each day's plan to client-main.log.</summary>
         public bool LogSchedule = true;
+        /// <summary>Species that migrate on their own (false = never scheduled; /flocks send still works).</summary>
+        public bool Geese = true, Cranes = true, Hawks = true;
         /// <summary>Reserved: enables fantasy creatures (the amphithere). Not read anywhere yet; the amphithere ships as
         /// assets only (shapes/entity/amphithere.json) with no entity, spawning or AI.</summary>
         public bool FantasyCreatures = false;
+
+        public bool SpeciesEnabled(string code) => code switch
+        {
+            "goose" => Geese, "crane" => Cranes, "hawk" => Hawks, _ => true,
+        };
     }
 }

@@ -1,0 +1,1361 @@
+{
+ "textureWidth": 32,
+ "textureHeight": 56,
+ "textures": {
+  "crane": "flocks:entity/bird/crane"
+ },
+ "elements": [
+  {
+   "name": "Body",
+   "from": [
+    2.5,
+    2.6,
+    6.0
+   ],
+   "to": [
+    12.0,
+    6.4,
+    10.0
+   ],
+   "rotationOrigin": [
+    7.25,
+    4.5,
+    8.0
+   ],
+   "faces": {
+    "north": {
+     "texture": "#crane",
+     "uv": [
+      10.0,
+      22.5,
+      19.5,
+      26.3
+     ]
+    },
+    "east": {
+     "texture": "#crane",
+     "uv": [
+      10.0,
+      27.0,
+      14.0,
+      30.8
+     ]
+    },
+    "south": {
+     "texture": "#crane",
+     "uv": [
+      20.0,
+      22.5,
+      29.5,
+      26.3
+     ]
+    },
+    "west": {
+     "texture": "#crane",
+     "uv": [
+      14.5,
+      27.0,
+      18.5,
+      30.8
+     ]
+    },
+    "up": {
+     "texture": "#crane",
+     "uv": [
+      0.0,
+      27.0,
+      9.5,
+      31.0
+     ]
+    },
+    "down": {
+     "texture": "#crane",
+     "uv": [
+      0.0,
+      22.5,
+      9.5,
+      26.5
+     ]
+    }
+   },
+   "children": [
+    {
+     "name": "Rump",
+     "from": [
+      9.5,
+      0.8,
+      0.6
+     ],
+     "to": [
+      10.7,
+      3.2,
+      3.4
+     ],
+     "rotationOrigin": [
+      10.1,
+      2.0,
+      2.0
+     ],
+     "faces": {
+      "north": {
+       "texture": "#crane",
+       "uv": [
+        3.5,
+        31.5,
+        4.699999999999999,
+        33.9
+       ]
+      },
+      "east": {
+       "texture": "#crane",
+       "uv": [
+        26.5,
+        27.0,
+        29.3,
+        29.4
+       ]
+      },
+      "south": {
+       "texture": "#crane",
+       "uv": [
+        5.5,
+        31.5,
+        6.699999999999999,
+        33.9
+       ]
+      },
+      "west": {
+       "texture": "#crane",
+       "uv": [
+        0.0,
+        31.5,
+        2.8000000000000007,
+        33.9
+       ]
+      },
+      "up": {
+       "texture": "#crane",
+       "uv": [
+        24.5,
+        27.0,
+        25.7,
+        29.8
+       ]
+      },
+      "down": {
+       "texture": "#crane",
+       "uv": [
+        22.5,
+        27.0,
+        23.7,
+        29.8
+       ]
+      }
+     }
+    },
+    {
+     "name": "Neck",
+     "from": [
+      -12.0,
+      1.7,
+      1.3
+     ],
+     "to": [
+      0.0,
+      3.1,
+      2.7
+     ],
+     "rotationOrigin": [
+      0.0,
+      2.4,
+      2.0
+     ],
+     "rotationZ": 3,
+     "faces": {
+      "north": {
+       "texture": "#crane",
+       "uv": [
+        12.5,
+        34.5,
+        24.5,
+        35.9
+       ]
+      },
+      "east": {
+       "texture": "#crane",
+       "uv": [
+        25.0,
+        36.5,
+        26.4,
+        37.9
+       ]
+      },
+      "south": {
+       "texture": "#crane",
+       "uv": [
+        0.0,
+        36.5,
+        12.0,
+        37.9
+       ]
+      },
+      "west": {
+       "texture": "#crane",
+       "uv": [
+        27.0,
+        36.5,
+        28.4,
+        37.9
+       ]
+      },
+      "up": {
+       "texture": "#crane",
+       "uv": [
+        12.5,
+        36.5,
+        24.5,
+        37.9
+       ]
+      },
+      "down": {
+       "texture": "#crane",
+       "uv": [
+        0.0,
+        34.5,
+        12.0,
+        35.9
+       ]
+      }
+     },
+     "children": [
+      {
+       "name": "Head",
+       "from": [
+        -2.9,
+        -0.1,
+        -0.3
+       ],
+       "to": [
+        0.0,
+        1.7,
+        1.7
+       ],
+       "rotationOrigin": [
+        0.0,
+        0.8,
+        0.7
+       ],
+       "rotationZ": -2,
+       "faces": {
+        "north": {
+         "texture": "#crane",
+         "uv": [
+          11.0,
+          31.5,
+          13.9,
+          33.3
+         ]
+        },
+        "east": {
+         "texture": "#crane",
+         "uv": [
+          21.5,
+          31.5,
+          23.5,
+          33.3
+         ]
+        },
+        "south": {
+         "texture": "#crane",
+         "uv": [
+          14.5,
+          31.5,
+          17.4,
+          33.3
+         ]
+        },
+        "west": {
+         "texture": "#crane",
+         "uv": [
+          24.0,
+          31.5,
+          26.0,
+          33.3
+         ]
+        },
+        "up": {
+         "texture": "#crane",
+         "uv": [
+          18.0,
+          31.5,
+          20.9,
+          33.5
+         ]
+        },
+        "down": {
+         "texture": "#crane",
+         "uv": [
+          7.5,
+          31.5,
+          10.4,
+          33.5
+         ]
+        }
+       },
+       "children": [
+        {
+         "name": "Bill",
+         "from": [
+          -3.6,
+          0.4,
+          0.6
+         ],
+         "to": [
+          0.0,
+          1.1,
+          1.4
+         ],
+         "rotationOrigin": [
+          -1.8,
+          0.75,
+          1.0
+         ],
+         "faces": {
+          "north": {
+           "texture": "#crane",
+           "uv": [
+            0.0,
+            44.5,
+            3.5999999999999996,
+            45.2
+           ]
+          },
+          "east": {
+           "texture": "#crane",
+           "uv": [
+            25.5,
+            44.5,
+            26.3,
+            45.2
+           ]
+          },
+          "south": {
+           "texture": "#crane",
+           "uv": [
+            4.5,
+            44.5,
+            8.1,
+            45.2
+           ]
+          },
+          "west": {
+           "texture": "#crane",
+           "uv": [
+            27.0,
+            44.5,
+            27.8,
+            45.2
+           ]
+          },
+          "up": {
+           "texture": "#crane",
+           "uv": [
+            9.0,
+            44.5,
+            12.6,
+            45.3
+           ]
+          },
+          "down": {
+           "texture": "#crane",
+           "uv": [
+            25.0,
+            43.0,
+            28.6,
+            43.8
+           ]
+          }
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Tail",
+     "from": [
+      9.5,
+      2.4,
+      0.25
+     ],
+     "to": [
+      12.5,
+      2.4,
+      3.75
+     ],
+     "rotationOrigin": [
+      9.5,
+      2.4,
+      2.0
+     ],
+     "rotationZ": 3,
+     "faces": {
+      "up": {
+       "texture": "#crane",
+       "uv": [
+        19.0,
+        27.0,
+        22.0,
+        30.5
+       ]
+      }
+     }
+    },
+    {
+     "name": "Tertials",
+     "from": [
+      7.5,
+      3.3,
+      -0.2
+     ],
+     "to": [
+      14.1,
+      3.3,
+      4.2
+     ],
+     "rotationOrigin": [
+      7.5,
+      3.3,
+      2.0
+     ],
+     "rotationZ": 8,
+     "faces": {
+      "up": {
+       "texture": "#crane",
+       "uv": [
+        21.5,
+        11.5,
+        28.1,
+        15.899999999999999
+       ]
+      }
+     }
+    },
+    {
+     "name": "LegL",
+     "from": [
+      8.5,
+      0.6,
+      2.3
+     ],
+     "to": [
+      20.5,
+      1.2,
+      2.9
+     ],
+     "rotationOrigin": [
+      8.5,
+      0.9,
+      2.6
+     ],
+     "rotationZ": -2,
+     "faces": {
+      "north": {
+       "texture": "#crane",
+       "uv": [
+        12.5,
+        38.5,
+        24.5,
+        39.1
+       ]
+      },
+      "east": {
+       "texture": "#crane",
+       "uv": [
+        28.5,
+        44.5,
+        29.1,
+        45.1
+       ]
+      },
+      "south": {
+       "texture": "#crane",
+       "uv": [
+        0.0,
+        40.0,
+        12.0,
+        40.6
+       ]
+      },
+      "west": {
+       "texture": "#crane",
+       "uv": [
+        30.0,
+        44.5,
+        30.6,
+        45.1
+       ]
+      },
+      "up": {
+       "texture": "#crane",
+       "uv": [
+        12.5,
+        40.0,
+        24.5,
+        40.6
+       ]
+      },
+      "down": {
+       "texture": "#crane",
+       "uv": [
+        0.0,
+        38.5,
+        12.0,
+        39.1
+       ]
+      }
+     },
+     "children": [
+      {
+       "name": "FootL",
+       "from": [
+        12.0,
+        -0.1,
+        -0.1
+       ],
+       "to": [
+        14.2,
+        0.4,
+        0.7
+       ],
+       "rotationOrigin": [
+        13.1,
+        0.15,
+        0.3
+       ],
+       "faces": {
+        "north": {
+         "texture": "#crane",
+         "uv": [
+          18.0,
+          48.5,
+          20.2,
+          49.0
+         ]
+        },
+        "east": {
+         "texture": "#crane",
+         "uv": [
+          10.5,
+          49.5,
+          11.3,
+          50.0
+         ]
+        },
+        "south": {
+         "texture": "#crane",
+         "uv": [
+          21.0,
+          48.5,
+          23.2,
+          49.0
+         ]
+        },
+        "west": {
+         "texture": "#crane",
+         "uv": [
+          12.0,
+          49.5,
+          12.8,
+          50.0
+         ]
+        },
+        "up": {
+         "texture": "#crane",
+         "uv": [
+          16.5,
+          44.5,
+          18.7,
+          45.3
+         ]
+        },
+        "down": {
+         "texture": "#crane",
+         "uv": [
+          13.5,
+          44.5,
+          15.7,
+          45.3
+         ]
+        }
+       }
+      }
+     ]
+    },
+    {
+     "name": "LegR",
+     "from": [
+      8.5,
+      0.6,
+      1.1
+     ],
+     "to": [
+      20.5,
+      1.2,
+      1.7
+     ],
+     "rotationOrigin": [
+      8.5,
+      0.9,
+      1.4
+     ],
+     "rotationZ": -2,
+     "faces": {
+      "north": {
+       "texture": "#crane",
+       "uv": [
+        12.5,
+        41.5,
+        24.5,
+        42.1
+       ]
+      },
+      "east": {
+       "texture": "#crane",
+       "uv": [
+        0.0,
+        46.0,
+        0.6000000000000005,
+        46.6
+       ]
+      },
+      "south": {
+       "texture": "#crane",
+       "uv": [
+        0.0,
+        43.0,
+        12.0,
+        43.6
+       ]
+      },
+      "west": {
+       "texture": "#crane",
+       "uv": [
+        1.5,
+        46.0,
+        2.1000000000000005,
+        46.6
+       ]
+      },
+      "up": {
+       "texture": "#crane",
+       "uv": [
+        12.5,
+        43.0,
+        24.5,
+        43.6
+       ]
+      },
+      "down": {
+       "texture": "#crane",
+       "uv": [
+        0.0,
+        41.5,
+        12.0,
+        42.1
+       ]
+      }
+     },
+     "children": [
+      {
+       "name": "FootR",
+       "from": [
+        12.0,
+        -0.1,
+        -0.1
+       ],
+       "to": [
+        14.2,
+        0.4,
+        0.7
+       ],
+       "rotationOrigin": [
+        13.1,
+        0.15,
+        0.3
+       ],
+       "faces": {
+        "north": {
+         "texture": "#crane",
+         "uv": [
+          24.0,
+          48.5,
+          26.2,
+          49.0
+         ]
+        },
+        "east": {
+         "texture": "#crane",
+         "uv": [
+          13.5,
+          49.5,
+          14.3,
+          50.0
+         ]
+        },
+        "south": {
+         "texture": "#crane",
+         "uv": [
+          27.0,
+          48.5,
+          29.2,
+          49.0
+         ]
+        },
+        "west": {
+         "texture": "#crane",
+         "uv": [
+          15.0,
+          49.5,
+          15.8,
+          50.0
+         ]
+        },
+        "up": {
+         "texture": "#crane",
+         "uv": [
+          22.5,
+          44.5,
+          24.7,
+          45.3
+         ]
+        },
+        "down": {
+         "texture": "#crane",
+         "uv": [
+          19.5,
+          44.5,
+          21.7,
+          45.3
+         ]
+        }
+       }
+      }
+     ]
+    },
+    {
+     "name": "ArmL",
+     "from": [
+      0.5,
+      3.0,
+      4.4
+     ],
+     "to": [
+      9.3,
+      3.0,
+      14.9
+     ],
+     "rotationOrigin": [
+      3.5,
+      3.0,
+      4.4
+     ],
+     "faces": {
+      "up": {
+       "texture": "#crane",
+       "uv": [
+        17.0,
+        0.0,
+        25.8,
+        10.499999999999998
+       ]
+      }
+     },
+     "children": [
+      {
+       "name": "ArmLu",
+       "from": [
+        0.0,
+        0.0,
+        0.0
+       ],
+       "to": [
+        8.8,
+        0.0,
+        10.5
+       ],
+       "rotationOrigin": [
+        0.0,
+        0.0,
+        0.0
+       ],
+       "rotationZ": 5,
+       "faces": {
+        "up": {
+         "texture": "#crane",
+         "uv": [
+          17.0,
+          0.0,
+          25.8,
+          10.499999999999998
+         ]
+        }
+       }
+      },
+      {
+       "name": "EdgeArmL",
+       "from": [
+        -0.2,
+        -0.2,
+        0.0
+       ],
+       "to": [
+        0.5,
+        0.2,
+        10.5
+       ],
+       "rotationOrigin": [
+        0.15,
+        0.0,
+        5.25
+       ],
+       "faces": {
+        "north": {
+         "texture": "#crane",
+         "uv": [
+          30.0,
+          48.5,
+          30.7,
+          48.9
+         ]
+        },
+        "east": {
+         "texture": "#crane",
+         "uv": [
+          3.0,
+          46.0,
+          13.499999999999998,
+          46.4
+         ]
+        },
+        "south": {
+         "texture": "#crane",
+         "uv": [
+          0.0,
+          49.5,
+          0.7000000000000002,
+          49.9
+         ]
+        },
+        "west": {
+         "texture": "#crane",
+         "uv": [
+          14.0,
+          46.0,
+          24.5,
+          46.4
+         ]
+        },
+        "up": {
+         "texture": "#crane",
+         "uv": [
+          11.0,
+          11.5,
+          11.7,
+          22.0
+         ]
+        },
+        "down": {
+         "texture": "#crane",
+         "uv": [
+          9.5,
+          11.5,
+          10.2,
+          22.0
+         ]
+        }
+       }
+      },
+      {
+       "name": "WingL",
+       "from": [
+        0.4,
+        0.0,
+        10.5
+       ],
+       "to": [
+        8.2,
+        0.0,
+        21.5
+       ],
+       "rotationOrigin": [
+        2.9,
+        0.0,
+        10.5
+       ],
+       "faces": {
+        "up": {
+         "texture": "#crane",
+         "uv": [
+          0.0,
+          0.0,
+          7.799999999999999,
+          11.0
+         ]
+        }
+       },
+       "children": [
+        {
+         "name": "EdgeHandL",
+         "from": [
+          -0.1,
+          -0.15,
+          0.0
+         ],
+         "to": [
+          0.5,
+          0.15,
+          5.5
+         ],
+         "rotationOrigin": [
+          0.2,
+          0.0,
+          2.75
+         ],
+         "faces": {
+          "north": {
+           "texture": "#crane",
+           "uv": [
+            4.5,
+            49.5,
+            5.1,
+            49.8
+           ]
+          },
+          "east": {
+           "texture": "#crane",
+           "uv": [
+            22.0,
+            47.5,
+            27.5,
+            47.8
+           ]
+          },
+          "south": {
+           "texture": "#crane",
+           "uv": [
+            6.0,
+            49.5,
+            6.6,
+            49.8
+           ]
+          },
+          "west": {
+           "texture": "#crane",
+           "uv": [
+            0.0,
+            48.5,
+            5.5,
+            48.8
+           ]
+          },
+          "up": {
+           "texture": "#crane",
+           "uv": [
+            17.0,
+            11.5,
+            17.6,
+            17.0
+           ]
+          },
+          "down": {
+           "texture": "#crane",
+           "uv": [
+            15.5,
+            11.5,
+            16.1,
+            17.0
+           ]
+          }
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "ArmR",
+     "from": [
+      0.5,
+      3.0,
+      -10.9
+     ],
+     "to": [
+      9.3,
+      3.0,
+      -0.4
+     ],
+     "rotationOrigin": [
+      3.5,
+      3.0,
+      -0.4
+     ],
+     "faces": {
+      "up": {
+       "texture": "#crane",
+       "uv": [
+        0.0,
+        11.5,
+        8.8,
+        22.0
+       ]
+      }
+     },
+     "children": [
+      {
+       "name": "ArmRu",
+       "from": [
+        0.0,
+        0.0,
+        0.0
+       ],
+       "to": [
+        8.8,
+        0.0,
+        10.5
+       ],
+       "rotationOrigin": [
+        0.0,
+        0.0,
+        10.5
+       ],
+       "rotationZ": 5,
+       "faces": {
+        "up": {
+         "texture": "#crane",
+         "uv": [
+          0.0,
+          11.5,
+          8.8,
+          22.0
+         ]
+        }
+       }
+      },
+      {
+       "name": "EdgeArmR",
+       "from": [
+        -0.2,
+        -0.2,
+        0.0
+       ],
+       "to": [
+        0.5,
+        0.2,
+        10.5
+       ],
+       "rotationOrigin": [
+        0.15,
+        0.0,
+        5.25
+       ],
+       "faces": {
+        "north": {
+         "texture": "#crane",
+         "uv": [
+          1.5,
+          49.5,
+          2.2,
+          49.9
+         ]
+        },
+        "east": {
+         "texture": "#crane",
+         "uv": [
+          0.0,
+          47.5,
+          10.499999999999998,
+          47.9
+         ]
+        },
+        "south": {
+         "texture": "#crane",
+         "uv": [
+          3.0,
+          49.5,
+          3.7,
+          49.9
+         ]
+        },
+        "west": {
+         "texture": "#crane",
+         "uv": [
+          11.0,
+          47.5,
+          21.5,
+          47.9
+         ]
+        },
+        "up": {
+         "texture": "#crane",
+         "uv": [
+          14.0,
+          11.5,
+          14.7,
+          22.0
+         ]
+        },
+        "down": {
+         "texture": "#crane",
+         "uv": [
+          12.5,
+          11.5,
+          13.2,
+          22.0
+         ]
+        }
+       }
+      },
+      {
+       "name": "WingR",
+       "from": [
+        0.4,
+        0.0,
+        -11.0
+       ],
+       "to": [
+        8.2,
+        0.0,
+        0.0
+       ],
+       "rotationOrigin": [
+        2.9,
+        0.0,
+        0.0
+       ],
+       "faces": {
+        "up": {
+         "texture": "#crane",
+         "uv": [
+          8.5,
+          0.0,
+          16.299999999999997,
+          11.0
+         ]
+        }
+       },
+       "children": [
+        {
+         "name": "EdgeHandR",
+         "from": [
+          -0.1,
+          -0.15,
+          5.5
+         ],
+         "to": [
+          0.5,
+          0.15,
+          11.0
+         ],
+         "rotationOrigin": [
+          0.2,
+          0.0,
+          8.25
+         ],
+         "faces": {
+          "north": {
+           "texture": "#crane",
+           "uv": [
+            7.5,
+            49.5,
+            8.1,
+            49.8
+           ]
+          },
+          "east": {
+           "texture": "#crane",
+           "uv": [
+            6.0,
+            48.5,
+            11.5,
+            48.8
+           ]
+          },
+          "south": {
+           "texture": "#crane",
+           "uv": [
+            9.0,
+            49.5,
+            9.6,
+            49.8
+           ]
+          },
+          "west": {
+           "texture": "#crane",
+           "uv": [
+            12.0,
+            48.5,
+            17.5,
+            48.8
+           ]
+          },
+          "up": {
+           "texture": "#crane",
+           "uv": [
+            20.0,
+            11.5,
+            20.6,
+            17.0
+           ]
+          },
+          "down": {
+           "texture": "#crane",
+           "uv": [
+            18.5,
+            11.5,
+            19.1,
+            17.0
+           ]
+          }
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "animations": [
+  {
+   "name": "fly-flap",
+   "code": "fly-flap",
+   "quantityframes": 30,
+   "onAnimationEnd": "Repeat",
+   "keyframes": [
+    {
+     "frame": 0,
+     "elements": {
+      "ArmL": {
+       "rotationX": 0
+      },
+      "ArmR": {
+       "rotationX": 0
+      },
+      "WingL": {
+       "rotationX": 20
+      },
+      "WingR": {
+       "rotationX": -20
+      },
+      "Body": {
+       "rotationZ": 1.5
+      }
+     }
+    },
+    {
+     "frame": 8,
+     "elements": {
+      "ArmL": {
+       "rotationX": -44
+      },
+      "ArmR": {
+       "rotationX": 44
+      },
+      "WingL": {
+       "rotationX": -10
+      },
+      "WingR": {
+       "rotationX": 10
+      },
+      "Body": {
+       "rotationZ": 0
+      }
+     }
+    },
+    {
+     "frame": 16,
+     "elements": {
+      "ArmL": {
+       "rotationX": -2
+      },
+      "ArmR": {
+       "rotationX": 2
+      },
+      "WingL": {
+       "rotationX": -24
+      },
+      "WingR": {
+       "rotationX": 24
+      },
+      "Body": {
+       "rotationZ": -1.5
+      }
+     }
+    },
+    {
+     "frame": 24,
+     "elements": {
+      "ArmL": {
+       "rotationX": 40
+      },
+      "ArmR": {
+       "rotationX": -40
+      },
+      "WingL": {
+       "rotationX": 12
+      },
+      "WingR": {
+       "rotationX": -12
+      },
+      "Body": {
+       "rotationZ": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "fly-soar",
+   "code": "fly-soar",
+   "quantityframes": 30,
+   "onAnimationEnd": "Repeat",
+   "keyframes": [
+    {
+     "frame": 0,
+     "elements": {
+      "ArmL": {
+       "rotationX": -4
+      },
+      "ArmR": {
+       "rotationX": 4
+      },
+      "WingL": {
+       "rotationX": 2
+      },
+      "WingR": {
+       "rotationX": -2
+      }
+     }
+    },
+    {
+     "frame": 15,
+     "elements": {
+      "ArmL": {
+       "rotationX": -2
+      },
+      "ArmR": {
+       "rotationX": 2
+      },
+      "WingL": {
+       "rotationX": 0
+      },
+      "WingR": {
+       "rotationX": 0
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

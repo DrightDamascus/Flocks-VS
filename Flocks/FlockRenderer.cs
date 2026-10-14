@@ -55,7 +55,7 @@ namespace Flocks
             var dir = new Vec3d(Math.Sin(ang), 0, Math.Cos(ang));
             var perp = new Vec3d(dir.Z, 0, -dir.X);
             int ground = capi.World.BlockAccessor.GetRainMapHeightAt((int)plr.X, (int)plr.Z);
-            double y = Math.Min(ground + (altitude ?? 60 + rand.NextDouble() * 60), capi.World.BlockAccessor.MapSizeY + 40);
+            double y = Math.Min(ground + (altitude ?? sp.AltitudeMin + rand.NextDouble() * (sp.AltitudeMax - sp.AltitudeMin)), capi.World.BlockAccessor.MapSizeY + 40);
             double side = (rand.NextDouble() - 0.5) * 40; // pass slightly off-centre
             // V slots scale with wingspan: each rank sits back by about half a span and out by most of one,
             // so neighbouring wingtips stay just clear of each other

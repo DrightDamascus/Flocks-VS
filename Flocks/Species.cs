@@ -24,6 +24,8 @@ namespace Flocks
         /// <summary>Flocks on a peak migration day (fractions round randomly); fewer toward the edges of a window.</summary>
         public float MaxFlocksPerDay = 2f;
         public int CountMin = 7, CountMax = 25;
+        /// <summary>Cruising height above the player's ground, blocks (picked per flock).</summary>
+        public double AltitudeMin = 60, AltitudeMax = 120;
         /// <summary>V formation, or a loose scattered group.</summary>
         public bool Loose;
 
@@ -42,6 +44,18 @@ namespace Flocks
                 SpringStart = 0.03f, SpringEnd = 0.22f, AutumnStart = 0.62f, AutumnEnd = 0.85f,
                 Hours = new float[] { 6.5f, 10, 15.5f, 19 }, MaxFlocksPerDay = 3, CountMin = 7, CountMax = 25,
                 Meshes = new BirdMeshes(capi, "goose", new BirdMeshes.Candidate("greylag", new AssetLocation("flocks", "shapes/entity/bird/greylag.json"), "fly-flap", "fly-soar")),
+            },
+            // Our own model (tools/make_crane.py). Cranes beat slower and deeper than geese, glide more, and fly higher.
+            ["crane"] = new Species
+            {
+                Code = "crane", Scale = 2.5f, SpeedMin = 15, SpeedMax = 19,
+                FlapSeconds = 0.8f, SoarSeconds = 2.4f, BlendSeconds = 0.45f,
+                FlapBeatsMin = 6, FlapBeatsMax = 12, SoarLoopsMin = 1, SoarLoopsMax = 2,
+                // cranes move earlier than geese in autumn and early in spring, through the day, in V's of 7-25
+                SpringStart = 0.02f, SpringEnd = 0.18f, AutumnStart = 0.55f, AutumnEnd = 0.75f,
+                Hours = new float[] { 8, 17 }, MaxFlocksPerDay = 2, CountMin = 7, CountMax = 25,
+                AltitudeMin = 75, AltitudeMax = 140,
+                Meshes = new BirdMeshes(capi, "crane", new BirdMeshes.Candidate("crane", new AssetLocation("flocks", "shapes/entity/bird/crane.json"), "fly-flap", "fly-soar")),
             },
             // Vanilla's unused hawk shape, with sparrow and chicken fallbacks in case an update removes it.
             ["hawk"] = new Species
