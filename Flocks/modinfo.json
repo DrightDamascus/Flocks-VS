@@ -2,7 +2,7 @@
   "type": "code",
   "modid": "flocks",
   "name": "Flocks",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "authors": ["Dright"],
   "description": "Migrating bird flocks that signal the changing seasons, and huntable geese that land on lakes. Install on both client and server.",
   "side": "Universal",

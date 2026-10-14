@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.7.0
+- Resident geese (server). Real flocks:greylag groups settle on some lakes near players from the start of the goose's
+  spring window (seasonRel 0.03) until the start of its autumn window (0.62), with the same latitude shift as the
+  migration planner. Within ~10 deg of the equator (no migration) they stay all year.
+  - Lake sites: world-aligned chunk-centre columns (every 32 blocks) that are fresh water, in loaded chunks, within
+    ScanRadius of a player, in a lake of MinLakeSize+ surface blocks, and that pass a chance seeded from the world seed
+    and the site position (LakeChance). One site per lake: the lowest-keyed passing centre owns it.
+  - Each check (CheckSeconds) counts a site's geese where they are, since they carry the site key. An empty in-season
+    site gets MinPerLake-MaxPerLake geese. That happens only if no player is within MinPlayerDistance, the server cap
+    (MaxResidents) allows it, and the site has been loaded for two checks in a row, so geese saved in the chunk get
+    counted before any new ones are added. Geese stay saved with their chunk and come back when it reloads.
+  - A group that disappears while its lake stays loaded (killed or scared off) rests the lake for RespawnDelayDays
+    game days. After that it gets a new group. Cooldowns are saved with the world.
+  - Arrival: new residents glide in from ~70 blocks out and ~30 blocks up (fly-flap, about 10 s), from the equator
+    side, then settle on the water. If the approach is not loaded they appear on the water instead.
+  - Residents don't expire after 6 hours (the /flocks land test geese still do). In autumn every resident group takes
+    off toward the equator and despawns. Takeoff, flee and the spear/melee dodge are unchanged from 0.6.0.
+- Server config ModConfig/flocks-server.json: ResidentGeese, LakeChance, MinPerLake, MaxPerLake, MaxResidents,
+  RespawnDelayDays, CheckSeconds, ScanRadius, MinLakeSize, ArriveByAir, MinPlayerDistance.
+- `/flocks residents [check]` (controlserver, works from the server console): known lake sites with size, status,
+  goose count, season and cooldown; `check` runs a check immediately.
+- `/flocks send`, `schedule` and `land` still need a player; the root command no longer does.
+- Client-only visual migration flocks are unchanged.
+
 ## 0.6.0
 - **The mod must now be installed on the server as well as every client** (modinfo side Universal, required on both).
   Landed geese are real server entities. Flying migration flocks are still client-only visuals.

@@ -47,6 +47,11 @@ client-only visuals. So the mod is required on the server as well as on clients.
 Done in 0.6.0 (first step): entity flocks:greylag, behaviour flocks.waterfowl (float, drift, paddle away, takeoff,
 despawn, spear/melee dodge), and `/flocks land` (finds a fresh-water patch near the player, spawns a group).
 
+Done in 0.7.0: seasonal residents (Residents.cs). The server keeps small seeded groups on some loaded lakes near
+players from the spring window to the autumn window. Lakes rest for a few days after a group is killed or scared off.
+New groups fly in and glide down, and every group leaves at the start of autumn. Config is in flocks-server.json.
+Not done: nudging a visual V toward a lake that is about to receive residents (the client doesn't know about sites).
+
 Next steps:
 - Hand-off from the sky: when a planned goose flock passes a suitable lake (fresh water, 36+ surface blocks, 64+
   blocks from the player, near its heading), the client asks the server to land it. The server checks the lake

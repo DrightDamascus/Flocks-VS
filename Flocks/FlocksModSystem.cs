@@ -37,12 +37,15 @@ namespace Flocks
         }
 
         /// <summary>/flocks (typed with a slash) goes to the server; it only relays the subcommand to the caller's client.</summary>
+        private ResidentManager residents;
+
         public override void StartServerSide(ICoreServerAPI sapi)
         {
+            residents = new ResidentManager(sapi, LoadServerConfig(sapi));
             var ch = sapi.Network.GetChannel("flocks");
             var p = sapi.ChatCommands.Parsers;
-            sapi.ChatCommands.Create("flocks").WithDescription("Flocks (client-side birds)").RequiresPrivilege(Privilege.chat).RequiresPlayer()
-                .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [goose|crane|hawk]")
+            sapi.ChatCommands.Create("flocks").WithDescription("Flocks (client-side birds)").RequiresPrivilege(Privilege.chat)
+                .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [goose|crane|hawk]").RequiresPlayer()
                 .WithArgs(p.OptionalInt("count", 12), p.OptionalWord("species"))
                 .HandleWith(args =>
                 {
@@ -50,17 +53,26 @@ namespace Flocks
                     return TextCommandResult.Success();
                 })
                 .EndSubCommand()
-                .BeginSubCommand("schedule").WithDescription("Show today's migration plan and why")
+                .BeginSubCommand("schedule").WithDescription("Show today's migration plan and why").RequiresPlayer()
                 .HandleWith(args =>
                 {
                     ch.SendPacket(new SendFlockPacket { Command = "schedule" }, (IServerPlayer)args.Caller.Player);
                     return TextCommandResult.Success();
                 })
                 .EndSubCommand()
-                .BeginSubCommand("land").WithDescription("Debug: spawn 5-12 greylag geese on open water near you: /flocks land [count]")
+                .BeginSubCommand("land").WithDescription("Debug: spawn 5-12 greylag geese on open water near you: /flocks land [count]").RequiresPlayer()
                 .RequiresPrivilege(Privilege.controlserver)
                 .WithArgs(p.OptionalInt("count", 0))
                 .HandleWith(args => Landing.Land(sapi, args.Caller.Entity, (int)args[0]))
+                .EndSubCommand()
+                .BeginSubCommand("residents").WithDescription("Debug: resident geese state (lakes, counts, cooldowns); /flocks residents check runs a check now")
+                .RequiresPrivilege(Privilege.controlserver)
+                .WithArgs(p.OptionalWord("action"))
+                .HandleWith(args =>
+                {
+                    if ((args[0] as string) == "check") residents.Check();
+                    return TextCommandResult.Success(residents.Report());
+                })
                 .EndSubCommand();
         }
 
@@ -110,6 +122,23 @@ namespace Flocks
                 .HandleWith(args => TextCommandResult.Success(Schedule()))
                 .EndSubCommand();
             api.Logger.Notification("[Flocks] client loaded; automatic migration {0}", config.AutoMigration ? "on" : "off");
+        }
+
+        public const string ServerConfigFile = "flocks-server.json";
+
+        private static FlocksServerConfig LoadServerConfig(ICoreServerAPI api)
+        {
+            FlocksServerConfig cfg;
+            try { cfg = api.LoadModConfig<FlocksServerConfig>(ServerConfigFile); }
+            catch (Exception ex)
+            {
+                api.Logger.Error("[Flocks] {0} is unreadable, using defaults: {1}", ServerConfigFile, ex.Message);
+                return new FlocksServerConfig();
+            }
+            cfg ??= new FlocksServerConfig();
+            try { api.StoreModConfig(cfg, ServerConfigFile); }
+            catch (Exception ex) { api.Logger.Warning("[Flocks] could not write {0}: {1}", ServerConfigFile, ex.Message); }
+            return cfg;
         }
 
         private static FlocksConfig LoadConfig(ICoreClientAPI api)

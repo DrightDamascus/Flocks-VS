@@ -19,6 +19,16 @@ namespace Flocks
     {
         public const string Code = "flocks.waterfowl";
         private const string SpawnKey = "flocksSpawnHours";
+        /// <summary>Set by the resident manager: the lake site this goose lives on. Residents don't expire.</summary>
+        public const string SiteKey = "flocksResidentSite";
+
+        public bool Resident => entity.WatchedAttributes.HasAttribute(SiteKey);
+        public long Site => entity.WatchedAttributes.GetLong(SiteKey);
+
+        // arrival glide (not saved: a goose whose chunk unloads mid-glide just settles where it reloads)
+        private Vec3d arriveFrom, arriveTo;
+        private float arriveTime, arriveSeconds;
+        private float seasonCheck = 5;
 
         private float fleeRange = 14, takeoffRange = 7, lifeHours = 6, flySeconds = 8, sink = 0.15f;
         private double driftSpeed = 0.004, paddleSpeed = 0.025, flySpeed = 0.07, climbSpeed = 0.045;
@@ -53,6 +63,18 @@ namespace Flocks
             double now = entity.World.Calendar.TotalHours;
             if (!attrs.HasAttribute(SpawnKey)) attrs.SetDouble(SpawnKey, now);
 
+            if (arriveTo != null)
+            {
+                // kinematic glide: straight in over the trees, easing down to the water at the end
+                arriveTime += dt;
+                double t = Math.Min(1, arriveTime / arriveSeconds), ty = 1 - (1 - t) * (1 - t);
+                double hx = arriveTo.X - arriveFrom.X, hz = arriveTo.Z - arriveFrom.Z;
+                pos.SetPos(arriveFrom.X + hx * t, arriveFrom.Y + (arriveTo.Y - arriveFrom.Y) * ty, arriveFrom.Z + hz * t);
+                pos.Motion.Set(0, 0, 0);
+                pos.Yaw = (float)Math.Atan2(hx, hz);
+                if (t >= 1) { arriveTo = null; heading = pos.Yaw; }
+                return;
+            }
             if (flying)
             {
                 flyTime += dt;
@@ -61,7 +83,19 @@ namespace Flocks
                 if (flyTime > flySeconds) entity.Die(EnumDespawnReason.Expire);
                 return;
             }
-            if (now - attrs.GetDouble(SpawnKey) > lifeHours) { Takeoff(rand.NextDouble() * Math.PI * 2); return; }
+            if (!Resident && now - attrs.GetDouble(SpawnKey) > lifeHours) { Takeoff(rand.NextDouble() * Math.PI * 2); return; }
+            if (Resident && (seasonCheck -= dt) <= 0)
+            {
+                seasonCheck = 30;
+                var bp = pos.AsBlockPos; var cal = entity.World.Calendar;
+                double lat = cal.OnGetLatitude(bp.Z);
+                if (!MigrationScheduler.ResidentSeason(Species.GooseSpringStart, Species.GooseAutumnStart, cal.GetSeasonRel(bp), lat))
+                {
+                    // autumn: the whole group leaves toward the equator (0 = south, pi = north)
+                    TakeoffGroup((lat >= 0 ? 0 : Math.PI) + (rand.NextDouble() - 0.5) * 0.5);
+                    return;
+                }
+            }
 
             nextCheck -= dt;
             var player = nextCheck <= 0 ? NearestPlayer() : null;
@@ -111,6 +145,13 @@ namespace Flocks
             foreach (var e in others)
                 e.GetBehavior<EntityBehaviorWaterfowl>()?.Takeoff(away + (rand.NextDouble() - 0.5) * 0.6);
             Takeoff(away);
+        }
+
+        /// <summary>Glide in from <paramref name="from"/> and land at <paramref name="to"/> (the water surface).</summary>
+        public void Arrive(Vec3d from, Vec3d to, float seconds)
+        {
+            arriveFrom = from; arriveTo = to; arriveTime = 0; arriveSeconds = Math.Max(1, seconds);
+            SetAnim("fly-flap");
         }
 
         public void Takeoff(double towards)

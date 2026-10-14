@@ -32,6 +32,9 @@ namespace Flocks
         /// <summary>Wingspan in blocks as drawn; formation spacing scales from it so wingtips never overlap.</summary>
         public double SpanBlocks => (Meshes.Span > 0 ? Meshes.Span : 1) * Scale;
 
+        /// <summary>Goose window edges, shared with the server's resident geese (Residents.cs).</summary>
+        public const float GooseSpringStart = 0.03f, GooseAutumnStart = 0.62f;
+
         public static Dictionary<string, Species> Create(ICoreClientAPI capi) => new()
         {
             // Our own model (tools/make_greylag.py). Geese flap steadily with short glides.
@@ -41,7 +44,7 @@ namespace Flocks
                 FlapSeconds = 0.5f, SoarSeconds = 2f, BlendSeconds = 0.35f,
                 FlapBeatsMin = 8, FlapBeatsMax = 16, SoarLoopsMin = 1, SoarLoopsMax = 1,
                 // geese move late in autumn and early in spring, mornings and late afternoons, in V's of 7-25
-                SpringStart = 0.03f, SpringEnd = 0.22f, AutumnStart = 0.62f, AutumnEnd = 0.85f,
+                SpringStart = GooseSpringStart, SpringEnd = 0.22f, AutumnStart = GooseAutumnStart, AutumnEnd = 0.85f,
                 Hours = new float[] { 6.5f, 10, 15.5f, 19 }, MaxFlocksPerDay = 3, CountMin = 7, CountMax = 25,
                 Meshes = new BirdMeshes(capi, "goose", new BirdMeshes.Candidate("greylag", new AssetLocation("flocks", "shapes/entity/bird/greylag.json"), "fly-flap", "fly-soar")),
             },

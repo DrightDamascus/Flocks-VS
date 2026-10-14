@@ -129,6 +129,18 @@ namespace Flocks
             return Math.Max(s, f);
         }
 
+        /// <summary>
+        /// Resident season: from the start of the spring window to the start of the autumn window, with the same
+        /// latitude shift as Strength(). Within ~10 deg of the equator (no migration) residents stay all year.
+        /// </summary>
+        public static bool ResidentSeason(float springStart, float autumnStart, float rel, double lat)
+        {
+            double a = Math.Abs(lat);
+            if (a < 0.11) return true;
+            float shift = (float)((a - 0.5) * 0.06);
+            return rel >= springStart + shift && rel < autumnStart - shift;
+        }
+
         private static double Window(float rel, float start, float end)
             => rel <= start || rel >= end ? 0 : Math.Sin(Math.PI * (rel - start) / (end - start));
 
