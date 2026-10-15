@@ -27,6 +27,7 @@ namespace Flocks
         public double NextSample;
         public double NextCall;                       // flock age (s) of its next distant call
         public double TargetSpeed;                    // a taken-over flock eases from the geese's speed to this; 0 = none
+        public double Bob = 1;                        // 0..1: the birds' small drift around their slots (0 at a swap)
         public LandingFlockPacket Script;             // a landing flock: flies this fixed path instead of moving freely
         public double ScriptT0;                       // client time (s) at which it was at the path's start
         public List<Bird> Birds = new();
@@ -53,7 +54,8 @@ namespace Flocks
         /// <summary>Calls fade out linearly over this many blocks from the calling bird.</summary>
         public float CallRange = 220;
 
-        /// <summary>The landed goose entity's size (entities/greylag.json client.size); the sky draws Species.Scale.</summary>
+        /// <summary>The landed goose entity's default size (entities/greylag.json client.size); the sky goose uses the
+        /// loaded value, so the two always match.</summary>
         public const double EntityScale = 0.55;
         /// <summary>A landing flock keeps being drawn this long past the swap, covering the entities' arrival.</summary>
         public const double SwapOverlapSeconds = 0.2;
@@ -64,9 +66,9 @@ namespace Flocks
 
         /// <summary>
         /// A landing flock (LandingFlocks): flies the packet's fixed path, so it is where the server says at every
-        /// moment, and disappears at the hand-off point as the real geese take its place. Drawn at sky scale with the
-        /// formation spread to match, closing to the real geese's spacing over the last 8 s (the birds themselves stay
-        /// sky-sized: no size matching yet).
+        /// moment, and disappears at the hand-off point as the real geese take its place. Over the last 8 s the
+        /// formation closes to the real geese's spacing and the birds stop drifting, so at the swap each drawn bird is
+        /// exactly where, and the same size as, its real goose.
         /// </summary>
         public void AddLanding(Species sp, LandingFlockPacket pkt)
         {
@@ -94,8 +96,9 @@ namespace Flocks
             f.Pos.Set(s.HandoffX - dx * before, s.CruiseY + (s.HandoffY - s.CruiseY) * w, s.HandoffZ - dz * before);
             f.ClimbRate = w > 0 && w < 1 ? (s.HandoffY - s.CruiseY) / descent * s.Speed : 0;
             f.Heading = s.Heading; f.TurnRate = 0; f.Travel = dist;
-            // spread to sky scale while far out, closing to the real geese's formation over the last 8 s
-            double wide = f.Species.Scale / EntityScale, k = GameMath.Clamp(before / (s.Speed * 8), 0, 1), m = 1 + (wide - 1) * k;
+            // a looser V while far out, closing to the real geese's formation over the last 8 s
+            double k = GameMath.Clamp(before / (s.Speed * 8), 0, 1), m = 1 + 0.6 * k;
+            f.Bob = k;
             for (int i = 0; i < f.Birds.Count; i++) f.Birds[i].Offset.Set(s.Along[i] * m, s.Up[i] * m, s.Across[i] * m);
         }
         public double RenderOrder => 0.45;
@@ -171,8 +174,7 @@ namespace Flocks
         /// <summary>
         /// Takes over departing landed geese (FlockRegistry hand-off): the birds start exactly where the entities were,
         /// at their speed and heading, then ease into a V, up to cruising height and up to the species' speed over
-        /// the next several seconds, and fly on out of sight like any other flock. Drawn at sky scale from the start
-        /// (no size matching yet).
+        /// the next several seconds, and fly on out of sight like any other flock. Same size as the geese it replaces.
         /// </summary>
         public void Adopt(Species sp, double[] xs, double[] ys, double[] zs, double heading, double speed)
         {
@@ -189,6 +191,7 @@ namespace Flocks
             var f = new Flock
             {
                 Species = sp, Speed = speed, TargetSpeed = sp.SpeedMin + rand.NextDouble() * (sp.SpeedMax - sp.SpeedMin),
+                Bob = 0, // exactly on the geese at the swap; the drift fades in as it flies off
                 // wander phases 0: the drift starts at 0 deg, so the flock doesn't jump off the geese's heading
                 BaseHeading = heading, Wander1 = 0, Wander2 = 0,
                 Pos = new Vec3d(xs[lead], ys[lead], zs[lead]), CruiseY = Math.Min(cruise, capi.World.BlockAccessor.MapSizeY + 40),
@@ -265,6 +268,7 @@ namespace Flocks
         {
             f.Age += dt;
             if (f.Script != null) { MoveScripted(f); return; }
+            f.Bob = Math.Min(1, f.Bob + dt / 10);
             if (f.TargetSpeed > 0) f.Speed += GameMath.Clamp(f.TargetSpeed - f.Speed, -1.5 * dt, 1.5 * dt);
             foreach (var b in f.Birds)
             {
@@ -327,9 +331,9 @@ namespace Flocks
                     var b = f.Birds[i];
                     float t = (float)f.Age + b.Phase;
                     var o = b.Offset;
-                    double x = f.Pos.X + dx * o.X + dz * o.Z + Math.Sin(t * 0.7) * 0.4;
-                    double y = f.Pos.Y + o.Y + Math.Sin(t * 0.9) * 0.3;
-                    double z = f.Pos.Z + dz * o.X - dx * o.Z + Math.Cos(t * 0.6) * 0.4;
+                    double x = f.Pos.X + dx * o.X + dz * o.Z + Math.Sin(t * 0.7) * 0.4 * f.Bob;
+                    double y = f.Pos.Y + o.Y + Math.Sin(t * 0.9) * 0.3 * f.Bob;
+                    double z = f.Pos.Z + dz * o.X - dx * o.Z + Math.Cos(t * 0.6) * 0.4 * f.Bob;
                     var mesh = PoseFor(sp, b, t);
                     // bird shapes have their head at -X; RotateY(a) turns -X into (-cos a, sin a), which equals dir for a = heading + pi/2
                     float yaw = (float)(f.Heading + Math.PI / 2 + b.YawJitter * Math.Sin(t * 0.4));

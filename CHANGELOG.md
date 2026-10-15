@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.1
+- Sky birds are drawn at one fixed, true size, so drawn and real geese match at a swap. The sky goose takes the landed
+  goose's size from entities/greylag.json client.size (0.55, a 1.4-block wingspan; real greylags are 1.5-1.8 m):
+  raise that one number to make both bigger. Cranes 2.2 and hawks 1.2 block wingspans (were all ~4.5x real size).
+- Flocks now appear and fade at ~540 blocks (where a true-size goose is 2 px on a 1080p screen; was up to 1500).
+- At a swap the birds' small drift around their slots fades out, so each drawn bird is exactly where its goose
+  appears; after a departure swap it fades back in.
+
 ## 0.11.0
 Flocks land as flocks and become geese (second half of flocks landing and leaving; new LandingFlocks.cs):
 - On spring migration days each player gets up to one landing flock a day (scaled by the day's migration strength,

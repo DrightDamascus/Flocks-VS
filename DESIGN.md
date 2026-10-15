@@ -74,8 +74,11 @@ Decisions (Dright, 0.10.0) for flocks landing and leaving:
   (the client schedules can't see deaths): FlockRegistry.
 - Distant flight stays client-drawn (sky renderer: visible 300-1500 blocks, no server cost). Real entities only for
   the final approach and the climb-out: the server only simulates entities within 128 blocks of a player.
-- No size matching yet: the sky goose is drawn ~4.5x the entity (6.4 vs 1.4 block wingspan) and the jump at a
-  hand-off is left visible on purpose, to judge it. Planned fix if needed: scale drawn birds by viewer distance.
+- Sizes (Dright, 0.11.1): one fixed size per bird at every distance, no distance tricks, so it can be judged by eye.
+  The sky goose is drawn at the landed entity's size, read from entities/greylag.json client.size (0.55: 1.4 block
+  wingspan; a real greylag is 1.5-1.8 m, 1 block = 1 m); raise that one number to enlarge both. Cranes 2.2 and hawks
+  1.2 block wingspans (Species.Wingspan). Until 0.11.0 the sky birds were ~4.5x real size to read from far off; at
+  true size a goose is ~2 px at ~540 blocks, which is now where flocks appear and fade.
 - Geese are the test species; per-species data (family unit, flock size) is to follow for the others.
 
 Done in 0.10.0 (first half): FlockRegistry (saved with the world; every goose carries a flock id; deaths counted;

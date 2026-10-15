@@ -109,7 +109,10 @@ namespace Flocks
             api.Event.RegisterGameTickListener(scheduler.Tick, 1000);
             api.Event.LevelFinalize += () =>
             {
-                foreach (var sp in species.Values) sp.Meshes.Load();
+                foreach (var sp in species.Values) { sp.Meshes.Load(); sp.FitScale(); }
+                // one size for sky and lake geese: the entity's client.size, so changing it there resizes both
+                float gooseSize = api.World.GetEntityType(ResidentGeese.Code)?.Client?.Size ?? 0;
+                if (gooseSize > 0 && species.TryGetValue("goose", out var goose)) goose.Scale = gooseSize;
                 if (!rendererRegistered) { api.Event.RegisterRenderer(renderer, EnumRenderStage.Opaque, "flocks"); rendererRegistered = true; }
             };
             api.Network.GetChannel("flocks").SetMessageHandler<SendFlockPacket>(pkt =>
