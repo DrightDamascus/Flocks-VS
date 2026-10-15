@@ -40,8 +40,11 @@ Goal: geese (later cranes) come down on lakes, float, take off and land again, u
 Decision (Dright, 0.6.0): landed birds are real server entities, huntable animals. Flying migration flocks stay
 client-only visuals. So the mod is required on the server as well as on clients.
 - Why: they must be huntable (arrows and other mods' guns), drop items, and be the same for every player.
-- Costs we accept: server ticks and entity sync per bird, chunk saves, and despawn rules. Keep groups small (5-12),
-  give them a lifetime (lifeHours) and make takeoff end in a despawn, so they never pile up.
+- Costs we accept: server ticks and entity sync per bird, chunk saves, and despawn rules. Keep groups small (5-12).
+  Until 0.9.0 every takeoff ended in a despawn so they never piled up. Decision (Dright, 0.9.0): a flushed group
+  doesn't vanish; it lands elsewhere on the lake or on another lake. Geese leave the world only when departing for
+  good (end of the resident season, a test goose's lifeHours) or after ~1200 blocks with no lake found, and only
+  once no player is within 128 blocks. Pile-ups stay bounded by vanilla's maxQuantity and the residents' area cap.
 - Combat rule: ranged projectiles kill; thrown spears and melee are dodged (damage zeroed in flocks.waterfowl before
   the health behaviour runs) and the group takes off. Geese are a wild feather source, so the harvest drops plenty.
 
@@ -54,6 +57,13 @@ MinDistanceToPlayer). A server OnTrySpawnEntity veto adds what vanilla lacks: th
 autumn window, all year near the equator), a minimum lake size, a maximum distance from shore (0.8.4: 8-direction scan, ShoreDistance), and a generous per-area safety cap. Residents leave
 with a takeoff when autumn starts. No global cap and no custom placer; geese appear out of sight like other animals.
 Not done: nudging a visual V toward a lake (the client has no lake knowledge).
+
+Done in 0.9.0: flight for the landed geese (Waterfowl.cs, LakeSearch.cs). Takeoff is a hurried run across the water
+(takeoff animation: deep fast strokes, body nose-up, feet pattering), a climb to 11-13.5 blocks/s, then a glide in
+(fly-soar, then the land flare: wings high and cupped, feet forward) and a short skid. The group's spot is picked
+once: open water on the same lake at least 26 blocks from the threat and 14 from the goose, near shore; else the
+nearest lake within 160 blocks not toward the threat; else they fly on, searching every 4 s. Flight state is saved
+in WatchedAttributes. A death animation (roll onto the side, neck limp) replaces the frozen swim pose.
 
 Next steps:
 - Hand-off from the sky: when a planned goose flock passes a suitable lake (fresh water, 36+ surface blocks, 64+

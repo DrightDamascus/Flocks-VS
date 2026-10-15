@@ -388,7 +388,37 @@ def animations():
     return [
         {"name": "fly-flap", "code": "fly-flap", "quantityframes": 30, "onAnimationEnd": "Repeat", "keyframes": flap},
         {"name": "fly-soar", "code": "fly-soar", "quantityframes": 30, "onAnimationEnd": "Repeat", "keyframes": soar},
-    ] + ground_animations()
+    ] + ground_animations() + action_animations()
+
+
+def action_animations():
+    """Takeoff, landing flare and death (0.9.0). All rotations; Body pitch is rotationZ (negative = nose up)."""
+    def takeoff(frame, arm, hand, legs):
+        """A hurried, deep wingbeat with the body pitched up, neck stretched forward and the feet running on the water."""
+        return key(frame, arm, hand, {
+            "Body": {"rotationZ": -18}, "Neck": {"rotationZ": -12}, "Head": {"rotationZ": 10},
+            "LegL": {"rotationZ": -60 + legs}, "LegR": {"rotationZ": -60 - legs},
+            "FootL": {"rotationZ": -45}, "FootR": {"rotationZ": -45}})
+    def flare(frame, arm, hand):
+        """Landing: wings held high and swept forward, tips cupped down, body steeply nose-up, feet thrust forward."""
+        k = key(frame, arm, hand, {
+            "Body": {"rotationZ": -30}, "Neck": {"rotationZ": -28}, "Head": {"rotationZ": 26},
+            "LegL": {"rotationZ": -125}, "LegR": {"rotationZ": -125}, "FootL": {"rotationZ": -70}, "FootR": {"rotationZ": -70}})
+        k["elements"]["ArmL"]["rotationY"] = -14; k["elements"]["ArmR"]["rotationY"] = 14
+        return k
+    def death(frame, roll, wing):
+        """Rolls onto its side; the upper wing loosens a little, neck limp, legs loose."""
+        return ground_key(frame, Body=(roll, 0, 0), Neck=(0, 0, -70 + roll), Head=(0, 0, 60 - roll * 0.4),
+                          ArmR=(10 - wing * 0.5, -95 + wing, 0), WingR=(0, -170 + wing * 0.9, 0),
+                          LegL=(0, 0, -roll * 0.5), LegR=(0, 0, -roll * 0.3), FootL=(0, 0, -roll * 0.7), FootR=(0, 0, -roll * 0.7))
+    return [
+        {"name": "takeoff", "code": "takeoff", "quantityframes": 20, "onAnimationEnd": "Repeat", "keyframes": [
+            takeoff(0, 0, -22, 25), takeoff(5, 55, 10, 0), takeoff(10, 0, 26, -25), takeoff(15, -45, -10, 0)]},
+        {"name": "land", "code": "land", "quantityframes": 20, "onAnimationEnd": "Repeat", "keyframes": [
+            flare(0, 34, -16), flare(10, 26, -10)]},
+        {"name": "death", "code": "death", "quantityframes": 24, "onActivityStopped": "PlayTillEnd", "onAnimationEnd": "Hold",
+         "keyframes": [death(0, 0, 0), death(6, 35, 5), death(14, 82, 10), death(23, 82, 10)]},
+    ]
 
 
 def ground_animations():

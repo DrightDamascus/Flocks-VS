@@ -1908,6 +1908,631 @@
      }
     }
    ]
+  },
+  {
+   "name": "takeoff",
+   "code": "takeoff",
+   "quantityframes": 20,
+   "onAnimationEnd": "Repeat",
+   "keyframes": [
+    {
+     "frame": 0,
+     "elements": {
+      "ArmL": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "ArmR": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "WingL": {
+       "rotationX": 22,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "WingR": {
+       "rotationX": -22,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "Body": {
+       "rotationZ": -18,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "Neck": {
+       "rotationZ": -12,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "Head": {
+       "rotationZ": 10,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "LegL": {
+       "rotationZ": -35,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "LegR": {
+       "rotationZ": -85,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "FootL": {
+       "rotationZ": -45,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "FootR": {
+       "rotationZ": -45,
+       "rotationX": 0,
+       "rotationY": 0
+      }
+     }
+    },
+    {
+     "frame": 5,
+     "elements": {
+      "ArmL": {
+       "rotationX": -55,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "ArmR": {
+       "rotationX": 55,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "WingL": {
+       "rotationX": -10,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "WingR": {
+       "rotationX": 10,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "Body": {
+       "rotationZ": -18,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "Neck": {
+       "rotationZ": -12,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "Head": {
+       "rotationZ": 10,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "LegL": {
+       "rotationZ": -60,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "LegR": {
+       "rotationZ": -60,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "FootL": {
+       "rotationZ": -45,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "FootR": {
+       "rotationZ": -45,
+       "rotationX": 0,
+       "rotationY": 0
+      }
+     }
+    },
+    {
+     "frame": 10,
+     "elements": {
+      "ArmL": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "ArmR": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "WingL": {
+       "rotationX": -26,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "WingR": {
+       "rotationX": 26,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "Body": {
+       "rotationZ": -18,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "Neck": {
+       "rotationZ": -12,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "Head": {
+       "rotationZ": 10,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "LegL": {
+       "rotationZ": -85,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "LegR": {
+       "rotationZ": -35,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "FootL": {
+       "rotationZ": -45,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "FootR": {
+       "rotationZ": -45,
+       "rotationX": 0,
+       "rotationY": 0
+      }
+     }
+    },
+    {
+     "frame": 15,
+     "elements": {
+      "ArmL": {
+       "rotationX": 45,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "ArmR": {
+       "rotationX": -45,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "WingL": {
+       "rotationX": 10,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "WingR": {
+       "rotationX": -10,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "Body": {
+       "rotationZ": -18,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "Neck": {
+       "rotationZ": -12,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "Head": {
+       "rotationZ": 10,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "LegL": {
+       "rotationZ": -60,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "LegR": {
+       "rotationZ": -60,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "FootL": {
+       "rotationZ": -45,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "FootR": {
+       "rotationZ": -45,
+       "rotationX": 0,
+       "rotationY": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "land",
+   "code": "land",
+   "quantityframes": 20,
+   "onAnimationEnd": "Repeat",
+   "keyframes": [
+    {
+     "frame": 0,
+     "elements": {
+      "ArmL": {
+       "rotationX": -34,
+       "rotationY": -14,
+       "rotationZ": 0
+      },
+      "ArmR": {
+       "rotationX": 34,
+       "rotationY": 14,
+       "rotationZ": 0
+      },
+      "WingL": {
+       "rotationX": 16,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "WingR": {
+       "rotationX": -16,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "Body": {
+       "rotationZ": -30,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "Neck": {
+       "rotationZ": -28,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "Head": {
+       "rotationZ": 26,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "LegL": {
+       "rotationZ": -125,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "LegR": {
+       "rotationZ": -125,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "FootL": {
+       "rotationZ": -70,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "FootR": {
+       "rotationZ": -70,
+       "rotationX": 0,
+       "rotationY": 0
+      }
+     }
+    },
+    {
+     "frame": 10,
+     "elements": {
+      "ArmL": {
+       "rotationX": -26,
+       "rotationY": -14,
+       "rotationZ": 0
+      },
+      "ArmR": {
+       "rotationX": 26,
+       "rotationY": 14,
+       "rotationZ": 0
+      },
+      "WingL": {
+       "rotationX": 10,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "WingR": {
+       "rotationX": -10,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "Body": {
+       "rotationZ": -30,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "Neck": {
+       "rotationZ": -28,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "Head": {
+       "rotationZ": 26,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "LegL": {
+       "rotationZ": -125,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "LegR": {
+       "rotationZ": -125,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "FootL": {
+       "rotationZ": -70,
+       "rotationX": 0,
+       "rotationY": 0
+      },
+      "FootR": {
+       "rotationZ": -70,
+       "rotationX": 0,
+       "rotationY": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "death",
+   "code": "death",
+   "quantityframes": 24,
+   "onActivityStopped": "PlayTillEnd",
+   "onAnimationEnd": "Hold",
+   "keyframes": [
+    {
+     "frame": 0,
+     "elements": {
+      "ArmL": {
+       "rotationX": -10,
+       "rotationY": 95,
+       "rotationZ": 0
+      },
+      "ArmR": {
+       "rotationX": 10.0,
+       "rotationY": -95,
+       "rotationZ": 0
+      },
+      "WingL": {
+       "rotationY": 170,
+       "rotationX": 0,
+       "rotationZ": 0
+      },
+      "WingR": {
+       "rotationX": 0,
+       "rotationY": -170.0,
+       "rotationZ": 0
+      },
+      "Body": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "Neck": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": -70
+      },
+      "Head": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": 60.0
+      },
+      "LegL": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": 0.0
+      },
+      "LegR": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": 0.0
+      },
+      "FootL": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": 0.0
+      },
+      "FootR": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": 0.0
+      }
+     }
+    },
+    {
+     "frame": 6,
+     "elements": {
+      "ArmL": {
+       "rotationX": -10,
+       "rotationY": 95,
+       "rotationZ": 0
+      },
+      "ArmR": {
+       "rotationX": 7.5,
+       "rotationY": -90,
+       "rotationZ": 0
+      },
+      "WingL": {
+       "rotationY": 170,
+       "rotationX": 0,
+       "rotationZ": 0
+      },
+      "WingR": {
+       "rotationX": 0,
+       "rotationY": -165.5,
+       "rotationZ": 0
+      },
+      "Body": {
+       "rotationX": 35,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "Neck": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": -35
+      },
+      "Head": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": 46.0
+      },
+      "LegL": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": -17.5
+      },
+      "LegR": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": -10.5
+      },
+      "FootL": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": -24.5
+      },
+      "FootR": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": -24.5
+      }
+     }
+    },
+    {
+     "frame": 14,
+     "elements": {
+      "ArmL": {
+       "rotationX": -10,
+       "rotationY": 95,
+       "rotationZ": 0
+      },
+      "ArmR": {
+       "rotationX": 5.0,
+       "rotationY": -85,
+       "rotationZ": 0
+      },
+      "WingL": {
+       "rotationY": 170,
+       "rotationX": 0,
+       "rotationZ": 0
+      },
+      "WingR": {
+       "rotationX": 0,
+       "rotationY": -161.0,
+       "rotationZ": 0
+      },
+      "Body": {
+       "rotationX": 82,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "Neck": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": 12
+      },
+      "Head": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": 27.199999999999996
+      },
+      "LegL": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": -41.0
+      },
+      "LegR": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": -24.599999999999998
+      },
+      "FootL": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": -57.4
+      },
+      "FootR": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": -57.4
+      }
+     }
+    },
+    {
+     "frame": 23,
+     "elements": {
+      "ArmL": {
+       "rotationX": -10,
+       "rotationY": 95,
+       "rotationZ": 0
+      },
+      "ArmR": {
+       "rotationX": 5.0,
+       "rotationY": -85,
+       "rotationZ": 0
+      },
+      "WingL": {
+       "rotationY": 170,
+       "rotationX": 0,
+       "rotationZ": 0
+      },
+      "WingR": {
+       "rotationX": 0,
+       "rotationY": -161.0,
+       "rotationZ": 0
+      },
+      "Body": {
+       "rotationX": 82,
+       "rotationY": 0,
+       "rotationZ": 0
+      },
+      "Neck": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": 12
+      },
+      "Head": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": 27.199999999999996
+      },
+      "LegL": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": -41.0
+      },
+      "LegR": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": -24.599999999999998
+      },
+      "FootL": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": -57.4
+      },
+      "FootR": {
+       "rotationX": 0,
+       "rotationY": 0,
+       "rotationZ": -57.4
+      }
+     }
+    }
+   ]
   }
  ]
 }

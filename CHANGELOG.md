@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.9.0
+Landed geese fly properly (Waterfowl.cs, new LakeSearch.cs, greylag shape and entity):
+- Takeoff is hurried: the group flushes a moment apart (0.1-0.6 s), each goose runs ~0.5 s across the water with a
+  splash, deep fast wingbeats, body pitched up and feet pattering (new "takeoff" animation), then climbs out.
+- Faster flight: 11-13.5 blocks/s cruise (entity attributes cruiseSpeedMin/Max), was 4.2.
+- They don't vanish any more. The group picks somewhere to land: open water on the same lake at least 26 blocks from
+  whatever scared them (the shooter, not the arrow) and 14 from the goose, near shore; else the nearest lake within
+  160 blocks with 36+ surface blocks, preferring lakes that don't lie toward the threat; else they fly on and search
+  again every 4 s. They glide in (fly-soar, then a new "land" flare with wings cupped and feet forward), splash down
+  and skid to a stop. Spots keep 2 blocks of open water all round; a flight simulation put 90% of touchdowns within
+  1.3 blocks of the spot (worst 3.6), and every spot 14-110 blocks off at any bearing was reached in under 23 s.
+- Flight state is saved with the entity, so a goose that flies out of the loaded area carries on when it reloads.
+- Geese leave the world only when departing for good (autumn, or a /flocks land test goose's lifeHours) or after
+  ~1200 blocks without finding a lake, and only once no player is within 128 blocks.
+- Death animation: the goose rolls onto its side, neck limp, legs loose (vanilla "die" on the dead control).
+- flySeconds is gone from the waterfowl behaviour.
+
 ## 0.8.4
 - Goose spawns are vetoed more than ShoreDistance (server config, default 20) blocks from shore. Shore means a solid
   non-water block at the water surface or one above. The check scans outward in 8 directions up to the limit and
