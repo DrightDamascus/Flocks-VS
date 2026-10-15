@@ -27,6 +27,8 @@ namespace Flocks
         public double NextSample;
         public double NextCall;                       // flock age (s) of its next distant call
         public double TargetSpeed;                    // a taken-over flock eases from the geese's speed to this; 0 = none
+        public LandingFlockPacket Script;             // a landing flock: flies this fixed path instead of moving freely
+        public double ScriptT0;                       // client time (s) at which it was at the path's start
         public List<Bird> Birds = new();
     }
 
@@ -51,7 +53,51 @@ namespace Flocks
         /// <summary>Calls fade out linearly over this many blocks from the calling bird.</summary>
         public float CallRange = 220;
 
+        /// <summary>The landed goose entity's size (entities/greylag.json client.size); the sky draws Species.Scale.</summary>
+        public const double EntityScale = 0.55;
+        /// <summary>A landing flock keeps being drawn this long past the swap, covering the entities' arrival.</summary>
+        public const double SwapOverlapSeconds = 0.2;
+
         public FlockRenderer(ICoreClientAPI capi) { this.capi = capi; }
+
+        private double Now => capi.ElapsedMilliseconds / 1000.0;
+
+        /// <summary>
+        /// A landing flock (LandingFlocks): flies the packet's fixed path, so it is where the server says at every
+        /// moment, and disappears at the hand-off point as the real geese take its place. Drawn at sky scale with the
+        /// formation spread to match, closing to the real geese's spacing over the last 8 s (the birds themselves stay
+        /// sky-sized: no size matching yet).
+        /// </summary>
+        public void AddLanding(Species sp, LandingFlockPacket pkt)
+        {
+            int n = pkt.Along?.Length ?? 0;
+            if (n == 0 || pkt.Speed <= 0) return;
+            var f = new Flock
+            {
+                Species = sp, Script = pkt, ScriptT0 = Now + pkt.SecondsToHandoff - pkt.EntryDist / pkt.Speed,
+                Speed = pkt.Speed, BaseHeading = pkt.Heading, Heading = pkt.Heading, Pos = new Vec3d(), CruiseY = pkt.CruiseY,
+                Length = pkt.EntryDist + pkt.Speed * SwapOverlapSeconds,
+            };
+            for (int i = 0; i < n; i++) f.Birds.Add(NewBird(sp, new Vec3d(pkt.Along[i], pkt.Up[i], pkt.Across[i])));
+            MoveScripted(f);
+            flocks.Add(f);
+        }
+
+        private void MoveScripted(Flock f)
+        {
+            var s = f.Script;
+            double dist = Math.Max(0, (Now - f.ScriptT0) * s.Speed);     // blocks flown from the path's start
+            double before = s.EntryDist - dist;                          // blocks short of the hand-off point
+            double descent = Math.Max(1e-6, s.EntryDist - s.DescentStart);
+            double w = GameMath.Clamp((dist - s.DescentStart) / descent, 0, 1);
+            double dx = Math.Sin(s.Heading), dz = Math.Cos(s.Heading);
+            f.Pos.Set(s.HandoffX - dx * before, s.CruiseY + (s.HandoffY - s.CruiseY) * w, s.HandoffZ - dz * before);
+            f.ClimbRate = w > 0 && w < 1 ? (s.HandoffY - s.CruiseY) / descent * s.Speed : 0;
+            f.Heading = s.Heading; f.TurnRate = 0; f.Travel = dist;
+            // spread to sky scale while far out, closing to the real geese's formation over the last 8 s
+            double wide = f.Species.Scale / EntityScale, k = GameMath.Clamp(before / (s.Speed * 8), 0, 1), m = 1 + (wide - 1) * k;
+            for (int i = 0; i < f.Birds.Count; i++) f.Birds[i].Offset.Set(s.Along[i] * m, s.Up[i] * m, s.Across[i] * m);
+        }
         public double RenderOrder => 0.45;
         public int RenderRange => 400;
         public int Count => flocks.Count;
@@ -218,6 +264,7 @@ namespace Flocks
         private void Move(Flock f, float dt)
         {
             f.Age += dt;
+            if (f.Script != null) { MoveScripted(f); return; }
             if (f.TargetSpeed > 0) f.Speed += GameMath.Clamp(f.TargetSpeed - f.Speed, -1.5 * dt, 1.5 * dt);
             foreach (var b in f.Birds)
             {

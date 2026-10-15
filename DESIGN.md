@@ -83,8 +83,19 @@ states Landed / Away / Lost) and the departure hand-off. Departing geese (autumn
 to land after being flushed) climb out; once their centre is 80 blocks from every player the server sends their
 positions, heading and speed to clients within 1600 blocks, removes the entities and marks the flock Away. Clients
 continue them as a drawn flock starting exactly there, easing into a V, up to cruising height and species speed
-over ~10 s. Not done yet: landing flocks (schedule-driven, server-planned and shared by all nearby players, with a
-time-based path so server and clients agree where every bird is at the swap) and replacing Lost flocks.
+over ~10 s.
+
+Done in 0.11.0 (second half): landing flocks (LandingFlocks.cs, server). On spring migration days each online player
+gets up to one landing a day (scaled by the day's spring strength, at a goose flying hour); `/flocks arrive` forces
+one. It needs open water 40-160 blocks from the player with no geese on it, in the resident season. The flock is the
+one Away longest (returning with whoever is left), else a replacement for a Lost one, else new (7-12). The server
+fixes the path up front (a straight line along the arrival heading, from ~800 blocks out to a hand-off point 60
+blocks short of the lake, cruise height clear of all loaded terrain along it, a descent steep enough to clear any
+hill) and sends it to every client within 1600 blocks; each draws the flock from the path and the time alone, so all
+agree where every bird is. At the hand-off the server spawns the real geese at the same spots, already flying at
+13 blocks/s toward their own landing spots, and they glide in (Waterfowl). Autumn has no landings: geese out of
+season would leave at once. The drawn formation closes to the real geese's spacing over the last 8 s, but the birds
+stay sky-sized until the swap (size jump left visible on purpose).
 
 Next steps:
 - Hand-off from the sky: when a planned goose flock passes a suitable lake (fresh water, 36+ surface blocks, 64+

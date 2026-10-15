@@ -33,19 +33,22 @@ namespace Flocks
         public override void Start(ICoreAPI api)
         {
             // message types register in the same order on both sides
-            api.Network.RegisterChannel("flocks").RegisterMessageType<SendFlockPacket>().RegisterMessageType<FlockHandoffPacket>();
+            api.Network.RegisterChannel("flocks").RegisterMessageType<SendFlockPacket>().RegisterMessageType<FlockHandoffPacket>()
+                .RegisterMessageType<LandingFlockPacket>();
             api.RegisterEntityBehaviorClass(EntityBehaviorWaterfowl.Code, typeof(EntityBehaviorWaterfowl));
         }
 
         /// <summary>/flocks (typed with a slash) goes to the server; it only relays the subcommand to the caller's client.</summary>
         private ResidentGeese residents;
         private FlockRegistry registry;
+        private LandingFlocks landings;
 
         public override void StartServerSide(ICoreServerAPI sapi)
         {
             residents = new ResidentGeese(sapi, LoadServerConfig(sapi));
             var ch = sapi.Network.GetChannel("flocks");
             registry = new FlockRegistry(sapi, ch);
+            landings = new LandingFlocks(sapi, ch);
             var p = sapi.ChatCommands.Parsers;
             sapi.ChatCommands.Create("flocks").WithDescription("Flocks (client-side birds)").RequiresPrivilege(Privilege.chat)
                 .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [goose|crane|hawk]").RequiresPlayer()
@@ -67,6 +70,14 @@ namespace Flocks
                 .RequiresPrivilege(Privilege.controlserver)
                 .WithArgs(p.OptionalInt("count", 0))
                 .HandleWith(args => Landing.Land(sapi, args.Caller.Entity, (int)args[0]))
+                .EndSubCommand()
+                .BeginSubCommand("arrive").WithDescription("Debug: send a landing flock to a lake near you now (any season)").RequiresPlayer()
+                .RequiresPrivilege(Privilege.controlserver)
+                .HandleWith(args =>
+                {
+                    bool ok = landings.Arrive((IServerPlayer)args.Caller.Player, true, out string msg);
+                    return ok ? TextCommandResult.Success(msg) : TextCommandResult.Error(msg);
+                })
                 .EndSubCommand()
                 .BeginSubCommand("residents").WithDescription("Debug: resident geese state (spawn checks and vetoes, geese near each player, season)")
                 .RequiresPrivilege(Privilege.controlserver)
@@ -110,6 +121,11 @@ namespace Flocks
                 // departing landed geese become a drawn flock where they are (FlockRegistry.TryHandoff)
                 if (renderer == null || pkt.X == null || !species.TryGetValue(pkt.Species ?? "", out var sp) || !sp.Meshes.Ok) return;
                 renderer.Adopt(sp, pkt.X, pkt.Y, pkt.Z, pkt.Heading, pkt.Speed);
+            }).SetMessageHandler<LandingFlockPacket>(pkt =>
+            {
+                // a flock coming in to land: drawn until the server swaps it for real geese (LandingFlocks)
+                if (renderer == null || !species.TryGetValue(pkt.Species ?? "", out var sp) || !sp.Meshes.Ok) return;
+                renderer.AddLanding(sp, pkt);
             });
             var p = api.ChatCommands.Parsers;
             api.ChatCommands.Create("flocks").WithDescription("Flocks (client-only birds)")

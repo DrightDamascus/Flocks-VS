@@ -412,8 +412,27 @@ namespace Flocks
             departing = t.GetBool("depart"); travel = t.GetDouble("travel"); cruise = t.GetDouble("cruise", cruiseMin);
             threatX = t.GetDouble("threatX"); threatZ = t.GetDouble("threatZ");
             target = t.HasAttribute("tx") ? new Vec3d(t.GetDouble("tx"), t.GetDouble("ty"), t.GetDouble("tz")) : null;
+            if (target != null && t.GetBool("rawTarget")) { target.Y -= sink; Persist(); } // set by PrepareLanding
             flyHeading = entity.Pos.Yaw; speed = cruise; phaseTime = 2; searchTimer = 0;
             if (phase == Phase.Water) Persist();
+        }
+
+        /// <summary>
+        /// Before spawning a goose of a landing flock (LandingFlocks hand-off): it starts in flight at speed, already
+        /// headed for spot (a water-surface point from LakeSearch), and glides in on its first ticks. Written in the
+        /// same saved form Restore() reads; the bird's own sink is applied there.
+        /// </summary>
+        public static void PrepareLanding(Entity goose, Vec3d spot, double heading, double speed, double threatX, double threatZ)
+        {
+            var t = new TreeAttribute();
+            t.SetInt("phase", (int)Phase.Fly);
+            t.SetBool("depart", false);
+            t.SetDouble("travel", 0); t.SetDouble("cruise", speed);
+            t.SetDouble("threatX", threatX); t.SetDouble("threatZ", threatZ);
+            t.SetDouble("tx", spot.X); t.SetDouble("ty", spot.Y); t.SetDouble("tz", spot.Z);
+            t.SetBool("rawTarget", true);
+            goose.WatchedAttributes[FlightKey] = t;
+            goose.Pos.Yaw = (float)heading;
         }
 
         /// <summary>Climbing away for good, ready to be handed to the sky renderer.</summary>

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.11.0
+Flocks land as flocks and become geese (second half of flocks landing and leaving; new LandingFlocks.cs):
+- On spring migration days each player gets up to one landing flock a day (scaled by the day's migration strength,
+  at a goose flying hour). `/flocks arrive` sends one now, in any season, for testing.
+- A landing needs open water 40-160 blocks from the player with no geese on it yet, in the resident season.
+- The flock is the one away longest (it returns with whoever survived), else a replacement for a flock that was
+  killed off, else a new one of 7-12 (FlockRegistry).
+- Every client within 1600 blocks sees the same flock: the server fixes its path up front (from ~800 blocks out,
+  cruising clear of all loaded terrain along the way, descending steeply enough to clear any hill before the lake)
+  and clients draw it from the path and the time alone.
+- 60 blocks short of the lake the drawn birds are swapped for real geese at the same spots, already flying at
+  13 blocks/s toward their own spots on the water; they glide in, splash down and stay for the season.
+- The drawn formation closes up to the real geese's spacing over the last 8 s; the birds stay sky-sized until the
+  swap, so the size jump is visible (on purpose, for now).
+- Autumn has no landings: geese out of their resident season would leave again at once.
+
 ## 0.10.1
 - Natural geese actually spawn now. Vanilla's spawner rolls a type's runtime `chance` once every 0.5 s to decide
   whether that type is considered at all (read from the decompiled spawner), not per chunk. At 0.0003 geese were

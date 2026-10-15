@@ -145,7 +145,7 @@ namespace Flocks
             => rel <= start || rel >= end ? 0 : Math.Sin(Math.PI * (rel - start) / (end - start));
 
         /// <summary>A random hour inside the species' flying hours, longer windows proportionally more likely.</summary>
-        private static double PickHour(Species sp, Random rnd)
+        internal static double PickHour(Species sp, Random rnd)
         {
             double total = 0;
             for (int i = 0; i + 1 < sp.Hours.Length; i += 2) total += sp.Hours[i + 1] - sp.Hours[i];

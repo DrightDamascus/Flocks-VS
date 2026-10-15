@@ -115,6 +115,27 @@ namespace Flocks
             goose.WatchedAttributes.SetLong(FlockIdKey, f.Id);
         }
 
+        /// <summary>
+        /// The flock that comes down in a landing: the flock away longest returns with whoever is left in it; failing
+        /// that, a flock that was killed off is replaced by a new one (the old record goes); failing that, a new flock
+        /// of 7-12. Marked Landed at the lake.
+        /// </summary>
+        public FlockRecord TakeForLanding(string species, Vec3d lake, Random rand)
+        {
+            var f = flocks.Values.Where(r => r.Species == species && r.State == FlockState.Away && r.Count > 0).OrderBy(r => r.SinceHours).FirstOrDefault();
+            if (f == null)
+            {
+                var lost = flocks.Values.Where(r => r.Species == species && r.State == FlockState.Lost).OrderBy(r => r.SinceHours).FirstOrDefault();
+                if (lost != null) flocks.Remove(lost.Id);
+                f = Create(species, 7 + rand.Next(6), lake);
+            }
+            f.State = FlockState.Landed; f.X = lake.X; f.Y = lake.Y; f.Z = lake.Z; f.SinceHours = sapi.World.Calendar.TotalHours;
+            return f;
+        }
+
+        /// <summary>A landing that couldn't complete (its lake unloaded): the flock is away again.</summary>
+        public void LandingFailed(FlockRecord f) { f.State = FlockState.Away; f.SinceHours = sapi.World.Calendar.TotalHours; }
+
         public void MemberDied(Entity goose)
         {
             var f = Get(goose.WatchedAttributes.GetLong(FlockIdKey, 0));
