@@ -32,17 +32,20 @@ namespace Flocks
 
         public override void Start(ICoreAPI api)
         {
-            api.Network.RegisterChannel("flocks").RegisterMessageType<SendFlockPacket>();
+            // message types register in the same order on both sides
+            api.Network.RegisterChannel("flocks").RegisterMessageType<SendFlockPacket>().RegisterMessageType<FlockHandoffPacket>();
             api.RegisterEntityBehaviorClass(EntityBehaviorWaterfowl.Code, typeof(EntityBehaviorWaterfowl));
         }
 
         /// <summary>/flocks (typed with a slash) goes to the server; it only relays the subcommand to the caller's client.</summary>
         private ResidentGeese residents;
+        private FlockRegistry registry;
 
         public override void StartServerSide(ICoreServerAPI sapi)
         {
             residents = new ResidentGeese(sapi, LoadServerConfig(sapi));
             var ch = sapi.Network.GetChannel("flocks");
+            registry = new FlockRegistry(sapi, ch);
             var p = sapi.ChatCommands.Parsers;
             sapi.ChatCommands.Create("flocks").WithDescription("Flocks (client-side birds)").RequiresPrivilege(Privilege.chat)
                 .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [goose|crane|hawk]").RequiresPlayer()
@@ -60,14 +63,14 @@ namespace Flocks
                     return TextCommandResult.Success();
                 })
                 .EndSubCommand()
-                .BeginSubCommand("land").WithDescription("Debug: spawn 5-12 greylag geese on open water near you: /flocks land [count]").RequiresPlayer()
+                .BeginSubCommand("land").WithDescription("Debug: spawn 7-12 greylag geese on open water near you: /flocks land [count]").RequiresPlayer()
                 .RequiresPrivilege(Privilege.controlserver)
                 .WithArgs(p.OptionalInt("count", 0))
                 .HandleWith(args => Landing.Land(sapi, args.Caller.Entity, (int)args[0]))
                 .EndSubCommand()
                 .BeginSubCommand("residents").WithDescription("Debug: resident geese state (spawn checks and vetoes, geese near each player, season)")
                 .RequiresPrivilege(Privilege.controlserver)
-                .HandleWith(args => TextCommandResult.Success(residents.Report()))
+                .HandleWith(args => TextCommandResult.Success(residents.Report() + "\n" + registry.Report()))
                 .EndSubCommand();
         }
 
@@ -102,6 +105,11 @@ namespace Flocks
             {
                 string msg = pkt.Command == "schedule" ? Schedule() : TrySend(pkt.Count, pkt.Species, out _);
                 api.ShowChatMessage("[Flocks] " + msg);
+            }).SetMessageHandler<FlockHandoffPacket>(pkt =>
+            {
+                // departing landed geese become a drawn flock where they are (FlockRegistry.TryHandoff)
+                if (renderer == null || pkt.X == null || !species.TryGetValue(pkt.Species ?? "", out var sp) || !sp.Meshes.Ok) return;
+                renderer.Adopt(sp, pkt.X, pkt.Y, pkt.Z, pkt.Heading, pkt.Speed);
             });
             var p = api.ChatCommands.Parsers;
             api.ChatCommands.Create("flocks").WithDescription("Flocks (client-only birds)")

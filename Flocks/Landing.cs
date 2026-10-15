@@ -22,7 +22,7 @@ namespace Flocks
             var type = sapi.World.GetEntityType(new AssetLocation("flocks", "greylag"));
             if (type == null) return TextCommandResult.Error("Entity type flocks:greylag is not loaded; see server-main.log.");
             var rand = sapi.World.Rand;
-            int n = count > 0 ? GameMath.Clamp(count, 1, 30) : 5 + rand.Next(8);
+            int n = count > 0 ? GameMath.Clamp(count, 1, 30) : 7 + rand.Next(6); // landing flocks are 7-12, like natural groups
             var patch = FindPatch(sapi.World.BlockAccessor, caller.Pos.AsBlockPos);
             if (patch == null) return TextCommandResult.Error($"No open water with {MinPatch}+ surface blocks at least {Clear:0} blocks from you (the geese would flee at once) within {Radius} blocks.");
 
@@ -33,11 +33,14 @@ namespace Flocks
             var anchor = spots.OrderBy(Dist).First();
             spots = spots.OrderBy(c => (c.X - anchor.X) * (c.X - anchor.X) + (c.Z - anchor.Z) * (c.Z - anchor.Z)).Take(Math.Max(MinPatch, n * 4)).ToList();
             int spawned = 0;
+            // one flock record for the whole group, so they leave together and are tracked as one
+            var flock = FlockRegistry.Instance?.Create("goose", n, new Vec3d(anchor.X + 0.5, anchor.Y + 1, anchor.Z + 0.5));
             for (int i = 0; i < n; i++)
             {
                 var c = spots[rand.Next(spots.Count)];
                 var e = sapi.World.ClassRegistry.CreateEntity(type);
                 e.WatchedAttributes.SetBool(EntityBehaviorWaterfowl.TestKey, true); // test geese leave after lifeHours
+                if (flock != null) e.WatchedAttributes.SetLong(FlockRegistry.FlockIdKey, flock.Id);
                 e.Pos.SetPos(c.X + 0.2 + rand.NextDouble() * 0.6, c.Y + 0.75, c.Z + 0.2 + rand.NextDouble() * 0.6);
                 e.Pos.Yaw = (float)(rand.NextDouble() * Math.PI * 2);
                 sapi.World.SpawnEntity(e);

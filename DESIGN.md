@@ -65,6 +65,27 @@ once: open water on the same lake at least 26 blocks from the threat and 14 from
 nearest lake within 160 blocks not toward the threat; else they fly on, searching every 4 s. Flight state is saved
 in WatchedAttributes. A death animation (roll onto the side, neck limp) replaces the frozen swim pose.
 
+Decisions (Dright, 0.10.0) for flocks landing and leaving:
+- Flocks that only pass over: 7-25 birds (hawks 3-10), unchanged. Landing flocks: 7-12, and natural resident groups
+  match (spawn groupSize 7-12; runtime maxQuantity raised 12 -> 24 so an area still holds about two groups).
+  A departing flock is simply whatever group is on the lake.
+- Landing flocks come from the migration schedule, and landed flocks rejoin it when they leave. A flock that is
+  killed off is replaced by a new one at the next migration. This needs a lasting, server-side identity per flock
+  (the client schedules can't see deaths): FlockRegistry.
+- Distant flight stays client-drawn (sky renderer: visible 300-1500 blocks, no server cost). Real entities only for
+  the final approach and the climb-out: the server only simulates entities within 128 blocks of a player.
+- No size matching yet: the sky goose is drawn ~4.5x the entity (6.4 vs 1.4 block wingspan) and the jump at a
+  hand-off is left visible on purpose, to judge it. Planned fix if needed: scale drawn birds by viewer distance.
+- Geese are the test species; per-species data (family unit, flock size) is to follow for the others.
+
+Done in 0.10.0 (first half): FlockRegistry (saved with the world; every goose carries a flock id; deaths counted;
+states Landed / Away / Lost) and the departure hand-off. Departing geese (autumn, test-goose lifeHours, or nowhere
+to land after being flushed) climb out; once their centre is 80 blocks from every player the server sends their
+positions, heading and speed to clients within 1600 blocks, removes the entities and marks the flock Away. Clients
+continue them as a drawn flock starting exactly there, easing into a V, up to cruising height and species speed
+over ~10 s. Not done yet: landing flocks (schedule-driven, server-planned and shared by all nearby players, with a
+time-based path so server and clients agree where every bird is at the swap) and replacing Lost flocks.
+
 Next steps:
 - Hand-off from the sky: when a planned goose flock passes a suitable lake (fresh water, 36+ surface blocks, 64+
   blocks from the player, near its heading), the client asks the server to land it. The server checks the lake

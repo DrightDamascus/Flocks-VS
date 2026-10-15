@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.10.0
+Departing geese become a migrating flock instead of vanishing (first half of flocks landing and leaving):
+- New FlockRegistry (server, saved with the world): every landed group of geese is a flock with an id, a living
+  count, deaths, and a state (Landed, Away on migration, Lost when all are killed). Geese carry their flock id;
+  vanilla group spawns, old saves and /flocks land groups are all picked up. `/flocks residents` shows the totals.
+- Departure hand-off: departing geese (the resident season ends, a /flocks land goose's lifeHours, or nowhere to land
+  after being flushed) climb away. Once their centre is 80 blocks from every player, the entities are removed and
+  every client within 1600 blocks continues them as a drawn flock from exactly where they were, at their speed and
+  heading, closing into a V and climbing to cruising height and species speed over ~10 s. The flock is marked Away.
+- This also fixes departing geese freezing in mid-air: they were meant to despawn once no player was within 128
+  blocks, but the server stops simulating entities at exactly that distance.
+- Flushed geese with nowhere to land now rejoin the migration (hand-off) instead of searching on.
+- Group sizes: natural resident groups and /flocks land are now 7-12 (were ~3-9 and 5-12). maxQuantity per player
+  area 12 -> 24, so an area still holds about two groups.
+- The drawn flock is ~4.5x the size of the real geese at the swap; left as is for now, on purpose.
+
 ## 0.9.1
 Flying geese avoid terrain instead of flying into it (Waterfowl.cs):
 - Every tick a flying goose scans the ground and tree tops 3 s ahead (36-40 blocks at cruise), down the middle and

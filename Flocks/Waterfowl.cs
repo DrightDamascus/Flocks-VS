@@ -12,8 +12,9 @@ namespace Flocks
     /// drifts it slowly and paddles away from players that come close. When a player gets very close or it is shot
     /// at, the group takes off in a hurry (a short run across the water), flies to another part of the lake, or to
     /// another lake if there's no safe water left on this one, and glides in to land there.
-    /// Geese only leave the world when they depart for good (the resident season ends, or a /flocks land test goose's
-    /// time is up) or fly a long way without finding any lake, and then only once no player is near enough to see.
+    /// A group that departs for good (the resident season ends, a /flocks land test goose's time is up, or there is
+    /// nowhere to land nearby) climbs away and, once 80 blocks from every player, becomes a drawn flock in the clients'
+    /// sky (FlockRegistry.TryHandoff): it rejoins the migration rather than vanishing.
     /// Flight state is kept in WatchedAttributes, so a goose that flies out of the loaded area carries on later.
     /// Vanilla's land-creature AI tasks are not used: their pathfinder avoids water and getoutofwater would drag
     /// the birds ashore, so movement is set here directly and the vanilla physics does the rest.
@@ -45,10 +46,8 @@ namespace Flocks
         private const double Accel = 7, TurnRate = 1.4, ClimbMax = 4.5, SinkMax = 3, GroundClear = 6;
         /// <summary>Gliding in: blocks forward per block down, and the speed at touchdown.</summary>
         private const double GlideRatio = 3.5, LandSpeed = 6, SplashSeconds = 0.9;
-        /// <summary>Departing geese, and geese that flew GiveUpTravel blocks without finding a lake, despawn once no
-        /// player is within VanishRange.</summary>
-        private const float VanishRange = 128;
-        private const double GiveUpTravel = 1200;
+        /// <summary>Species code of the drawn flock this bird becomes when it departs (Species.cs).</summary>
+        private string species = "goose";
         /// <summary>Terrain avoidance: feet clear ground and trees by Clearance; obstacles are seen LookSeconds ahead
         /// across the wingspan (HalfSpan either side). A wall too steep to climb at speed makes the goose pull up hard
         /// (SteepClimb) and shed speed, down to a near-vertical hover-climb at MinPullSpeed.</summary>
@@ -81,6 +80,7 @@ namespace Flocks
             sink = attributes["sink"].AsFloat(sink);
             cruiseMin = attributes["cruiseSpeedMin"].AsDouble(cruiseMin);
             cruiseMax = attributes["cruiseSpeedMax"].AsDouble(cruiseMax);
+            species = attributes["species"].AsString(species);
             heading = rand.NextDouble() * Math.PI * 2;
         }
 
@@ -89,7 +89,7 @@ namespace Flocks
             if (entity.World.Side != EnumAppSide.Server) return;
             var pos = entity.Pos;
             if (!entity.Alive) { pos.Roll = 0; if (entity.Swimming || entity.FeetInLiquid) pos.Motion.Y = SurfaceMotion(); return; }
-            if (!restored) { restored = true; Restore(); }
+            if (!restored) { restored = true; Restore(); FlockRegistry.Instance?.Adopt(entity, species); }
             if (phase != Phase.Water) { TickFlight(dt); return; }
 
             var attrs = entity.WatchedAttributes;
@@ -155,6 +155,7 @@ namespace Flocks
             var pos = entity.Pos;
             double tx = threat?.Pos.X ?? pos.X, tz = threat?.Pos.Z ?? pos.Z;
             List<Vec3d> spots = depart ? null : LakeSearch.FindSpots(entity.World.BlockAccessor, pos.XYZ, tx, tz, Landing.MinPatch, rand);
+            if (spots == null || spots.Count == 0) depart = true; // nowhere to land nearby: they rejoin the migration
             Takeoff(away, Pick(spots), depart, tx, tz, 0);
             foreach (var e in entity.World.GetEntitiesAround(pos.XYZ, 16, 8, e => e.Code == entity.Code && e.Alive && e != entity))
                 e.GetBehavior<EntityBehaviorWaterfowl>()?.Takeoff(away + (rand.NextDouble() - 0.5) * 0.6, Pick(spots), depart, tx, tz,
@@ -209,7 +210,7 @@ namespace Flocks
                         searchTimer = 4;
                         target = Pick(LakeSearch.FindSpots(entity.World.BlockAccessor, pos.XYZ, threatX, threatZ, Landing.MinPatch, rand));
                         if (target != null) { target.Y -= sink; Persist(); }
-                        else if (travel > GiveUpTravel) { departing = true; Persist(); }
+                        else { departing = true; Persist(); } // nowhere to land: rejoin the migration
                     }
                     // Climb out straight for a moment, then turn toward the landing spot. A spot close by and well off
                     // the nose can sit inside the turning circle, where steering at it only orbits it: fly on until it
@@ -236,7 +237,12 @@ namespace Flocks
                         bool clear = NeededSlope(flyHeading, Math.Max(0, d - 2.5)) <= -drop / Math.Max(d, 1) + 0.05;
                         if (d <= drop * GlideRatio + 3 && err < 0.5 && phaseTime > 1.5 && clear) SetPhase(Phase.Glide);
                     }
-                    else if (departing && phaseTime > 6 && NearestPlayer(VanishRange) == null) { entity.Die(EnumDespawnReason.Expire); return; }
+                    else if (departing && phaseTime > 3)
+                    {
+                        // far enough from every player: the group becomes a drawn flock (FlockRegistry.TryHandoff)
+                        FlockRegistry.Instance?.TryHandoff(entity, species);
+                        if (!entity.Alive) return;
+                    }
                     break;
                 }
 
@@ -408,6 +414,16 @@ namespace Flocks
             target = t.HasAttribute("tx") ? new Vec3d(t.GetDouble("tx"), t.GetDouble("ty"), t.GetDouble("tz")) : null;
             flyHeading = entity.Pos.Yaw; speed = cruise; phaseTime = 2; searchTimer = 0;
             if (phase == Phase.Water) Persist();
+        }
+
+        /// <summary>Climbing away for good, ready to be handed to the sky renderer.</summary>
+        public bool DepartingInFlight => phase == Phase.Fly && departing;
+        public double FlyHeading => flyHeading;
+        public double FlySpeed => speed;
+
+        public override void OnEntityDeath(DamageSource damageSourceForDeath)
+        {
+            if (entity.World.Side == EnumAppSide.Server) FlockRegistry.Instance?.MemberDied(entity);
         }
 
         // ------------------------------------------------------------------------------------------------ water
