@@ -48,13 +48,14 @@
 			] },
 			{ code: "floatupwhenstuck", onlyWhenDead: true }
 		],
-		// Vanilla spawning, modelled on freshwater fish (inside still water at the surface) and wolves (runtime group,
-		// MinDistanceToPlayer, maxQuantity per player area). Season, lake size and crowding are vetoed in Residents.cs.
+		// Vanilla spawning, modelled on freshwater fish. tryOnlySurface places the group just above the worldgen terrain
+		// height, i.e. on the lake bed inside the water; the geese float up. No light limit: water dims sunlight with
+		// depth, and tryOnlySurface already keeps them out of caves. Season, lake size, shore distance and crowding are
+		// vetoed in Residents.cs (after vanilla has found the spots).
 		spawnconditions: {
 			worldgen: {
 				TriesPerChunk: { avg: 0.03, var: 0 },
 				tryOnlySurface: true,
-				minLightLevel: 6,
 				groupSize: { dist: "verynarrowgaussian", avg: 9.5, var: 2.5 },
 				insideBlockCodes: ["game:water-still-7"],
 				minTemp: -8,
@@ -64,10 +65,12 @@
 			runtime: {
 				group: "passive",
 				MinDistanceToPlayer: 32,
-				chance: 0.0003,
-				maxQuantity: 24, // about two groups of 7-12 per player area
+				// Rolled once per entity type every 0.5 s to decide whether geese are considered at all that round (not
+				// per chunk). 0.0003 meant about once every 28 minutes, so they almost never appeared; 0.01 is ~50 s.
+				chance: 0.01,
+				// all loaded geese on the server (scaled up for extra players), not per area: about two groups of 7-12
+				maxQuantity: 24,
 				tryOnlySurface: true,
-				minLightLevel: 6,
 				groupSize: { dist: "verynarrowgaussian", avg: 9.5, var: 2.5 },
 				insideBlockCodes: ["game:water-still-7"],
 				minTemp: -8,

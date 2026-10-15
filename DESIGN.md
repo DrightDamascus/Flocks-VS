@@ -52,7 +52,7 @@ Done in 0.6.0 (first step): entity flocks:greylag, behaviour flocks.waterfowl (f
 despawn, spear/melee dodge), and `/flocks land` (finds a fresh-water patch near the player, spawns a group).
 
 Done in 0.7.0, reworked in 0.7.1: resident geese spawn through vanilla's spawner (spawnconditions in
-entities/greylag.json, like fish: inside still surface water; like wolves: runtime maxQuantity per player area,
+entities/greylag.json, like fish: inside still surface water; like wolves: runtime maxQuantity (all loaded geese, scaled per player),
 MinDistanceToPlayer). A server OnTrySpawnEntity veto adds what vanilla lacks: the resident season (spring window to
 autumn window, all year near the equator), a minimum lake size, a maximum distance from shore (0.8.4: 8-direction scan, ShoreDistance), and a generous per-area safety cap. Residents leave
 with a takeoff when autumn starts. No global cap and no custom placer; geese appear out of sight like other animals.
@@ -67,7 +67,7 @@ in WatchedAttributes. A death animation (roll onto the side, neck limp) replaces
 
 Decisions (Dright, 0.10.0) for flocks landing and leaving:
 - Flocks that only pass over: 7-25 birds (hawks 3-10), unchanged. Landing flocks: 7-12, and natural resident groups
-  match (spawn groupSize 7-12; runtime maxQuantity raised 12 -> 24 so an area still holds about two groups).
+  match (spawn groupSize 7-12; runtime maxQuantity, a cap on all loaded geese, raised 12 -> 24: about two groups).
   A departing flock is simply whatever group is on the lake.
 - Landing flocks come from the migration schedule, and landed flocks rejoin it when they leave. A flock that is
   killed off is replaced by a new one at the next migration. This needs a lasting, server-side identity per flock

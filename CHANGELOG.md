@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.10.1
+- Natural geese actually spawn now. Vanilla's spawner rolls a type's runtime `chance` once every 0.5 s to decide
+  whether that type is considered at all (read from the decompiled spawner), not per chunk. At 0.0003 geese were
+  considered about once every 28 minutes, and then needed a full group's worth of water in one pass, so they almost
+  never appeared (`/flocks residents` showed 0 spawn checks). Now 0.01, about every 50 s.
+- No light limit any more: tryOnlySurface places geese on the lake bed (worldgen terrain height + 1), where deeper
+  water was too dark for the old minLightLevel 6. tryOnlySurface already keeps them out of caves.
+- Comments corrected: maxQuantity caps all loaded geese on the server (scaled per player), not per area.
+
 ## 0.10.0
 Departing geese become a migrating flock instead of vanishing (first half of flocks landing and leaving):
 - New FlockRegistry (server, saved with the world): every landed group of geese is a flock with an id, a living
