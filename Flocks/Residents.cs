@@ -15,6 +15,9 @@ namespace Flocks
         public bool ResidentGeese = true;
         /// <summary>Smallest lake (fresh-water surface blocks around the spawn point) a goose spawn is allowed on.</summary>
         public int MinLakeSize = 36;
+        /// <summary>No goose spawn further than this from shore (a solid non-water block at or just above the water
+        /// surface, looked for in 8 directions). Floating geese more than 1.5x this far out steer back toward land.</summary>
+        public int ShoreDistance = 20;
         /// <summary>Safety cap: no new goose spawn when this many geese are already within NearbyRadius of the spot.
         /// Vanilla's own per-player limit (spawnconditions.runtime.maxQuantity) normally applies long before this.</summary>
         public int MaxGeeseNearby = 30;
@@ -32,11 +35,14 @@ namespace Flocks
         private readonly ICoreServerAPI sapi;
         public readonly FlocksServerConfig Cfg;
         public static readonly AssetLocation Code = new("flocks", "greylag");
-        public int Allowed, VetoSeason, VetoLake, VetoCrowded, VetoOff;
+        public int Allowed, VetoSeason, VetoLake, VetoShore, VetoCrowded, VetoOff;
+        /// <summary>Config ShoreDistance, for EntityBehaviorWaterfowl (server side).</summary>
+        public static int ShoreDistanceCfg = 20;
 
         public ResidentGeese(ICoreServerAPI sapi, FlocksServerConfig cfg)
         {
             this.sapi = sapi; Cfg = cfg;
+            ShoreDistanceCfg = Math.Max(1, cfg.ShoreDistance);
             sapi.Event.OnTrySpawnEntity += TrySpawn;
         }
 
@@ -49,6 +55,7 @@ namespace Flocks
                 var bp = pos.AsBlockPos;
                 if (!InSeason(sapi.World, bp)) { VetoSeason++; return false; }
                 if (LakeSize(ba, bp, Cfg.MinLakeSize) < Cfg.MinLakeSize) { VetoLake++; return false; }
+                if (ShoreDirection(ba, bp, ShoreDistanceCfg, out _) < 0) { VetoShore++; return false; }
                 int near = sapi.World.GetEntitiesAround(pos, Cfg.NearbyRadius, 32, e => e.Alive && e.Code.Equals(Code)).Length;
                 if (near >= Cfg.MaxGeeseNearby) { VetoCrowded++; return false; }
                 Allowed++;
@@ -80,6 +87,32 @@ namespace Flocks
             return n;
         }
 
+        /// <summary>
+        /// Distance to the nearest shore within maxDist along 8 directions (N, NE, ... from bp's water surface), with
+        /// its heading (FlockRenderer convention, dir = (sin, cos)); -1 if none. Shore = a solid non-liquid block at the
+        /// surface level or one above. Cost is at most 8 x maxDist x 2 block reads; it never floods the lake.
+        /// </summary>
+        public static int ShoreDirection(IBlockAccessor ba, BlockPos bp, int maxDist, out double heading)
+        {
+            heading = 0;
+            int y = Surface(ba, bp.X, bp.Z, out int sy) ? sy : bp.Y;
+            var tmp = new BlockPos(0, 0, 0);
+            for (int d = 1; d <= maxDist; d++)
+                for (int i = 0; i < 8; i++)
+                {
+                    double h = i * Math.PI / 4;
+                    int x = bp.X + (int)Math.Round(Math.Sin(h) * d), z = bp.Z + (int)Math.Round(Math.Cos(h) * d);
+                    for (int dy = 0; dy <= 1; dy++)
+                    {
+                        tmp.Set(x, y + dy, z);
+                        var b = ba.GetBlock(tmp);
+                        if (b != null && b.Id != 0 && !b.IsLiquid() && b.CollisionBoxes != null && b.CollisionBoxes.Length > 0)
+                        { heading = h; return d; }
+                    }
+                }
+            return -1;
+        }
+
         private static bool Surface(IBlockAccessor ba, int x, int z, out int y)
         {
             y = ba.GetRainMapHeightAt(x, z);
@@ -91,7 +124,7 @@ namespace Flocks
         public string Report()
         {
             var sb = new StringBuilder($"Resident geese {(Cfg.ResidentGeese ? "on" : "OFF")} (vanilla spawning + season/lake veto). " +
-                $"Spawn checks since start: {Allowed} allowed, vetoed {VetoSeason} out of season, {VetoLake} small lake, {VetoCrowded} crowded, {VetoOff} disabled.");
+                $"Spawn checks since start: {Allowed} allowed, vetoed {VetoSeason} out of season, {VetoLake} small lake, {VetoShore} too far from shore (>{Cfg.ShoreDistance}), {VetoCrowded} crowded, {VetoOff} disabled.");
             var geese = sapi.World.LoadedEntities.Values.Where(e => e.Alive && e.Code.Equals(Code)).ToList();
             sb.Append($"\nLoaded geese: {geese.Count}");
             foreach (var p in sapi.World.AllOnlinePlayers)

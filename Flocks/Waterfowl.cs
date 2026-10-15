@@ -25,6 +25,9 @@ namespace Flocks
 
         public bool Resident => !entity.WatchedAttributes.HasAttribute(TestKey);
         private float seasonCheck = 5;
+        // far-from-shore check: every few seconds; while too far out, drift is pulled toward the nearest land seen
+        private float shoreCheck = 2;
+        private double shoreHeading = double.NaN;
 
         private float fleeRange = 14, takeoffRange = 7, lifeHours = 6, flySeconds = 8, sink = 0.15f;
         private double driftSpeed = 0.004, paddleSpeed = 0.025, flySpeed = 0.07, climbSpeed = 0.045;
@@ -97,7 +100,13 @@ namespace Flocks
                 if (d < takeoffRange) { TakeoffGroup(away); return; }
                 if (d < fleeRange) { heading = away; speed = paddleSpeed; }
             }
-            else heading += (rand.NextDouble() - 0.5) * 0.15; // slow wandering drift
+            else
+            {
+                heading += (rand.NextDouble() - 0.5) * 0.15; // slow wandering drift
+                if (!double.IsNaN(shoreHeading))            // too far out: ease back toward land
+                    heading += GameMath.AngleRadDistance((float)heading, (float)shoreHeading) * 0.05;
+            }
+            if ((shoreCheck -= dt) <= 0) { shoreCheck = 3; CheckShore(); }
 
             bool inWater = entity.Swimming || entity.FeetInLiquid;
             // A bank flush with the water is only ~0.3 blocks above a floating goose, well within stepHeight, so it
@@ -111,6 +120,19 @@ namespace Flocks
             if (entity.CollidedHorizontally) heading += Math.PI * (0.5 + rand.NextDouble()); // turn away from a wall
             pos.Yaw = (float)heading;
             SetAnim(inWater ? "swim" : (speed > driftSpeed ? "walk" : "idle-stand"));
+        }
+
+        /// <summary>
+        /// Sets shoreHeading while the goose is more than 1.5 x ShoreDistance from any shore (8-direction scan up to
+        /// 3 x ShoreDistance; if nothing is found at all, no steering). Cleared once it is back within range.
+        /// </summary>
+        private void CheckShore()
+        {
+            if (!(entity.Swimming || entity.FeetInLiquid)) { shoreHeading = double.NaN; return; }
+            int far = (int)(ResidentGeese.ShoreDistanceCfg * 1.5);
+            var ba = entity.World.BlockAccessor; var bp = entity.Pos.AsBlockPos;
+            if (ResidentGeese.ShoreDirection(ba, bp, far, out _) >= 0) { shoreHeading = double.NaN; return; }
+            shoreHeading = ResidentGeese.ShoreDirection(ba, bp, ResidentGeese.ShoreDistanceCfg * 3, out double h) >= 0 ? h : double.NaN;
         }
 
         /// <summary>Vertical motion that eases the bird to sit a little below the top of the water it is in.</summary>

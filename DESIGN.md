@@ -51,7 +51,7 @@ despawn, spear/melee dodge), and `/flocks land` (finds a fresh-water patch near 
 Done in 0.7.0, reworked in 0.7.1: resident geese spawn through vanilla's spawner (spawnconditions in
 entities/greylag.json, like fish: inside still surface water; like wolves: runtime maxQuantity per player area,
 MinDistanceToPlayer). A server OnTrySpawnEntity veto adds what vanilla lacks: the resident season (spring window to
-autumn window, all year near the equator), a minimum lake size, and a generous per-area safety cap. Residents leave
+autumn window, all year near the equator), a minimum lake size, a maximum distance from shore (0.8.4: 8-direction scan, ShoreDistance), and a generous per-area safety cap. Residents leave
 with a takeoff when autumn starts. No global cap and no custom placer; geese appear out of sight like other animals.
 Not done: nudging a visual V toward a lake (the client has no lake knowledge).
 

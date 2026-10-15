@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.4
+- Goose spawns are vetoed more than ShoreDistance (server config, default 20) blocks from shore. Shore means a solid
+  non-water block at the water surface or one above. The check scans outward in 8 directions up to the limit and
+  allows the spawn as soon as any direction hits land (at most 8 x ShoreDistance x 2 block reads; it never floods
+  the lake).
+- Floating geese more than 1.5 x ShoreDistance from shore (checked every 3 s, same 8-direction scan) are gently
+  steered back toward the nearest land seen within 3 x ShoreDistance while drifting. Fleeing is unchanged.
+- `/flocks residents` shows the new "too far from shore" veto count.
+
 ## 0.8.3
 Landed geese (Waterfowl.cs), from a review of 0.4.2-0.8.0:
 - Fleeing now works. The nearest player was looked up every 0.25 s but dropped on every tick in between, so a fleeing
