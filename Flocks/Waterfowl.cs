@@ -49,9 +49,15 @@ namespace Flocks
         /// player is within VanishRange.</summary>
         private const float VanishRange = 128;
         private const double GiveUpTravel = 1200;
+        /// <summary>Terrain avoidance: feet clear ground and trees by Clearance; obstacles are seen LookSeconds ahead
+        /// across the wingspan (HalfSpan either side). A wall too steep to climb at speed makes the goose pull up hard
+        /// (SteepClimb) and shed speed, down to a near-vertical hover-climb at MinPullSpeed.</summary>
+        private const double Clearance = 1.5, LookSeconds = 3, HalfSpan = 0.8, SteepClimb = 7, MinPullSpeed = 1.2, PullDecel = 20;
+        /// <summary>A landing approach that can't get in for this long gives up on that spot and picks another.</summary>
+        private const float ApproachGiveUp = 40;
 
         private Phase phase = Phase.Water;
-        private bool restored, runStarted;
+        private bool restored, runStarted, hardFlap;
         private float phaseTime, searchTimer;
         private Vec3d target;              // landing point at the water surface; null while searching or departing
         private bool departing;
@@ -82,7 +88,7 @@ namespace Flocks
         {
             if (entity.World.Side != EnumAppSide.Server) return;
             var pos = entity.Pos;
-            if (!entity.Alive) { if (entity.Swimming || entity.FeetInLiquid) pos.Motion.Y = SurfaceMotion(); return; }
+            if (!entity.Alive) { pos.Roll = 0; if (entity.Swimming || entity.FeetInLiquid) pos.Motion.Y = SurfaceMotion(); return; }
             if (!restored) { restored = true; Restore(); }
             if (phase != Phase.Water) { TickFlight(dt); return; }
 
@@ -181,6 +187,7 @@ namespace Flocks
                     if (!runStarted)
                     {
                         runStarted = true;
+                        flyHeading = ClearestHeading(flyHeading);
                         var w = entity.World;
                         w.PlaySoundAt(new AssetLocation("game", "environment/smallsplash"), entity, null, true, 24, 0.5f);
                         if (rand.NextDouble() < 0.6) w.PlaySoundAt(new AssetLocation("flocks", "wings/flap" + (1 + rand.Next(2))), entity, null, true, 32, 0.9f);
@@ -195,8 +202,8 @@ namespace Flocks
                     break;
 
                 case Phase.Fly:
-                    SetAnim(phaseTime < 1.4 ? "takeoff" : "fly-flap");
-                    speed = Math.Min(cruise, speed + Accel * dt);
+                {
+                    if (target != null && phaseTime > ApproachGiveUp) { target = null; searchTimer = 0; } // can't get in: try elsewhere
                     if (target == null && !departing && (searchTimer -= dt) <= 0)
                     {
                         searchTimer = 4;
@@ -215,14 +222,23 @@ namespace Flocks
                         if (!tooClose) Steer(want, TurnRate, dt);
                     }
                     vy = ClimbRate(CruiseY());
+                    double cap = cruise;
+                    AvoidTerrain(ref vy, ref cap, dt);
+                    speed = speed < cap ? Math.Min(cap, speed + Accel * dt) : Math.Max(cap, speed - PullDecel * dt);
+                    // beat hard while climbing out or pulling up, cruise-flap otherwise (with some hysteresis)
+                    if (phaseTime < 1.4 || vy > 3) hardFlap = true; else if (vy < 2) hardFlap = false;
+                    SetAnim(hardFlap ? "takeoff" : "fly-flap");
                     if (target != null)
                     {
                         double d = HorDist(target), drop = pos.Y - target.Y;
                         double err = Math.Abs(GameMath.AngleRadDistance((float)flyHeading, (float)Math.Atan2(target.X - pos.X, target.Z - pos.Z)));
-                        if (d <= drop * GlideRatio + 3 && err < 0.5 && phaseTime > 1.5) SetPhase(Phase.Glide);
+                        // glide in only along a clear line: nothing within Clearance of the straight path down
+                        bool clear = NeededSlope(flyHeading, Math.Max(0, d - 2.5)) <= -drop / Math.Max(d, 1) + 0.05;
+                        if (d <= drop * GlideRatio + 3 && err < 0.5 && phaseTime > 1.5 && clear) SetPhase(Phase.Glide);
                     }
                     else if (departing && phaseTime > 6 && NearestPlayer(VanishRange) == null) { entity.Die(EnumDespawnReason.Expire); return; }
                     break;
+                }
 
                 case Phase.Glide:
                 {
@@ -232,6 +248,8 @@ namespace Flocks
                     Steer(Math.Atan2(target.X - pos.X, target.Z - pos.Z), TurnRate * 1.3, dt);
                     // a straight line down to the spot at the current speed
                     vy = GameMath.Clamp(-(pos.Y - target.Y) / Math.Max(0.3, d / speed), -4, 0.5);
+                    // something rose into the glide path (a turn brought a tree into line): go round and climb over it
+                    if (NeededSlope(flyHeading, Math.Max(0, d - 2.5)) > vy / Math.Max(speed, 0.5) + 0.05) { SetPhase(Phase.Fly); break; }
                     if (entity.Swimming || entity.FeetInLiquid || pos.Y <= target.Y + 0.15)
                     {
                         entity.World.PlaySoundAt(new AssetLocation("game", "environment/mediumsplash"), entity, null, true, 24, 0.45f);
@@ -248,17 +266,27 @@ namespace Flocks
                     onWater = true;
                     if (phaseTime >= SplashSeconds)
                     {
-                        heading = flyHeading; target = null;
+                        heading = flyHeading; target = null; pos.Roll = 0;
                         SetPhase(Phase.Water);
                         return;
                     }
                     break;
             }
 
-            if (entity.CollidedHorizontally && phase == Phase.Fly) vy = ClimbMax; // clipped a tree or a hillside
+            if (entity.CollidedHorizontally && (phase == Phase.Fly || phase == Phase.Glide))
+            {
+                // clipped something the scan missed: stop pushing into it and climb straight up
+                speed = Math.Min(speed, MinPullSpeed); vy = SteepClimb;
+                if (phase == Phase.Glide) SetPhase(Phase.Fly);
+            }
             travel += speed * dt;
             pos.Motion.Set(Math.Sin(flyHeading) * speed / 60, onWater ? SurfaceMotion() : vy / 60, Math.Cos(flyHeading) * speed / 60);
             pos.Yaw = (float)flyHeading;
+            // Pitch the whole body with the climb angle. For this model the renderer's Roll turns about the wing axis
+            // (applied after yaw; head at -X), and negative is nose-up. Synced and interpolated like the yaw.
+            double pitch = phase == Phase.Run ? 0.15 : phase == Phase.Splash ? 0 : Math.Atan2(vy, Math.Max(speed, 0.5));
+            double wantRoll = -GameMath.Clamp(pitch, -0.45, 1.1);
+            pos.Roll += (float)((wantRoll - pos.Roll) * Math.Min(1, dt * 6));
         }
 
         /// <summary>Height to fly at: over a short hop a few blocks above the water, further off higher (up to 22),
@@ -275,6 +303,76 @@ namespace Flocks
             }
             if (target == null && ground > 0) baseY = ground;
             return Math.Max(baseY + alt, ground + GroundClear);
+        }
+
+        /// <summary>
+        /// Steepest climb (blocks up per block forward) needed to keep the feet Clearance above every ground or tree
+        /// top within dist along towards, sampled every 1.5 blocks down the middle and at each wingtip; -infinity if
+        /// nothing is in the way. Open water never counts.
+        /// </summary>
+        private double NeededSlope(double towards, double dist)
+        {
+            var pos = entity.Pos; var ba = entity.World.BlockAccessor;
+            double sx = Math.Sin(towards), sz = Math.Cos(towards), worst = double.NegativeInfinity;
+            var tmp = new BlockPos(0, 0, 0);
+            for (double d = 1; d <= dist; d += 1.5)
+                for (int side = -1; side <= 1; side++)
+                {
+                    int x = (int)Math.Floor(pos.X + sx * d + sz * side * HalfSpan), z = (int)Math.Floor(pos.Z + sz * d - sx * side * HalfSpan);
+                    int h = ba.GetRainMapHeightAt(x, z);
+                    if (h <= 0 || h + 1 + Clearance <= pos.Y) continue;                       // unloaded, or well below
+                    tmp.Set(x, h, z);
+                    if (ba.GetBlock(tmp, BlockLayersAccess.Fluid)?.IsLiquid() == true) continue;
+                    // the face may be up to one sample spacing nearer than the sample that sees it
+                    worst = Math.Max(worst, (h + 1 + Clearance - pos.Y) / Math.Max(d - 2.1, 0.4));
+                }
+            return worst;
+        }
+
+        /// <summary>
+        /// Raises vy to clear whatever is ahead, starting early (LookSeconds out) so most climbs are gentle. When the
+        /// climb is steeper than SteepClimb allows at the current speed, caps the speed so the climb angle is enough:
+        /// the goose pulls up hard and sheds speed, down to a hover-climb. If something is overhead (it flew in under
+        /// a crown), climbing can't help: it turns hard toward the most open direction instead.
+        /// </summary>
+        private void AvoidTerrain(ref double vy, ref double cap, float dt)
+        {
+            var pos = entity.Pos; var ba = entity.World.BlockAccessor;
+            int x = (int)Math.Floor(pos.X), z = (int)Math.Floor(pos.Z), above = ba.GetRainMapHeightAt(x, z);
+            if (above + 1 > pos.Y + 1.2 && ba.GetBlock(new BlockPos(x, above, z), BlockLayersAccess.Fluid)?.IsLiquid() != true)
+            {
+                double best = flyHeading, bestSlope = double.MaxValue;
+                foreach (double off in new[] { 0, 0.8, -0.8, 1.6, -1.6, Math.PI })
+                {
+                    double sl = NeededSlope(flyHeading + off, 6);
+                    if (sl < bestSlope) { bestSlope = sl; best = flyHeading + off; }
+                }
+                Steer(best, TurnRate * 2.5, dt);
+                vy = Math.Min(vy, 0.5); cap = Math.Min(cap, 4);
+                return;
+            }
+            double slope = NeededSlope(flyHeading, Math.Max(8, speed * LookSeconds));
+            if (double.IsNegativeInfinity(slope)) return;
+            vy = Math.Max(vy, Math.Min(slope * Math.Max(speed, MinPullSpeed) * 1.35 + 0.6, SteepClimb));
+            cap = Math.Min(cap, Math.Max(MinPullSpeed, SteepClimb / (slope * 1.35)));
+        }
+
+        /// <summary>
+        /// Geese run out along open water, not at the bank. A wall within ~4 blocks of where the feet leave the water
+        /// can't be cleared from a run (side-on simulation: 10+ block trees 2 blocks off were hit; from 4-8 blocks out
+        /// even a 24-block cliff was cleared). So take the smallest turn, up to 120 degrees either way, whose next 12
+        /// blocks need no more than a 1.5 climb; if none does, the least steep.
+        /// </summary>
+        private double ClearestHeading(double away)
+        {
+            double best = away, bestSlope = double.MaxValue;
+            foreach (double off in new[] { 0, 0.4, -0.4, 0.8, -0.8, 1.25, -1.25, 1.7, -1.7, 2.1, -2.1 })
+            {
+                double s = NeededSlope(away + off, 12);
+                if (s <= 1.5) return away + off;
+                if (s < bestSlope) { bestSlope = s; best = away + off; }
+            }
+            return best;
         }
 
         private double ClimbRate(double wantY) => GameMath.Clamp((wantY - entity.Pos.Y) * 0.8, -SinkMax, phaseTime < 2 ? ClimbMax * 0.8 : ClimbMax);

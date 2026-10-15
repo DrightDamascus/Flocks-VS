@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.9.1
+Flying geese avoid terrain instead of flying into it (Waterfowl.cs):
+- Every tick a flying goose scans the ground and tree tops 3 s ahead (36-40 blocks at cruise), down the middle and
+  at each wingtip, and climbs early enough to keep its feet 1.5 blocks clear. Open water never counts.
+- A climb too steep for its speed makes it pull up hard: up to 7 blocks/s climb, shedding speed (down to 1.2) so the
+  climb angle is enough, beating hard (takeoff animation) all the way up.
+- The body pitches nose-up with the climb angle (up to 63 deg), nose-down a little when descending (Pos.Roll, which
+  for this model turns about the wing axis; synced and interpolated by the game).
+- Each goose takes off along the clearest heading within 120 deg of "away", so it doesn't run straight at a bank.
+- Under an overhanging crown it turns hard toward the most open side instead of climbing into it. If it still
+  clips something, it stops pushing forward and climbs straight up.
+- Glide-ins only start along a clear line, and break off into a go-around if a tree comes into the path. An approach
+  that can't get in for 40 s picks another spot.
+- A side-on simulation of these rules against tree lines and cliffs 6-24 blocks tall cleared them by at least 1.2
+  blocks whenever the wall was 4+ blocks past the water's edge. Closer walls are what the heading choice avoids.
+
 ## 0.9.0
 Landed geese fly properly (Waterfowl.cs, new LakeSearch.cs, greylag shape and entity):
 - Takeoff is hurried: the group flushes a moment apart (0.1-0.6 s), each goose runs ~0.5 s across the water with a
