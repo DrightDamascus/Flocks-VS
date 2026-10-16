@@ -125,6 +125,18 @@ and glides down once its line is at least that steep (up to 45 deg, slowing to h
 something still between the goose and its spot. A spot is given up after 40 s, 3 aborted glides, or no lane under
 45 deg; after 3 given-up spots the flock rejoins the migration.
 
+Decisions (Dright, 0.13.0), Phase 1 AI:
+- Missed shots flush the group like a hit: any fast non-creature whose path passes within 4 blocks (arrows, spears,
+  stones, other mods' shot), flying on away from the shooter.
+- Lake wariness, not player memory: a flock learns to avoid a place, it does not hold a grudge against a player.
+  Every flush +1, a kill +0.5 more; from 1 the flock is skittish (flee and takeoff distances x1.8); at 2.5 it abandons
+  the lake and rejoins the migration, and no geese land or spawn within 64 blocks for 2 in-game days. Wears off at 1
+  per in-game day. A careful hunter gets about two geese from a flock before it goes. All in flocks-server.json;
+  `/flocks calm` resets it. Vanilla deer only have a short spooked state (fleeondamage, 40-60 s) and a herd alarm.
+- Players are sensed as vanilla animals sense them (AiTaskBaseTargetable.CanSensePlayer): animalSeekingRange stat,
+  sneaking on the ground x0.6, creative and spectator players unnoticed.
+- Next in Phase 1: data-driven species (each bird a data file plus a behaviour type), then Phase 2, the roster.
+
 Next steps:
 - Hand-off from the sky: when a planned goose flock passes a suitable lake (fresh water, 36+ surface blocks, 64+
   blocks from the player, near its heading), the client asks the server to land it. The server checks the lake

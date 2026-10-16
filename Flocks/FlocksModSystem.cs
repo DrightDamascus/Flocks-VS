@@ -47,7 +47,7 @@ namespace Flocks
         {
             residents = new ResidentGeese(sapi, LoadServerConfig(sapi));
             var ch = sapi.Network.GetChannel("flocks");
-            registry = new FlockRegistry(sapi);
+            registry = new FlockRegistry(sapi, residents.Cfg);
             landings = new LandingFlocks(sapi);
             var p = sapi.ChatCommands.Parsers;
             sapi.ChatCommands.Create("flocks").WithDescription("Flocks (client-side birds)").RequiresPrivilege(Privilege.chat)
@@ -78,6 +78,10 @@ namespace Flocks
                     bool ok = landings.Arrive((IServerPlayer)args.Caller.Player, true, out string msg);
                     return ok ? TextCommandResult.Success(msg) : TextCommandResult.Error(msg);
                 })
+                .EndSubCommand()
+                .BeginSubCommand("calm").WithDescription("Admin: calm every flock and forget abandoned lakes (lake wariness)")
+                .RequiresPrivilege(Privilege.controlserver)
+                .HandleWith(args => { registry.Calm(); return TextCommandResult.Success("All flocks calm; no lakes abandoned."); })
                 .EndSubCommand()
                 .BeginSubCommand("residents").WithDescription("Debug: resident geese state (spawn checks and vetoes, geese near each player, season)")
                 .RequiresPrivilege(Privilege.controlserver)

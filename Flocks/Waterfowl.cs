@@ -34,6 +34,14 @@ namespace Flocks
 
         public bool Resident => !entity.WatchedAttributes.HasAttribute(TestKey);
         private float seasonCheck = 5;
+        /// <summary>Missed shots: ten times a second the goose looks for fast non-creatures (arrows, spears, stones, other
+        /// mods' shot) within ShotScan blocks whose path passes within NearMiss of it in the next 0.3 s. An arrow covers
+        /// several blocks between checks, so it is the path that is tested, not the distance.</summary>
+        private const double ShotScan = 24, NearMiss = 4, ShotMinSpeed = 9;   // blocks, blocks, blocks/s
+        private float shotCheck;
+        private double rangeMult = 1;                  // SkittishRangeFactor while the flock is skittish
+        private double senseMul = 1;                   // the noticed player's sensing multiplier (sneaking, stats)
+        private long FlockId => entity.WatchedAttributes.GetLong(FlockRegistry.FlockIdKey, 0);
         // far-from-shore check: every few seconds; while too far out, drift is pulled toward the nearest land seen
         private float shoreCheck = 2;
         private double shoreHeading = double.NaN;
@@ -138,16 +146,27 @@ namespace Flocks
                 }
             }
 
-            // the nearest player is looked up 4 times a second and kept in between, so fleeing is continuous
-            if ((nextCheck -= dt) <= 0) { nextCheck = 0.25f; scarer = NearestPlayer(fleeRange); }
+            if ((shotCheck -= dt) <= 0)
+            {
+                shotCheck = 0.1f;
+                if (IncomingShot(out double shotAway, out Entity shooter, out Vec3d from)) { TakeoffGroup(shotAway, shooter, false, from); return; }
+            }
+            // the nearest player is looked up 4 times a second and kept in between, so fleeing is continuous;
+            // a skittish flock (lake wariness) flees and takes off from further away
+            if ((nextCheck -= dt) <= 0)
+            {
+                nextCheck = 0.25f;
+                rangeMult = FlockRegistry.Instance?.Skittish(FlockId) == true ? (FlockRegistry.Instance?.SkittishRangeFactor ?? 1) : 1;
+                scarer = NearestPlayer((float)(fleeRange * rangeMult), out senseMul);
+            }
             var player = scarer;
             double speedNow = driftSpeed;
             if (player != null)
             {
                 double dx = pos.X - player.Pos.X, dz = pos.Z - player.Pos.Z, d = Math.Sqrt(dx * dx + dz * dz);
                 double away = Math.Atan2(dx, dz);
-                if (d < takeoffRange) { TakeoffGroup(away, player, false); return; }
-                if (d < fleeRange) { heading = away; speedNow = paddleSpeed; }
+                if (d < takeoffRange * rangeMult * senseMul) { TakeoffGroup(away, player, false); return; }
+                if (d < fleeRange * rangeMult * senseMul) { heading = away; speedNow = paddleSpeed; }
             }
             else
             {
@@ -178,10 +197,12 @@ namespace Flocks
         /// departing for good, one search picks where the group comes down, and each bird gets its own spot there.
         /// threat: what scared them (null = nothing in particular; the search then just avoids their own spot).
         /// </summary>
-        private void TakeoffGroup(double away, Entity threat, bool depart)
+        private void TakeoffGroup(double away, Entity threat, bool depart, Vec3d threatAt = null)
         {
             var pos = entity.Pos;
-            double tx = threat?.Pos.X ?? pos.X, tz = threat?.Pos.Z ?? pos.Z;
+            double tx = threat?.Pos.X ?? threatAt?.X ?? pos.X, tz = threat?.Pos.Z ?? threatAt?.Z ?? pos.Z;
+            // every flush disturbs the flock; disturbed often enough, it leaves this lake and rejoins the migration
+            if (!depart && FlockRegistry.Instance?.Disturb(FlockId, 1, pos.XYZ) == true) depart = true;
             List<Vec3d> spots = depart ? null : LakeSearch.FindSpots(entity.World.BlockAccessor, pos.XYZ, tx, tz, Landing.MinPatch, rand);
             if (spots == null || spots.Count == 0) depart = true; // nowhere to land nearby: they rejoin the migration
             Takeoff(away, Pick(spots), depart, tx, tz, 0);
@@ -321,7 +342,8 @@ namespace Flocks
                         glideCheck = 0.25f;
                         double ux = (pos.X - target.X) / Math.Max(d, 0.01), uz = (pos.Z - target.Z) / Math.Max(d, 0.01);
                         double ahead = ApproachSlope(ux, uz, d - 1);
-                        if (ahead > line + 0.1) { GoAround($"obstacle ahead (line {line:0.00}, needs {ahead:0.00}, {d:0.0} out)"); break; }
+                        // no slack: "needs" already keeps Clearance, and slack 10 blocks out is most of that block and a half
+                        if (ahead > line + 0.02) { GoAround($"obstacle ahead (line {line:0.00}, needs {ahead:0.00}, {d:0.0} out)"); break; }
                     }
                     if (entity.Swimming || entity.FeetInLiquid || pos.Y <= target.Y + 0.15)
                     {
@@ -500,7 +522,8 @@ namespace Flocks
             var ba = entity.World.BlockAccessor;
             double worst = 0;
             var tmp = new BlockPos(0, 0, 0);
-            for (double s = 1.5; s <= maxDist; s += 1)
+            // every half block: a 1-thick wall crossed at an angle can fall between whole-block samples
+            for (double s = 1.5; s <= maxDist; s += 0.5)
                 for (int side = -1; side <= 1; side++)
                 {
                     int x = (int)Math.Floor(target.X + ux * s + uz * side * HalfSpan), z = (int)Math.Floor(target.Z + uz * s - ux * side * HalfSpan);
@@ -625,10 +648,57 @@ namespace Flocks
             return GameMath.Clamp((target - entity.Pos.Y) * 0.15, -0.03, 0.03);
         }
 
-        /// <summary>Nearest living player within range, ignoring spectators (they can't be seen).</summary>
-        private Entity NearestPlayer(float range) =>
-            entity.World.GetNearestEntity(entity.Pos.XYZ, range, range, e => e is EntityPlayer ep && ep.Alive
-                && ep.Player?.WorldData?.CurrentGameMode != EnumGameMode.Spectator);
+        /// <summary>
+        /// A shot coming close: a fast-moving non-creature whose straight path over the next 0.3 s passes within NearMiss.
+        /// away: the shot's direction of travel (the flock flies on away from the shooter); shooter: who fired it, when
+        /// the projectile says (vanilla's EntityProjectile.FiredBy, read by name, since that class isn't in the API);
+        /// from: otherwise a point 20 blocks back along its path.
+        /// </summary>
+        private bool IncomingShot(out double away, out Entity shooter, out Vec3d from)
+        {
+            away = 0; shooter = null; from = null;
+            var me = entity.Pos.XYZ;
+            double minSq = ShotMinSpeed / 60 * (ShotMinSpeed / 60);
+            foreach (var e in entity.World.GetEntitiesAround(me, (float)ShotScan, (float)ShotScan / 2,
+                         e => e.Alive && e is not EntityAgent && e.Pos.Motion.LengthSq() > minSq))
+            {
+                var m = e.Pos.Motion;
+                double vx = m.X * 60, vy = m.Y * 60, vz = m.Z * 60, v2 = vx * vx + vy * vy + vz * vz;
+                double rx = me.X - e.Pos.X, ry = me.Y + 0.3 - e.Pos.Y, rz = me.Z - e.Pos.Z;
+                double t = GameMath.Clamp((rx * vx + ry * vy + rz * vz) / v2, 0, 0.3);
+                double cx = rx - vx * t, cy = ry - vy * t, cz = rz - vz * t;
+                if (cx * cx + cy * cy + cz * cz > NearMiss * NearMiss) continue;
+                away = Math.Atan2(vx, vz);
+                shooter = e.GetType().GetField("FiredBy")?.GetValue(e) as Entity;
+                double v = Math.Sqrt(v2);
+                from = new Vec3d(e.Pos.X - vx / v * 20, e.Pos.Y, e.Pos.Z - vz / v * 20);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// The nearest player this goose notices within range, sensed the way vanilla animals sense players
+        /// (AiTaskBaseTargetable.CanSensePlayer): the player's animalSeekingRange stat scales the range, sneaking on
+        /// the ground cuts it to 60%, and creative and spectator players go unnoticed. senseMul: that player's
+        /// multiplier, which the flee and takeoff distances use too, so a sneaking hunter gets closer before the flush.
+        /// </summary>
+        private Entity NearestPlayer(float range, out double senseMul)
+        {
+            EntityPlayer best = null; double bestD = double.MaxValue; senseMul = 1;
+            foreach (var p in entity.World.AllOnlinePlayers)
+            {
+                var ep = p.Entity;
+                if (ep == null || !ep.Alive || ep.Pos.Dimension != entity.Pos.Dimension) continue;
+                var mode = p.WorldData?.CurrentGameMode;
+                if (mode == EnumGameMode.Creative || mode == EnumGameMode.Spectator) continue;
+                double mul = ep.Stats.GetBlended("animalSeekingRange");
+                if (ep.Controls.Sneak && ep.OnGround) mul *= 0.6;
+                double d = ep.Pos.DistanceTo(entity.Pos);
+                if (d < range * mul && d < bestD) { best = ep; bestD = d; senseMul = mul; }
+            }
+            return best;
+        }
 
         /// <summary>Water at the goose's level (or one below, for a goose standing ashore) dist blocks along heading.</summary>
         private bool WaterAt(double towards, double dist)

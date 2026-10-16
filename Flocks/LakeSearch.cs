@@ -72,6 +72,7 @@ namespace Flocks
                 int x = (int)(k >> 32), z = (int)k;
                 double cx = x + 0.5, cz = z + 0.5;
                 if (Dist(cx, cz, tx, tz) < minThreat) continue;
+                if (FlockRegistry.Instance?.IsAbandoned(cx, cz) == true) continue; // a lake geese left: not yet
                 double d = Dist(cx, cz, from.X, from.Z);
                 if (d < minHere || !Open(lake, x, z)) continue;
                 open.Add((d, x, z));

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.13.0
+Phase 1 AI: missed shots, lake wariness, vanilla-style player sensing.
+- A missed arrow flushes the group like a hit. Ten times a second each goose looks for fast non-creatures (arrows,
+  spears, thrown stones, other mods' shot) within 24 blocks whose path passes within 4 blocks of it in the next 0.3 s
+  (an arrow covers several blocks between checks, so the path is tested, not the distance). They fly on away from the
+  shooter (vanilla's EntityProjectile.FiredBy when present).
+- Lake wariness (flocks-server.json: LakeWariness and its numbers): every flush disturbs the flock (+1), a kill a
+  little more (+0.5). From 1 it is skittish: it flees and takes off from 1.8x further. At 2.5 it abandons the lake and
+  rejoins the migration (it comes back next spring like any flock away), and no geese land on or spawn within 64
+  blocks of that lake for 2 in-game days. It wears off at 1 per in-game day. A careful hunter gets about two geese
+  from a flock before it leaves. `/flocks calm` (admin) calms every flock and forgets abandoned lakes;
+  `/flocks residents` shows skittish flocks, abandoned lakes and spawns vetoed for them.
+- Players are sensed the way vanilla animals sense them: the animalSeekingRange stat scales detection, sneaking on
+  the ground cuts it to 60% (and the flush distance with it), and creative and spectator players go unnoticed, as with
+  deer. Test flushes in survival.
+- Fixed geese clipping trees on a steep glide-in: the obstacle check sampled every block (a thin wall crossed at an
+  angle could fall between samples) and let a goose sit 0.1 below the line it needed, most of its clearance 10 blocks
+  out. Now every half block, and a glide is aborted as soon as it is under the line.
+- Engine tests: 58 passed, 0 failed (new: missed arrow, second disturbance, leaving and the abandoned lake, a
+  landing flock avoiding it, a kill counted and its wariness).
+
 ## 0.12.1
 Fixed geese circling forever after being flushed (found and verified with new in-engine tests):
 - The "give up on a spot after 40 s" rule never worked: its timer reset every time a goose switched between gliding

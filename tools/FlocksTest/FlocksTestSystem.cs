@@ -143,6 +143,7 @@ namespace FlocksTest
             steps.Enqueue(("settle", () =>
             {
                 var type = sapi.World.GetEntityType(new AssetLocation("flocks", "greylag"));
+                FlockRegistry.Instance.Calm();
                 flock = FlockRegistry.Instance.Create("goose", 8, c);
                 testFlock = flock.Id;
                 for (int i = 0; i < 8; i++)
@@ -193,20 +194,53 @@ namespace FlocksTest
                 testFlock = flock.Id;
             }, 90));
 
-            steps.Enqueue(("depart", () =>
+            // ---- lake wariness: a missed arrow, then disturbances until the flock abandons the lake
+            steps.Enqueue(("missed arrow", () =>
+            {
+                ResetStats(); FlockRegistry.Instance.Calm();
+                var g = LoadedGeese()[0];
+                // an arrow flying east past the flock, 2 blocks to the north of a goose, starting 5 blocks west of it
+                var arrow = sapi.World.ClassRegistry.CreateEntity(sapi.World.GetEntityType(new AssetLocation("game", "arrow-flint")));
+                arrow.Pos.SetPos(g.Pos.X - 5, g.Pos.Y + 0.8, g.Pos.Z - 2);
+                arrow.Pos.Motion.Set(1.0, 0, 0); // 60 blocks/s
+                sapi.World.SpawnEntity(arrow);
+                sapi.Event.RegisterCallback(_ => arrow.Die(EnumDespawnReason.Expire), 1500);
+            }, () => Elapsed > 4 && LoadedGeese().All(e => Phase(e) == "Water"), () =>
+            {
+                int flew = stats.Values.Count(st => st.Samples > 0);
+                Check(flew == LoadedGeese().Count && flew > 0, $"the whole flock took off at the near miss ({flew} of {LoadedGeese().Count} flew)");
+                double w = FlockRegistry.Instance.Wariness(flock.Id);
+                Check(Math.Abs(w - 1) < 0.05 && FlockRegistry.Instance.Skittish(flock.Id), $"one disturbance: wariness {w:0.00}, skittish");
+                ReportFlight("missed arrow", 2);
+            }, 90));
+
+            steps.Enqueue(("second disturbance", () =>
             {
                 ResetStats();
-                // make them test geese whose time is up: they leave for good on the next tick
-                foreach (var e in geese.Where(e => e.Alive))
-                {
-                    e.WatchedAttributes.SetBool(EntityBehaviorWaterfowl.TestKey, true);
-                    e.WatchedAttributes.SetDouble("flocksSpawnHours", sapi.World.Calendar.TotalHours - 1000);
-                }
-            }, () => Elapsed > 2 && geese.All(e => !e.Alive), () =>
+                LoadedGeese()[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 1);
+            }, () => Elapsed > 4 && LoadedGeese().All(e => Phase(e) == "Water"), () =>
             {
-                Check(geese.All(e => !e.Alive), "all departed geese removed (no players, so as soon as they were up and away)");
-                Check(FlockRegistry.Instance.Get(flock.Id)?.State == FlockState.Away, $"flock #{flock.Id} is Away ({FlockRegistry.Instance.Get(flock.Id)?.State})");
-                ReportFlight("depart", 0, landed: false);
+                double w = FlockRegistry.Instance.Wariness(flock.Id);
+                Check(Math.Abs(w - 2) < 0.05, $"two disturbances: wariness {w:0.00}, still on the lake");
+                ReportFlight("second disturbance", 2);
+            }, 90));
+
+            Vec3d lakeLeft = null;
+            steps.Enqueue(("third disturbance: leave", () =>
+            {
+                ResetStats();
+                var g = LoadedGeese();
+                lakeLeft = g[0].Pos.XYZ;
+                g[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 1);
+            }, () => Elapsed > 2 && LoadedGeese().Count == 0, () =>
+            {
+                var rec = FlockRegistry.Instance.Get(flock.Id);
+                Check(rec?.State == FlockState.Away, $"the flock left and rejoined the migration ({rec?.State})");
+                Check(FlockRegistry.Instance.IsAbandoned(lakeLeft.X, lakeLeft.Z), "the lake it left is marked abandoned");
+                var spots = LakeSearch.FindSpots(sapi.World.BlockAccessor, new Vec3d(lakeLeft.X + 30, y0 + 1, lakeLeft.Z), lakeLeft.X + 30, lakeLeft.Z, 36, new Random(1));
+                Check(spots == null || spots.All(sp => sp.HorizontalSquareDistanceTo(lakeLeft.X, lakeLeft.Z) > FlockRegistry.AbandonRadius * FlockRegistry.AbandonRadius),
+                    "the lake search no longer offers the abandoned lake");
+                ReportFlight("leave", 0, landed: false);
             }, 60));
 
             steps.Enqueue(("landing flock", () =>
@@ -221,19 +255,38 @@ namespace FlocksTest
                 Check(g.Count == 8, $"the Away flock returned whole: {g.Count} geese");
                 Check(g.All(e => e.WatchedAttributes.GetLong(FlockRegistry.FlockIdKey) == flock.Id), $"same flock id #{flock.Id}");
                 Check(FlockRegistry.Instance.Get(flock.Id)?.State == FlockState.Landed, "flock record Landed again");
+                Check(g.All(e => e.Pos.HorDistanceTo(lakeLeft) > FlockRegistry.AbandonRadius), $"not on the abandoned lake: {string.Join(" ", g.Select(Where))}");
                 geese.AddRange(g);
                 ReportFlight("landing", 2);
             }, 150));
+
+            steps.Enqueue(("a kill", () =>
+            {
+                ResetStats(); FlockRegistry.Instance.Calm();
+                var arrow = sapi.World.ClassRegistry.CreateEntity(sapi.World.GetEntityType(new AssetLocation("game", "arrow-flint")));
+                var g = LoadedGeese()[0];
+                arrow.Pos.SetPos(g.Pos.X, g.Pos.Y + 1, g.Pos.Z);
+                sapi.World.SpawnEntity(arrow);
+                g.ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = arrow, CauseEntity = threat, Type = EnumDamageType.PiercingAttack }, 10);
+                sapi.Event.RegisterCallback(_ => arrow.Die(EnumDespawnReason.Expire), 500);
+            }, () => Elapsed > 4 && LoadedGeese().All(e => Phase(e) == "Water"), () =>
+            {
+                var rec = FlockRegistry.Instance.Get(flock.Id);
+                Check(rec.Count == 7 && rec.Killed == 1 && LoadedGeese().Count == 7, $"one goose shot: record {rec.Count} alive, {rec.Killed} killed, {LoadedGeese().Count} loaded");
+                double w = FlockRegistry.Instance.Wariness(flock.Id);
+                Check(Math.Abs(w - 1.5) < 0.05, $"a kill and the flush that follows: wariness {w:0.00}");
+                ReportFlight("a kill", 2);
+            }, 90));
 
             for (int cycle = 1; cycle <= 3; cycle++)
             {
                 int n = cycle;
                 steps.Enqueue(($"cycle {n}", () =>
                 {
-                    ResetStats();
-                    var alive = geese.Where(e => e.Alive).ToList();
+                    ResetStats(); FlockRegistry.Instance.Calm();
+                    var alive = LoadedGeese();
                     if (alive.Count > 0) alive[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 1);
-                }, () => Elapsed > 4 && geese.Where(e => e.Alive).All(e => Phase(e) == "Water"), () =>
+                }, () => Elapsed > 4 && LoadedGeese().All(e => Phase(e) == "Water"), () =>
                 {
                     long mem = GC.GetTotalMemory(true) / (1024 * 1024);
                     Log($"cycle {n}: {LoadedGeese().Count} geese loaded, {sapi.World.LoadedEntities.Count} entities, managed memory {mem} MB, {FlockRegistry.Instance.Report()}");
@@ -244,7 +297,7 @@ namespace FlocksTest
             steps.Enqueue(("memory", () => { }, () => true, () =>
             {
                 Check(memory.Count >= 3 && memory.Last() - memory[1] < 64, $"managed memory over cycles (MB): {string.Join(", ", memory)}");
-                Check(LoadedGeese().Count == 8, $"still 8 geese after the cycles ({LoadedGeese().Count})");
+                Check(LoadedGeese().Count == 7, $"still 7 geese after the cycles ({LoadedGeese().Count})");
             }, 5));
         }
 

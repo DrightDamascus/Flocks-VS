@@ -22,6 +22,15 @@ namespace Flocks
         /// Vanilla's own per-player limit (spawnconditions.runtime.maxQuantity) normally applies long before this.</summary>
         public int MaxGeeseNearby = 30;
         public int NearbyRadius = 96;
+
+        /// <summary>Lake wariness: disturbed flocks grow skittish and, disturbed often enough, abandon the lake for a while.
+        /// Every flush adds 1 and a kill KillWariness more; it wears off by WarinessDecayPerDay per in-game day.</summary>
+        public bool LakeWariness = true;
+        /// <summary>From this wariness a flock flees and takes off from SkittishRangeFactor times further away.</summary>
+        public double SkittishAt = 1, SkittishRangeFactor = 1.8;
+        /// <summary>At this wariness the flock leaves the lake and rejoins the migration; no geese land or spawn within
+        /// 64 blocks of it for AbandonDays in-game days. A careful hunter gets about two geese before they go.</summary>
+        public double LeaveAt = 2.5, KillWariness = 0.5, WarinessDecayPerDay = 1, AbandonDays = 2;
     }
 
     /// <summary>
@@ -35,7 +44,7 @@ namespace Flocks
         private readonly ICoreServerAPI sapi;
         public readonly FlocksServerConfig Cfg;
         public static readonly AssetLocation Code = new("flocks", "greylag");
-        public int Allowed, VetoSeason, VetoLake, VetoShore, VetoCrowded, VetoOff;
+        public int Allowed, VetoSeason, VetoLake, VetoShore, VetoCrowded, VetoOff, VetoAbandoned;
         /// <summary>Config ShoreDistance, for EntityBehaviorWaterfowl (server side).</summary>
         public static int ShoreDistanceCfg = 20;
 
@@ -56,6 +65,7 @@ namespace Flocks
                 if (!InSeason(sapi.World, bp)) { VetoSeason++; return false; }
                 if (LakeSize(ba, bp, Cfg.MinLakeSize) < Cfg.MinLakeSize) { VetoLake++; return false; }
                 if (ShoreDirection(ba, bp, ShoreDistanceCfg, out _) < 0) { VetoShore++; return false; }
+                if (FlockRegistry.Instance?.IsAbandoned(pos.X, pos.Z) == true) { VetoAbandoned++; return false; }
                 int near = sapi.World.GetEntitiesAround(pos, Cfg.NearbyRadius, 32, e => e.Alive && e.Code.Equals(Code)).Length;
                 if (near >= Cfg.MaxGeeseNearby) { VetoCrowded++; return false; }
                 Allowed++;
@@ -124,7 +134,7 @@ namespace Flocks
         public string Report()
         {
             var sb = new StringBuilder($"Resident geese {(Cfg.ResidentGeese ? "on" : "OFF")} (vanilla spawning + season/lake veto). " +
-                $"Spawn checks since start: {Allowed} allowed, vetoed {VetoSeason} out of season, {VetoLake} small lake, {VetoShore} too far from shore (>{Cfg.ShoreDistance}), {VetoCrowded} crowded, {VetoOff} disabled.");
+                $"Spawn checks since start: {Allowed} allowed, vetoed {VetoSeason} out of season, {VetoLake} small lake, {VetoShore} too far from shore (>{Cfg.ShoreDistance}), {VetoCrowded} crowded, {VetoAbandoned} abandoned lake, {VetoOff} disabled.");
             var geese = sapi.World.LoadedEntities.Values.Where(e => e.Alive && e.Code.Equals(Code)).ToList();
             sb.Append($"\nLoaded geese: {geese.Count}");
             foreach (var p in sapi.World.AllOnlinePlayers)

@@ -27,6 +27,18 @@ namespace Flocks
         [ProtoMember(8)] public double SinceHours;
         /// <summary>Members killed over the flock's life.</summary>
         [ProtoMember(9)] public int Killed;
+        /// <summary>How disturbed the flock is (lake wariness) as of WaryHours; it calms down over time.</summary>
+        [ProtoMember(10)] public double Wariness;
+        [ProtoMember(11)] public double WaryHours;
+    }
+
+    /// <summary>A lake a flock left because it kept being disturbed: no geese land or spawn near it for a while.</summary>
+    [ProtoContract]
+    public class AbandonedLake
+    {
+        [ProtoMember(1)] public double X;
+        [ProtoMember(2)] public double Z;
+        [ProtoMember(3)] public double Hours;
     }
 
     public enum FlockState { Landed = 0, Away = 1, Lost = 2 }
@@ -36,10 +48,15 @@ namespace Flocks
     /// is on a lake, away on migration, or lost (all killed). Geese carry their flock id in WatchedAttributes.
     /// A departing flock flies off as real geese; once DepartRange from every player its entities are removed and its
     /// record goes Away, so the migration schedule can bring it back (LandingFlocks).
+    /// Lake wariness: every flush disturbs the flock (a kill a little more). A disturbed flock is skittish (it flees and
+    /// takes off from further away); a flock disturbed again and again leaves the lake and rejoins the migration, and
+    /// that lake gets no geese for a while. It is the place they learn to avoid, not the player, and it wears off.
     /// </summary>
     public class FlockRegistry
     {
-        public const string FlockIdKey = "flocksFlockId", SaveKey = "flocks:registry";
+        public const string FlockIdKey = "flocksFlockId", SaveKey = "flocks:registry", AbandonedKey = "flocks:abandonedlakes";
+        /// <summary>Geese stay away from this far around an abandoned lake's last spot.</summary>
+        public const double AbandonRadius = 64;
         /// <summary>Departing geese are removed this far from the nearest player: 3-4 px across by then. Must stay
         /// inside a flying goose's simulation range (EntityBehaviorWaterfowl.FlightRange), or it would stop ticking first.</summary>
         public const double DepartRange = 360;
@@ -50,13 +67,15 @@ namespace Flocks
         public static FlockRegistry Instance { get; private set; }
 
         private readonly ICoreServerAPI sapi;
+        private readonly FlocksServerConfig cfg;
         private Dictionary<long, FlockRecord> flocks = new();
+        private List<AbandonedLake> abandoned = new();
         private long nextId = 1;
         private readonly Dictionary<long, double> lastDepartCheck = new();
 
-        public FlockRegistry(ICoreServerAPI sapi)
+        public FlockRegistry(ICoreServerAPI sapi, FlocksServerConfig cfg)
         {
-            this.sapi = sapi; Instance = this;
+            this.sapi = sapi; this.cfg = cfg; Instance = this;
             sapi.Event.SaveGameLoaded += Load;
             sapi.Event.GameWorldSave += Save;
         }
@@ -69,11 +88,18 @@ namespace Flocks
                 var list = data == null ? new List<FlockRecord>() : SerializerUtil.Deserialize<List<FlockRecord>>(data) ?? new List<FlockRecord>();
                 flocks = list.ToDictionary(f => f.Id);
                 nextId = flocks.Count == 0 ? 1 : flocks.Keys.Max() + 1;
+                var ab = sapi.WorldManager.SaveGame.GetData(AbandonedKey);
+                abandoned = ab == null ? new List<AbandonedLake>() : SerializerUtil.Deserialize<List<AbandonedLake>>(ab) ?? new List<AbandonedLake>();
             }
             catch (Exception ex) { sapi.Logger.Error("[Flocks] flock registry unreadable, starting empty: {0}", ex); flocks = new(); }
         }
 
-        private void Save() => sapi.WorldManager.SaveGame.StoreData(SaveKey, SerializerUtil.Serialize(flocks.Values.ToList()));
+        private void Save()
+        {
+            sapi.WorldManager.SaveGame.StoreData(SaveKey, SerializerUtil.Serialize(flocks.Values.ToList()));
+            PruneAbandoned();
+            sapi.WorldManager.SaveGame.StoreData(AbandonedKey, SerializerUtil.Serialize(abandoned));
+        }
 
         public FlockRecord Get(long id) => flocks.TryGetValue(id, out var f) ? f : null;
 
@@ -119,10 +145,57 @@ namespace Flocks
         /// <summary>A landing that couldn't complete (its lake unloaded): the flock is away again.</summary>
         public void LandingFailed(FlockRecord f) { f.State = FlockState.Away; f.SinceHours = sapi.World.Calendar.TotalHours; }
 
+        // ---------------------------------------------------------------------------------------------- lake wariness
+
+        private double Hours => sapi.World.Calendar.TotalHours;
+
+        /// <summary>The flock's wariness now, after calming down by WarinessDecayPerDay per in-game day.</summary>
+        public double Wariness(long id)
+        {
+            var f = Get(id);
+            if (f == null || !cfg.LakeWariness) return 0;
+            return Math.Max(0, f.Wariness - (Hours - f.WaryHours) / 24 * cfg.WarinessDecayPerDay);
+        }
+
+        /// <summary>Skittish: it flees and takes off from SkittishRangeFactor times further away.</summary>
+        public bool Skittish(long id) => Wariness(id) >= cfg.SkittishAt;
+        public double SkittishRangeFactor => cfg.SkittishRangeFactor;
+
+        /// <summary>The flock was disturbed (a flush, or extra for a kill). True when it has had enough of this lake: it
+        /// should leave, and the lake is abandoned for AbandonDays.</summary>
+        public bool Disturb(long id, double amount, Vec3d at, bool mayLeave = true)
+        {
+            var f = Get(id);
+            if (f == null || !cfg.LakeWariness) return false;
+            f.Wariness = Wariness(id) + amount; f.WaryHours = Hours;
+            if (!mayLeave || f.Wariness < cfg.LeaveAt) return false;
+            f.Wariness = 0;   // the next lake is a fresh start
+            abandoned.Add(new AbandonedLake { X = at.X, Z = at.Z, Hours = Hours });
+            sapi.Logger.Notification("[Flocks] flock #{0} abandons the lake at {1:0}, {2:0} after repeated disturbance", id, at.X, at.Z);
+            return true;
+        }
+
+        /// <summary>Within AbandonRadius of a lake a flock left in the last AbandonDays: no landings, no spawns.</summary>
+        public bool IsAbandoned(double x, double z)
+        {
+            if (!cfg.LakeWariness) return false;
+            double since = Hours - cfg.AbandonDays * 24;
+            foreach (var a in abandoned)
+                if (a.Hours >= since && (a.X - x) * (a.X - x) + (a.Z - z) * (a.Z - z) < AbandonRadius * AbandonRadius) return true;
+            return false;
+        }
+
+        private void PruneAbandoned() { double since = Hours - cfg.AbandonDays * 24; abandoned.RemoveAll(a => a.Hours < since); }
+
+        /// <summary>/flocks calm: every flock calm, no lake abandoned.</summary>
+        public void Calm() { foreach (var f in flocks.Values) f.Wariness = 0; abandoned.Clear(); }
+
         public void MemberDied(Entity goose)
         {
             var f = Get(goose.WatchedAttributes.GetLong(FlockIdKey, 0));
             if (f == null) return;
+            // only adds: the flush that follows adds the rest and decides whether they leave
+            Disturb(f.Id, cfg.KillWariness, goose.Pos.XYZ, mayLeave: false);
             f.Count = Math.Max(0, f.Count - 1); f.Killed++;
             if (f.Count == 0) { f.State = FlockState.Lost; f.SinceHours = sapi.World.Calendar.TotalHours; }
         }
@@ -175,7 +248,10 @@ namespace Flocks
                 if (f.State == FlockState.Landed) { landed++; geese += f.Count; }
                 else if (f.State == FlockState.Away) away++; else lost++;
             }
-            return $"Flocks: {landed} landed ({geese} geese), {away} away on migration, {lost} lost (all killed).";
+            PruneAbandoned();
+            int wary = flocks.Values.Count(f => f.State == FlockState.Landed && Skittish(f.Id));
+            return $"Flocks: {landed} landed ({geese} geese, {wary} skittish), {away} away on migration, {lost} lost (all killed); " +
+                   $"{abandoned.Count} lake(s) abandoned{(cfg.LakeWariness ? "" : " (lake wariness OFF)")}.";
         }
     }
 }
