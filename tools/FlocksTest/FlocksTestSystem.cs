@@ -104,7 +104,8 @@ namespace FlocksTest
                     for (int y = y0 - 3; y <= y0; y++)
                     {
                         pos.Set(x, y, z);
-                        if (pond && y > y0 - 3) { bulk.SetBlock(0, pos); bulk.SetBlock(water, pos, BlockLayersAccess.Fluid); }
+                        bool deep = !InPondARim(x, z) || y == y0;   // pond A's rim is one block deep (shallows for waders)
+                        if (pond && y > y0 - 3 && deep) { bulk.SetBlock(0, pos); bulk.SetBlock(water, pos, BlockLayersAccess.Fluid); }
                         else bulk.SetBlock(stone, pos);
                     }
                     if (x >= x0 - 12 && x <= x0 - 10 && Math.Abs(z - z0) <= 30)
@@ -121,12 +122,15 @@ namespace FlocksTest
             var gt = sapi.World.GetEntityType(new AssetLocation("flocks", "greylag"));
             Check(gt?.Sounds != null && gt.Sounds.ContainsKey("takeoffwings") && gt.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.waterfowl") == true,
                 "greylag entity file loaded whole (sounds and flocks.waterfowl behaviour present)");
+            var ht = sapi.World.GetEntityType(new AssetLocation("flocks", "heron"));
+            Check(ht?.Sounds != null && ht.Sounds.ContainsKey("takeoffcall") && ht.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.waterfowl") == true,
+                "heron entity file loaded whole");
             var mt = sapi.World.GetEntityType(new AssetLocation("flocks", "mallard"));
             Check(mt?.Sounds != null && mt.Sounds.ContainsKey("takeoffwings") && mt.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.waterfowl") == true,
                 "mallard entity file loaded whole (sounds and flocks.waterfowl behaviour present)");
             var spc = sapi.ModLoader.GetModSystem<FlocksModSystem>().SpeciesByCode;
             Check(spc.ContainsKey("goose") && spc["goose"].Lands && spc["goose"].LandingMin == 7 && spc.ContainsKey("crane") && spc.ContainsKey("hawk")
-                  && spc.ContainsKey("mallard") && spc["mallard"].MinLakeSize == 25,
+                  && spc.ContainsKey("mallard") && spc["mallard"].MinLakeSize == 25 && spc.ContainsKey("heron") && spc["heron"].Wades && !spc["heron"].ArriveInFlocks,
                 $"species data loaded: {string.Join(", ", spc.Keys)}");
             Check(top + 12 <= ba.MapSizeY - 60, $"test site above the terrain (terrain max {top}, slab {y0})");
             Check(ba.GetRainMapHeightAt(x0 - 40, z0) == y0 && ba.GetRainMapHeightAt(x0 - 11, z0) == y0 + 14 && ba.GetRainMapHeightAt(x0 + 50 - 17, z0 + 30) == y0 + 8,
@@ -145,6 +149,7 @@ namespace FlocksTest
         }
 
         private bool InPondA(int x, int z) => Math.Abs(x - ((int)c.X - 40)) <= 18 && Math.Abs(z - (int)c.Z) <= 18;
+        private bool InPondARim(int x, int z) => InPondA(x, z) && (Math.Abs(x - ((int)c.X - 40)) > 15 || Math.Abs(z - (int)c.Z) > 15);
         private bool InPondB(int x, int z) => Math.Abs(x - ((int)c.X + 50)) <= 15 && Math.Abs(z - ((int)c.Z + 30)) <= 15;
         private string Where(Entity e) => InPondA((int)Math.Floor(e.Pos.X), (int)Math.Floor(e.Pos.Z)) ? "A" : InPondB((int)Math.Floor(e.Pos.X), (int)Math.Floor(e.Pos.Z)) ? "B"
             : (e.FeetInLiquid || e.Swimming) ? "lake" : "LAND";
@@ -331,6 +336,57 @@ namespace FlocksTest
                 ResetStats();
                 LoadedGeese()[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 1);
             }, () => Elapsed > 3 && LoadedGeese().All(e => Phase(e) == "Water"), () => ReportFlight("mallard flush", 2), 90));
+
+            // ---- herons: wading (standing on the bottom of water one block deep), from data plus the wade habitat
+            FlockRecord herons = null;
+            int wadeOut = 0, wadeSamples = 0;
+            steps.Enqueue(("heron settle", () =>
+            {
+                ResetStats(); FlockRegistry.Instance.Calm();
+                var type = sapi.World.GetEntityType(new AssetLocation("flocks", "heron"));
+                herons = FlockRegistry.Instance.Create("heron", 2, c);
+                testFlock = herons.Id;
+                for (int i = 0; i < 2; i++)
+                {
+                    var e = sapi.World.ClassRegistry.CreateEntity(type);
+                    e.WatchedAttributes.SetLong(FlockRegistry.FlockIdKey, herons.Id);
+                    e.Pos.SetPos(c.X - 40 + 16.5, y0 + 0.05, c.Z + i * 3 - 1);   // on the bottom of pond A's east shallows
+                    sapi.World.SpawnEntity(e);
+                }
+            }, () => Elapsed > 10, () =>
+            {
+                var g = LoadedGeese();
+                Check(g.Count == 2 && g.All(e => Phase(e) == "Water"), $"2 herons at rest ({string.Join(" ", g.Select(Phase))})");
+                Check(g.All(e => !e.Swimming && e.FeetInLiquid && Math.Abs(e.Pos.Y - y0) < 0.25),
+                    $"standing on the bottom, not swimming: {string.Join(" ", g.Select(e => $"y{e.Pos.Y - y0:0.00} swim={e.Swimming} feet={e.FeetInLiquid}"))}");
+            }, 20));
+            steps.Enqueue(("heron wading", () => { wadeOut = 0; wadeSamples = 0; }, () =>
+            {
+                foreach (var e in LoadedGeese())
+                {
+                    if (Phase(e) != "Water") continue;
+                    wadeSamples++;
+                    if (!LakeSearch.IsWadeable(sapi.World.BlockAccessor, (int)Math.Floor(e.Pos.X), (int)Math.Floor(e.Pos.Z), out _)) wadeOut++;
+                }
+                return Elapsed > 25;
+            }, () =>
+            {
+                Check(wadeSamples > 0 && wadeOut == 0, $"stayed in wadeable water for 25 s ({wadeOut} of {wadeSamples} samples out of it)");
+                Check(LoadedGeese().All(e => Phase(e) == "Water" && !e.Swimming), "still wading, not swimming");
+            }, 40));
+            steps.Enqueue(("heron flush", () =>
+            {
+                ResetStats();
+                LoadedGeese()[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 1);
+            }, () => Elapsed > 4 && LoadedGeese().All(e => Phase(e) == "Water"), () =>
+            {
+                var g = LoadedGeese();
+                Check(stats.Values.Count(st => st.Samples > 0) == 2, "both herons flew");
+                Check(g.All(e => !e.Swimming && LakeSearch.IsWadeable(sapi.World.BlockAccessor, (int)Math.Floor(e.Pos.X), (int)Math.Floor(e.Pos.Z), out int wy) && Math.Abs(e.Pos.Y - wy) < 0.3),
+                    $"came down standing in wadeable water: {string.Join(" ", g.Select(e => $"{Where(e)} y{e.Pos.Y - y0:0.00} swim={e.Swimming}"))}");
+                ReportFlight("heron flush", 2);
+                foreach (var e in g) e.Die(EnumDespawnReason.Expire);
+            }, 90));
 
             steps.Enqueue(("memory", () => { }, () => true, () =>
             {

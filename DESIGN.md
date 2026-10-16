@@ -146,6 +146,14 @@ Decisions (Dright, 0.13.0), Phase 1 AI:
   animations; drake and hen textures picked at random per bird), entities/mallard.json, config/flocks-species/
   mallard.json and sounds/duck/. New per-species data it needed: takeoffRunSeconds/takeoffRunSpeed (a dabbling duck
   springs straight up instead of running) and minLakeSize (ducks take ponds of 25 surface blocks).
+- Done in 0.16.0: the grey heron, the first new behaviour type: wading. Vintage Story's still water is always a full
+  block deep, so a true-size heron would stand chest-deep; Dright: give it freakishly long legs (~1 block). It stands
+  on the bottom of water one block deep (species habitat "wade"; a taller selection box while standing so the game's
+  swimming check, water at 66% of the box, looks above the water), rests hunched, stalks and strikes, goes alert and
+  backs off when approached, and flushes from further than geese. Landing spots are wadeable water a block away from
+  any drop-off; a wader that ends up in deep water floats up and paddles back. It spawns on its own (only in water one
+  block deep) and doesn't arrive in landing flocks (arriveInFlocks false). tools/make_heron.py: own bones (two-part
+  neck for the S) and animations; ground poses lift the body by the leg length so the feet stand at the entity's feet.
 
 Next steps:
 - Hand-off from the sky: when a planned goose flock passes a suitable lake (fresh water, 36+ surface blocks, 64+

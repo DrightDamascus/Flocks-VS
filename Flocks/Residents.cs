@@ -46,7 +46,7 @@ namespace Flocks
         private readonly ICoreServerAPI sapi;
         public readonly FlocksServerConfig Cfg;
         private readonly Dictionary<string, Species> species;
-        public int Allowed, VetoSeason, VetoLake, VetoShore, VetoCrowded, VetoOff, VetoAbandoned;
+        public int Allowed, VetoSeason, VetoLake, VetoShore, VetoCrowded, VetoOff, VetoAbandoned, VetoDepth;
         /// <summary>Config ShoreDistance, for EntityBehaviorWaterfowl (server side).</summary>
         public static int ShoreDistanceCfg = 20;
 
@@ -68,6 +68,8 @@ namespace Flocks
                 if (!Cfg.ResidentGeese) { VetoOff++; return false; }
                 var bp = pos.AsBlockPos;
                 if (!InSeason(sapi.World, bp, sp)) { VetoSeason++; return false; }
+                // a wading bird only where it can stand: water one block deep, the spawn on its bottom
+                if (sp.Wades && !(LakeSearch.IsWadeable(ba, bp.X, bp.Z, out int wy) && wy == bp.Y)) { VetoDepth++; return false; }
                 int minLake = sp.MinLake(Cfg.MinLakeSize);
                 if (LakeSize(ba, bp, minLake) < minLake) { VetoLake++; return false; }
                 if (ShoreDirection(ba, bp, ShoreDistanceCfg, out _) < 0) { VetoShore++; return false; }
@@ -148,7 +150,7 @@ namespace Flocks
         public string Report()
         {
             var sb = new StringBuilder($"Resident birds {(Cfg.ResidentGeese ? "on" : "OFF")} (vanilla spawning + season/lake veto). " +
-                $"Spawn checks since start: {Allowed} allowed, vetoed {VetoSeason} out of season, {VetoLake} small lake, {VetoShore} too far from shore (>{Cfg.ShoreDistance}), {VetoCrowded} crowded, {VetoAbandoned} abandoned lake, {VetoOff} disabled.");
+                $"Spawn checks since start: {Allowed} allowed, vetoed {VetoSeason} out of season, {VetoLake} small lake, {VetoShore} too far from shore (>{Cfg.ShoreDistance}), {VetoCrowded} crowded, {VetoAbandoned} abandoned lake, {VetoDepth} too deep to wade, {VetoOff} disabled.");
             foreach (var sp in species.Values.Where(s => s.Lands))
             {
                 var code = sp.LandedEntityCode;

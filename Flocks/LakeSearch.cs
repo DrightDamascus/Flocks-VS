@@ -128,6 +128,72 @@ namespace Flocks
 
         private static long Key(int x, int z) => ((long)x << 32) | (uint)z;
 
+        // ---------------------------------------------------------------- wading (herons)
+
+        /// <summary>Wading birds keep at least this far from the threat when they come down again.</summary>
+        public const double SafeWade = 30;
+
+        /// <summary>
+        /// Water a wading bird can stand in: the column's surface is fresh water exactly one block deep, with solid
+        /// ground under it. y = the water block, which is where the bird's feet are (on the bottom). Vintage Story's still
+        /// water is always a full block, so the heron's legs are long enough to stand in that (Dright: tall legs).
+        /// </summary>
+        public static bool IsWadeable(IBlockAccessor ba, int x, int z, out int y)
+        {
+            if (!Surface(ba, x, z, out y)) return false;
+            var below = ba.GetBlock(new BlockPos(x, y - 1, z));
+            if (below == null || below.Id == 0 || below.IsLiquid()) return false;
+            if (ba.GetBlock(new BlockPos(x, y - 1, z), BlockLayersAccess.Fluid)?.IsLiquid() == true) return false;
+            return below.CollisionBoxes != null && below.CollisionBoxes.Length > 0;
+        }
+
+        /// <summary>
+        /// Where a flushed wading bird comes down: wadeable water within SearchRadius, at least SafeWade from the
+        /// threat and MinHop from where it was, on water of at least minLake surface blocks; one of the dozen nearest,
+        /// and the wadeable water within 3 blocks of it (for a pair). Landing points are on the bottom. Null if none.
+        /// </summary>
+        public static List<Vec3d> FindWadeSpots(IBlockAccessor ba, Vec3d from, double threatX, double threatZ, int minLake, Random rand)
+        {
+            int fx = (int)Math.Floor(from.X), fz = (int)Math.Floor(from.Z);
+            var found = new List<(double d, int x, int z, int y)>();
+            for (int dx = -SearchRadius; dx <= SearchRadius; dx += 2)
+                for (int dz = -SearchRadius; dz <= SearchRadius; dz += 2)
+                {
+                    int x = fx + dx, z = fz + dz;
+                    double d = Math.Sqrt(dx * dx + dz * dz);
+                    if (d > SearchRadius || d < MinHop) continue;
+                    if (Dist(x + 0.5, z + 0.5, threatX, threatZ) < SafeWade) continue;
+                    if (FlockRegistry.Instance?.IsAbandoned(x + 0.5, z + 0.5) == true) continue;
+                    if (!IsWadeable(ba, x, z, out int y) || DeepNear(ba, x, z, y)) continue;
+                    found.Add((d, x, z, y));
+                }
+            found.Sort((p, q) => p.d.CompareTo(q.d));
+            var near = new List<(int x, int z, int y)>();
+            foreach (var f in found)
+            {
+                if (near.Count >= 12) break;
+                if (Flood(ba, f.x, f.z, f.y, minLake, new HashSet<long>()).Count >= minLake) near.Add((f.x, f.z, f.y));
+            }
+            if (near.Count == 0) return null;
+            var c = near[rand.Next(near.Count)];
+            var spots = new List<Vec3d>();
+            for (int dx = -3; dx <= 3; dx++)
+                for (int dz = -3; dz <= 3; dz++)
+                    if (IsWadeable(ba, c.x + dx, c.z + dz, out int wy) && wy == c.y && !DeepNear(ba, c.x + dx, c.z + dz, wy))
+                        spots.Add(new Vec3d(c.x + dx + 0.5, wy, c.z + dz + 0.5));
+            return spots;
+        }
+
+        /// <summary>Deep water (the same lake, more than a block deep) right next to (x, z): a touchdown a block off would
+        /// put a wader in over its head, so landing spots keep a block away from the drop-off.</summary>
+        private static bool DeepNear(IBlockAccessor ba, int x, int z, int y)
+        {
+            for (int dx = -1; dx <= 1; dx++)
+                for (int dz = -1; dz <= 1; dz++)
+                    if ((dx != 0 || dz != 0) && Surface(ba, x + dx, z + dz, out int wy) && wy == y && !IsWadeable(ba, x + dx, z + dz, out _)) return true;
+            return false;
+        }
+
         /// <summary>Rain-map top of the column is fresh water; y = that block.</summary>
         public static bool Surface(IBlockAccessor ba, int x, int z, out int y)
         {

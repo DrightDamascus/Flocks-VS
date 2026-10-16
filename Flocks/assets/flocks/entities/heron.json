@@ -1,0 +1,98 @@
+{
+	code: "heron",
+	class: "EntityAgent",
+	tags: ["animal", "huntable", "adult", "habitat-water"],
+	// the box in flight; standing in water it is wadeHitboxHeight tall (flocks.waterfowl), so the bird stands rather
+	// than floats (the game counts a creature as swimming when there is water at 66% of its box height)
+	hitboxSize: { x: 0.6, y: 0.7 },
+	deadHitboxSize: { x: 0.7, y: 0.35 },
+	eyeHeight: 1.3,
+	fallDamageMultiplier: 0.5,
+	drops: [],
+	attributes: {
+		handbook: { exclude: true }
+	},
+	client: {
+		renderer: "Shape",
+		// tools/make_heron.py: its own bones (a two-part neck for the heron's S) and animations
+		shape: { base: "flocks:entity/bird/heron" },
+		textures: { "heron": { base: "flocks:entity/bird/heron" } },
+		// 1.75-block wingspan (a real grey heron is 1.55-1.95 m); freakishly long legs, ~1 block, so it can stand in a
+		// full block of water. Passing herons read this size too.
+		size: 0.7,
+		behaviors: [
+			{ code: "repulseagents" },
+			{ code: "controlledphysics", stepHeight: 0.6 },
+			{ code: "floatupwhenstuck", onlyWhenDead: true },
+			{ code: "interpolateposition" },
+			{ code: "harvestable" }
+		],
+		animations: [
+			{ code: "idle-stand", animation: "idle-stand", blendMode: "Average", easeInSpeed: 3, easeOutSpeed: 3, triggeredBy: { defaultAnim: true } },
+			{ code: "alert", animation: "alert", blendMode: "Average", easeInSpeed: 5, easeOutSpeed: 3 },
+			{ code: "walk", animation: "walk", blendMode: "Average", easeInSpeed: 3, easeOutSpeed: 3 },
+			{ code: "strike", animation: "strike", animationSpeed: 1.2, blendMode: "Average", weight: 5, easeInSpeed: 10, easeOutSpeed: 4 },
+			// slow, deep wingbeats
+			{ code: "fly-flap", animation: "fly-flap", animationSpeed: 0.9, blendMode: "Average", weight: 10, easeInSpeed: 6, easeOutSpeed: 6 },
+			{ code: "fly-soar", animation: "fly-soar", blendMode: "Average", weight: 10, easeInSpeed: 4, easeOutSpeed: 4 },
+			{ code: "takeoff", animation: "takeoff", animationSpeed: 1.6, blendMode: "Average", weight: 10, easeInSpeed: 10, easeOutSpeed: 5 },
+			{ code: "land", animation: "land", animationSpeed: 1.0, blendMode: "Average", weight: 10, easeInSpeed: 5, easeOutSpeed: 4 },
+			{ code: "die", animation: "death", animationSpeed: 1.25, weight: 10, blendMode: "Average", triggeredBy: { onControls: ["dead"] } }
+		]
+	},
+	server: {
+		behaviors: [
+			{ code: "repulseagents" },
+			{ code: "controlledphysics", stepHeight: 0.6 },
+			// wary: flushes from much further than a goose. A short hop off the bottom rather than a run; slow flight.
+			// Wading (rest, stalk, strike) comes from the species' habitat "wade" (config/flocks-species/heron.json).
+			{ code: "flocks.waterfowl", species: "heron", fleeRange: 22, takeoffRange: 14, lifeHours: 6, sink: 0,
+			  cruiseSpeedMin: 9, cruiseSpeedMax: 11, takeoffRunSeconds: 0.3, takeoffRunSpeed: 3, wadeHitboxHeight: 1.55,
+			  takeoffWingsChance: 0.8, takeoffCallChance: 0.8 },
+			{ code: "health", currenthealth: 6, maxhealth: 6 },
+			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
+			{ code: "harvestable", drops: [
+				{ type: "item", code: "game:poultry-raw", quantity: { avg: 2, var: 0.5 } },
+				{ type: "item", code: "game:feather", quantity: { avg: 12, var: 2 } }
+			] },
+			{ code: "floatupwhenstuck", onlyWhenDead: true }
+		],
+		// Vanilla spawning as for the greylag (tryOnlySurface puts it on the bottom of the water); Residents.cs vetoes
+		// anywhere the water isn't exactly one block deep. Usually alone, sometimes a pair.
+		spawnconditions: {
+			worldgen: {
+				TriesPerChunk: { avg: 0.03, var: 0 },
+				tryOnlySurface: true,
+				groupSize: { dist: "verynarrowgaussian", avg: 1.2, var: 0.5 },
+				insideBlockCodes: ["game:water-still-7"],
+				minTemp: -10,
+				maxTemp: 34,
+				minRain: 0.3
+			},
+			runtime: {
+				group: "passive",
+				MinDistanceToPlayer: 40,
+				chance: 0.008,
+				maxQuantity: 6,
+				tryOnlySurface: true,
+				groupSize: { dist: "verynarrowgaussian", avg: 1.2, var: 0.5 },
+				insideBlockCodes: ["game:water-still-7"],
+				minTemp: -10,
+				maxTemp: 34,
+				minRain: 0.3
+			}
+		}
+	},
+	sounds: {
+		hurt: "flocks:heron/hurt",
+		death: "flocks:heron/death",
+		// mostly silent while hunting; a croak now and then
+		idle: { path: "flocks:heron/croak*", pitch: { avg: 1, var: 0.1 }, range: 40 },
+		takeoffsplash: { path: "game:environment/smallsplash", pitch: { avg: 0.9, var: 0.1 }, range: 24, volume: { avg: 0.5 } },
+		// the goose wingbeats, pitched down: bigger, slower wings
+		takeoffwings: { path: "flocks:wings/flap*", pitch: { avg: 0.8, var: 0.05 }, range: 32, volume: { avg: 0.9 } },
+		takeoffcall: { path: "flocks:heron/croak*", pitch: { avg: 1, var: 0.08 }, range: 56, volume: { avg: 0.9 } },
+		landsplash: { path: "game:environment/smallsplash", pitch: { avg: 0.9, var: 0.1 }, range: 24, volume: { avg: 0.4 } }
+	},
+	idleSoundChance: 0.006
+}

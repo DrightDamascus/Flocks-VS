@@ -1,0 +1,27 @@
+// Grey heron. Our own model (tools/make_heron.py), with freakishly long legs. Wades: stands on the bottom of water one
+// block deep, stalks and strikes there, and flies to other such water when flushed (entities/heron.json). Mostly
+// resident; it doesn't arrive in landing flocks, and passes over rarely, alone or in twos and threes.
+// Fields: see Flocks/Species.cs.
+{
+	code: "heron",
+	name: "grey herons",
+	shapes: [
+		{ name: "heron", shape: "flocks:shapes/entity/bird/heron.json", flap: "fly-flap", soar: "fly-soar" }
+	],
+	sizeFromEntity: "flocks:heron",
+	// slow, deep beats with glides
+	speedMin: 9, speedMax: 12,
+	flapSeconds: 1.0, soarSeconds: 2.5, blendSeconds: 0.5,
+	flapBeatsMin: 3, flapBeatsMax: 6, soarLoopsMin: 1, soarLoopsMax: 2,
+	altitudeMin: 25, altitudeMax: 70,
+	loose: true,
+	springStart: 0.0, springEnd: 0.12, springWeight: 0.3, autumnStart: 0.9, autumnEnd: 0.98, autumnWeight: 0.3,
+	hours: [7, 18],
+	maxFlocksPerDay: 0.5, countMin: 1, countMax: 3,
+	callSound: "heron/croak", callVariants: 3, callGapMin: 10, callGapMax: 25,
+	landedEntity: "flocks:heron",
+	habitat: "wade",
+	arriveInFlocks: false,
+	landingMin: 1, landingMax: 2,
+	minLakeSize: 16
+}

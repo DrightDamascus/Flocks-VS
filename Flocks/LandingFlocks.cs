@@ -46,7 +46,7 @@ namespace Flocks
                 if (plr.Entity == null || plr.ConnectionState != EnumClientState.Playing) continue;
                 foreach (var sp in species.Values)
                 {
-                    if (!sp.Lands) continue;
+                    if (!sp.Lands || !sp.ArriveInFlocks) continue;
                     var key = (plr.PlayerUID, sp.Code);
                     if (!plans.TryGetValue(key, out var plan) || plan.day != day)
                     {

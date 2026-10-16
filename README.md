@@ -5,12 +5,14 @@ lakes, can be hunted, and come and go with the year. Install on both server and 
 DESIGN.md. Version history: CHANGELOG.md.
 
 ## What it does
-- **Passing flocks** (drawn by each client, no entities): geese, cranes, hawks and mallards cross the sky on
-  migration days in spring and autumn, at their own hours and heights, held back by storms. All but the hawks call
-  as they pass.
+- **Passing flocks** (drawn by each client, no entities): geese, cranes, hawks, mallards and now and then a heron
+  cross the sky on migration days in spring and autumn, at their own hours and heights, held back by storms. All but
+  the hawks call as they pass.
 - **Landing flocks** (real entities): on spring migration days a flock of greylag geese or mallards flies in from up
   to 320 blocks out and glides down onto a lake near you. Both also spawn naturally on lakes (mallards on ponds too)
   in their resident season.
+- **Grey herons** stand on freakishly long legs in water a block deep, stalk and strike, and flap off croaking when
+  you get too close.
 - **Geese on the water** drift, paddle away from you, and take off in a hurry when you get close, shoot at them, or
   miss them. They fly to another part of the lake or another lake, coming in along a clear lane, and climb over hills
   and trees on the way. A flock that keeps being disturbed abandons the lake for a while (lake wariness).
@@ -37,11 +39,11 @@ entity file with the `flocks.waterfowl` behaviour, like vanilla animals. See `co
 `entities/greylag.json`; fields are documented in `Flocks/Species.cs`.
 
 ## Tools
-- Models: `python tools/make_greylag.py` (and `make_crane.py`, `make_mallard.py`) regenerate a bird's shape and animations (`--texture`
-  repaints the texture, overwriting hand edits); `python tools/preview_greylag.py` renders it without the game.
+- Models: `python tools/make_greylag.py` (and `make_crane.py`, `make_mallard.py`, `make_heron.py`) regenerate a
+  bird's shape and animations (`--texture` repaints the texture, overwriting hand edits); `python tools/preview_greylag.py` renders it without the game.
 - Build: `./build_zip.ps1 [-GamePath <folder with VintagestoryAPI.dll>]` -> `dist/flocks_<version>.zip`
   (default GamePath: the 1.22.7 reference DLLs at %USERPROFILE%\agent-tools\vsref1227).
 - Engine tests: `./tools/run_engine_tests.ps1` runs the bird AI on a scratch dedicated server (new world, no players)
-  against a built test site and prints PASS/FAIL lines with measurements (about 6 minutes). See DESIGN.md.
+  against a built test site and prints PASS/FAIL lines with measurements (about 9 minutes). See DESIGN.md.
 
 The amphithere model (tools/make_amphithere.py) ships as assets only and is unused.

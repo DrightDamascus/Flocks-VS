@@ -69,6 +69,12 @@ namespace Flocks
         public int MinLakeSize;
 
         public int MinLake(int serverDefault) => MinLakeSize > 0 ? MinLakeSize : serverDefault;
+        /// <summary>"water": floats on open water (geese, ducks). "wade": stands on the bottom of water one block deep
+        /// (herons): rests, stalks and strikes there, and lands and spawns only in such water.</summary>
+        public string Habitat = "water";
+        public bool Wades => Habitat == "wade";
+        /// <summary>Whether landing flocks of it arrive on spring migration days (herons don't; they spawn on their own).</summary>
+        public bool ArriveInFlocks = true;
 
         public bool Lands => !string.IsNullOrEmpty(LandedEntity);
         public AssetLocation LandedEntityCode => Lands ? new AssetLocation(LandedEntity) : null;

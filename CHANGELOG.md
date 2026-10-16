@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.16.0
+The grey heron, and wading (the first new behaviour type of the roster):
+- New model (tools/make_heron.py): slim grey body with black shoulder patches and pale back plumes, white neck with a
+  line of black streaks, white head with the black stripe to the crest, a long yellow dagger bill, broad rounded wings
+  with dark flight feathers, and freakishly long legs (~1 block; Dright's call: Vintage Story's still water is always a
+  full block deep). The neck is in two segments for the heron's S. Its own animations: flight with the neck drawn back
+  and the legs trailing far behind, a hunched rest, an alert stretch, a stalking walk, the strike, takeoff, landing and
+  death (the body drops the length of its legs).
+- flocks:heron (entities/heron.json): size 0.7 (1.75-block wingspan, real 1.55-1.95 m), 6 health. Wades (species
+  habitat "wade"): stands on the bottom of water one block deep, mostly resting hunched, now and then stalking slowly
+  through the shallows or striking; goes alert and backs away when approached; flushes from 14 blocks (22 to start
+  backing off), hops off the bottom instead of running, flies slowly with deep beats and croaks. Comes down in other
+  wadeable water a block away from any drop-off; one that ends up in deep water floats up and paddles back.
+- Spawns on its own, usually alone, only where the water is exactly one block deep (/flocks residents counts the rest
+  as "too deep to wade"). Doesn't arrive in landing flocks (species arriveInFlocks false); passes over rarely.
+- Sounds (sounds/heron/): croaks for calls and takeoff, hurt and death, from a recording by Sharad Apte (CC BY-SA 4.0).
+- New species data: habitat ("water" or "wade") and arriveInFlocks. The landing approach now counts only what stands
+  higher than the landing spot as in the way (needed for spots on the bottom of shallow water).
+- Engine tests: the test site's pond A has a 3-block rim of water one block deep, like a natural lake's shallows. New:
+  heron settle (standing on the bottom, not swimming), 25 s of wading without leaving wadeable water, and a flush
+  ending standing in wadeable water.
+
 ## 0.15.0
 The mallard, the first bird of the roster (Phase 2):
 - New model (tools/make_mallard.py, built from the greylag generator's pieces with duck proportions: plump body, short

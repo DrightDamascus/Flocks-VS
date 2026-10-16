@@ -2,9 +2,9 @@
 
 ## Sounds (Flocks/assets/flocks/sounds)
 All clips were cut from the recordings below, mixed to mono, high-passed at 120 Hz, faded at the ends, loudness/peak
-normalized and encoded as Ogg Vorbis. goose/hurt and duck/hurt are pitched up 15%, goose/death and duck/death down 15%; the duck clips are high-passed at
-150 Hz. The CC BY-SA clips are
-adaptations and are themselves licensed CC BY-SA under the same version as their source.
+normalized and encoded as Ogg Vorbis (the duck and heron clips high-passed at 150 Hz). The hurt sounds are pitched up
+15% and the death sounds down 15%. The CC BY-SA clips are adaptations and are themselves licensed CC BY-SA under the
+same version as their source.
 
 | Files | Source | Author | License |
 |---|---|---|---|
@@ -16,6 +16,7 @@ adaptations and are themselves licensed CC BY-SA under the same version as their
 | duck/idle/quack1-4, duck/call1, duck/hurt, duck/death (female mallard) | [Mallard (Anas platyrhynchos) (W1CDR0001518 BD17)](https://commons.wikimedia.org/wiki/File:Mallard_(Anas_platyrhynchos)_(W1CDR0001518_BD17).ogg) (British Library) | Aubrey John Williams | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 | duck/idle/quack5-6, duck/call2 | [Anas platyrhynchos - Mallard - XC112828](https://commons.wikimedia.org/wiki/File:Anas_platyrhynchos_-_Mallard_-_XC112828.ogg) (xeno-canto [XC112828](https://xeno-canto.org/112828)) | Jonathon Jongsma | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) |
 | duck/idle/mutter1-2 (female mallard feeding) | [Anas platyrhynchos - Mallard XC518422](https://commons.wikimedia.org/wiki/File:Anas_platyrhynchos_-_Mallard_XC518422.mp3) (xeno-canto [XC518422](https://xeno-canto.org/518422)) | Marie-Lan Taÿ Pamart | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+| heron/croak1-3, heron/hurt, heron/death | [Grey heron call recorded in January 2023 at Sangli](https://commons.wikimedia.org/wiki/File:Grey_heron_call_recorded_in_January_2023_at_Sangli.wav) | Sharad Apte (Sharadapte) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 
 The NPS/Yellowstone sound library (public domain) was checked first. It has Canada geese and sandhill cranes, but no
 greylag, common crane or clean wingbeat takeoffs, so the clips above were used instead.

@@ -67,6 +67,16 @@ namespace Flocks
         /// <summary>Chances a bird plays its takeoffwings and takeoffcall sounds (entity sounds) as it takes off, so a
         /// group doesn't play one of each per bird.</summary>
         private double takeoffWingsChance = 0.6, takeoffCallChance = 0.4;
+        /// <summary>Wading birds (species habitat "wade"): stand on the bottom of water one block deep, and have a taller
+        /// selection box while standing there (wadeHitboxHeight), so the game's swimming check (water at 66% of it)
+        /// looks above the water and they stand instead of floating. In flight they use the entity's own box.</summary>
+        private bool Wade => SpeciesData?.Wades == true;
+        private float wadeHitboxHeight = 1.55f, flightHitboxHeight = -1, hitboxWidth = 0.6f;
+        // wading activity: rest, stalk (walk), strike; how long it lasts
+        private string activity = "rest";
+        private float activityTime = 3;
+        private const double StalkSpeed = 0.45;      // blocks/s
+
         /// <summary>Smallest lake this species lands on (its species data; else the server default).</summary>
         private int MinLake => SpeciesData?.MinLakeSize > 0 ? SpeciesData.MinLakeSize : Landing.MinPatch;
         /// <summary>Simulation range while flying: the server ticks an entity, and sends it to players, only within this
@@ -128,6 +138,7 @@ namespace Flocks
             species = attributes["species"].AsString(species);
             takeoffWingsChance = attributes["takeoffWingsChance"].AsDouble(takeoffWingsChance);
             RunSeconds = Math.Max(0.05, attributes["takeoffRunSeconds"].AsDouble(RunSeconds));
+            wadeHitboxHeight = attributes["wadeHitboxHeight"].AsFloat(wadeHitboxHeight);
             RunSpeed = attributes["takeoffRunSpeed"].AsDouble(RunSpeed);
             takeoffCallChance = attributes["takeoffCallChance"].AsDouble(takeoffCallChance);
             heading = rand.NextDouble() * Math.PI * 2;
@@ -140,6 +151,12 @@ namespace Flocks
             if (!entity.Alive) { pos.Roll = 0; if (entity.Swimming || entity.FeetInLiquid) pos.Motion.Y = SurfaceMotion(); return; }
             if (!restored) { restored = true; Restore(); FlockRegistry.Instance?.Adopt(entity, species); }
             entity.SimulationRange = phase == Phase.Water ? GlobalConstants.DefaultSimulationRange : FlightRange;
+            if (Wade)
+            {
+                if (flightHitboxHeight < 0) { flightHitboxHeight = entity.SelectionBox.Y2; hitboxWidth = entity.SelectionBox.X2 - entity.SelectionBox.X1; }
+                float want = phase == Phase.Water || phase == Phase.Splash ? wadeHitboxHeight : flightHitboxHeight;
+                if (Math.Abs(entity.SelectionBox.Y2 - want) > 0.01) entity.SetSelectionBox(hitboxWidth, want);
+            }
             if (phase != Phase.Water) { TickFlight(dt); return; }
 
             var attrs = entity.WatchedAttributes;
@@ -182,7 +199,8 @@ namespace Flocks
                 if (d < takeoffRange * rangeMult * senseMul) { TakeoffGroup(away, player, false); return; }
                 if (d < fleeRange * rangeMult * senseMul) { heading = away; speedNow = paddleSpeed; }
             }
-            else
+            if (Wade) { TickWade(dt, speedNow > driftSpeed); return; }
+            if (player == null)
             {
                 heading += (rand.NextDouble() - 0.5) * 0.15; // slow wandering drift
                 if (!double.IsNaN(shoreHeading))            // too far out: ease back toward land
@@ -217,7 +235,7 @@ namespace Flocks
             double tx = threat?.Pos.X ?? threatAt?.X ?? pos.X, tz = threat?.Pos.Z ?? threatAt?.Z ?? pos.Z;
             // every flush disturbs the flock; disturbed often enough, it leaves this lake and rejoins the migration
             if (!depart && FlockRegistry.Instance?.Disturb(FlockId, 1, pos.XYZ) == true) depart = true;
-            List<Vec3d> spots = depart ? null : LakeSearch.FindSpots(entity.World.BlockAccessor, pos.XYZ, tx, tz, MinLake, rand);
+            List<Vec3d> spots = depart ? null : FindSpots(pos.XYZ, tx, tz);
             if (spots == null || spots.Count == 0) depart = true; // nowhere to land nearby: they rejoin the migration
             Takeoff(away, Pick(spots), depart, tx, tz, 0);
             foreach (var e in entity.World.GetEntitiesAround(pos.XYZ, 16, 8, e => e.Code == entity.Code && e.Alive && e != entity))
@@ -282,7 +300,7 @@ namespace Flocks
                     SetAnim("takeoff");
                     // pattering along the surface, wings thrashing, then the feet leave the water
                     speed = Math.Min(RunSpeed, speed + RunSpeed / RunSeconds * dt);
-                    onWater = phaseTime < RunSeconds * 0.7;
+                    onWater = !Wade && phaseTime < RunSeconds * 0.7;
                     vy = onWater ? 0 : 2.5;
                     if (phaseTime >= RunSeconds) SetPhase(Phase.Fly);
                     break;
@@ -293,7 +311,7 @@ namespace Flocks
                     if (target == null && !departing && (searchTimer -= dt) <= 0)
                     {
                         searchTimer = 4;
-                        NewTarget(Pick(LakeSearch.FindSpots(entity.World.BlockAccessor, pos.XYZ, threatX, threatZ, MinLake, rand)));
+                        NewTarget(Pick(FindSpots(pos.XYZ, threatX, threatZ)));
                         if (target != null) { target.Y -= sink; Persist(); }
                         else { departing = true; Persist(); } // nowhere (left) to land: rejoin the migration
                     }
@@ -359,7 +377,7 @@ namespace Flocks
                         // no slack: "needs" already keeps Clearance, and slack 10 blocks out is most of that block and a half
                         if (ahead > line + 0.02) { GoAround($"obstacle ahead (line {line:0.00}, needs {ahead:0.00}, {d:0.0} out)"); break; }
                     }
-                    if (entity.Swimming || entity.FeetInLiquid || pos.Y <= target.Y + 0.15)
+                    if (Wade ? (entity.OnGround || pos.Y <= target.Y + 0.15) : (entity.Swimming || entity.FeetInLiquid || pos.Y <= target.Y + 0.15))
                     {
                         entity.PlayEntitySound("landsplash");
                         SetPhase(Phase.Splash);
@@ -369,10 +387,11 @@ namespace Flocks
                 }
 
                 case Phase.Splash:
-                    // skid to a stop on the water, wings still up, then fold them and float
-                    SetAnim(phaseTime < 0.5 ? "land" : "swim");
-                    speed *= Math.Exp(-4 * dt);
-                    onWater = true;
+                    // skid to a stop on the water, wings still up, then fold them and float; a wader settles onto the bottom
+                    SetAnim(phaseTime < 0.5 ? "land" : (Wade ? "idle-stand" : "swim"));
+                    speed *= Math.Exp((Wade ? -8 : -4) * dt);
+                    onWater = !Wade;
+                    if (Wade) vy = -3;
                     if (phaseTime >= SplashSeconds)
                     {
                         heading = flyHeading; NewTarget(null); pos.Roll = 0; badSpots.Clear(); spotChanges = 0;
@@ -564,7 +583,7 @@ namespace Flocks
                 {
                     int x = (int)Math.Floor(target.X + ux * s + uz * side * HalfSpan), z = (int)Math.Floor(target.Z + uz * s - ux * side * HalfSpan);
                     int h = ba.GetRainMapHeightAt(x, z);
-                    if (h <= 0 || h + 1 + Clearance <= target.Y) continue;
+                    if (h <= 0 || h + 1 <= target.Y + 0.2) continue;              // unloaded, or no higher than the spot
                     tmp.Set(x, h, z);
                     if (ba.GetBlock(tmp, BlockLayersAccess.Fluid)?.IsLiquid() == true) continue;
                     worst = Math.Max(worst, (h + 1 + Clearance - target.Y) / s);
@@ -682,6 +701,79 @@ namespace Flocks
             }
             double target = top - 0.125 - sink;
             return GameMath.Clamp((target - entity.Pos.Y) * 0.15, -0.03, 0.03);
+        }
+
+        /// <summary>Landing spots for this bird's habitat: open water, or water one block deep for waders.</summary>
+        private List<Vec3d> FindSpots(Vec3d from, double tx, double tz) => Wade
+            ? LakeSearch.FindWadeSpots(entity.World.BlockAccessor, from, tx, tz, MinLake, rand)
+            : LakeSearch.FindSpots(entity.World.BlockAccessor, from, tx, tz, MinLake, rand);
+
+        /// <summary>
+        /// A wading bird at rest: mostly standing hunched, now and then stalking slowly through the shallows or striking
+        /// at a fish, and alert (neck up) while backing away from someone too close. It keeps to water one block deep:
+        /// a step that would leave it turns instead, and a bird that is out of it walks back to the nearest. The vertical
+        /// is left to the game's physics (it stands on the bottom).
+        /// </summary>
+        private void TickWade(float dt, bool fleeing)
+        {
+            var pos = entity.Pos;
+            double speedNow = 0;
+            bool wading = LakeSearch.IsWadeable(entity.World.BlockAccessor, (int)Math.Floor(pos.X), (int)Math.Floor(pos.Z), out _);
+            // in over its head (a landing a block off the shallows, say): float up and paddle back to them
+            if (entity.Swimming) pos.Motion.Y = SurfaceMotion();
+            if (!wading)
+            {
+                heading = TowardWade(heading);
+                speedNow = StalkSpeed; SetAnim("walk");
+            }
+            else if (fleeing)
+            {
+                if (!WadeAt(heading, 0.8)) heading = TowardWade(heading);
+                speedNow = WadeAt(heading, 0.8) ? StalkSpeed * 1.3 : 0;
+                SetAnim("alert");
+            }
+            else
+            {
+                if ((activityTime -= dt) <= 0)
+                {
+                    double r = rand.NextDouble();
+                    if (r < 0.55) { activity = "rest"; activityTime = 8 + (float)rand.NextDouble() * 17; }
+                    else if (r < 0.85) { activity = "stalk"; activityTime = 2 + (float)rand.NextDouble() * 4; heading += (rand.NextDouble() - 0.5) * 2; }
+                    else { activity = "strike"; activityTime = 1.0f; }
+                }
+                if (activity == "stalk")
+                {
+                    if (!WadeAt(heading, 0.8)) heading = TowardWade(heading);
+                    speedNow = WadeAt(heading, 0.8) ? StalkSpeed : 0;
+                    SetAnim(speedNow > 0 ? "walk" : "idle-stand");
+                }
+                else SetAnim(activity == "strike" ? "strike" : "idle-stand");
+            }
+            pos.Motion.X = Math.Sin(heading) * speedNow / 60;
+            pos.Motion.Z = Math.Cos(heading) * speedNow / 60;
+            if (entity.CollidedHorizontally) heading += Math.PI * (0.5 + rand.NextDouble());
+            pos.Yaw = (float)heading;
+        }
+
+        /// <summary>Wadeable water dist blocks along heading, at the bird's own level.</summary>
+        private bool WadeAt(double towards, double dist)
+        {
+            var pos = entity.Pos;
+            int x = (int)Math.Floor(pos.X + Math.Sin(towards) * dist), z = (int)Math.Floor(pos.Z + Math.Cos(towards) * dist);
+            return LakeSearch.IsWadeable(entity.World.BlockAccessor, x, z, out int y) && Math.Abs(y - (int)Math.Floor(pos.Y + 0.1)) <= 1;
+        }
+
+        /// <summary>The heading itself if wadeable water is just ahead, else toward the nearest within 6 blocks, else a turn.</summary>
+        private double TowardWade(double current)
+        {
+            if (WadeAt(current, 0.8)) return current;
+            for (int dist = 1; dist <= 6; dist++)
+                for (int i = 0; i < 8; i++)
+                {
+                    double h = current + (i % 2 == 0 ? 1 : -1) * ((i + 1) / 2) * Math.PI / 4;
+                    if (WadeAt(h, dist)) return h;
+                }
+            return current + Math.PI * (0.5 + rand.NextDouble());
         }
 
         /// <summary>
