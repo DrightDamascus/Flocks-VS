@@ -68,7 +68,8 @@ namespace Flocks
                 if (!Cfg.ResidentGeese) { VetoOff++; return false; }
                 var bp = pos.AsBlockPos;
                 if (!InSeason(sapi.World, bp, sp)) { VetoSeason++; return false; }
-                if (LakeSize(ba, bp, Cfg.MinLakeSize) < Cfg.MinLakeSize) { VetoLake++; return false; }
+                int minLake = sp.MinLake(Cfg.MinLakeSize);
+                if (LakeSize(ba, bp, minLake) < minLake) { VetoLake++; return false; }
                 if (ShoreDirection(ba, bp, ShoreDistanceCfg, out _) < 0) { VetoShore++; return false; }
                 if (FlockRegistry.Instance?.IsAbandoned(pos.X, pos.Z) == true) { VetoAbandoned++; return false; }
                 int near = sapi.World.GetEntitiesAround(pos, Cfg.NearbyRadius, 32, e => e.Alive && e.Code.Equals(code)).Length;

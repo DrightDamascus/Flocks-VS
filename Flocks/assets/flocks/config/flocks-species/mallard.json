@@ -1,0 +1,28 @@
+// Mallard. Our own model (tools/make_mallard.py; drake and hen textures). Passes over in loose, fast groups, and
+// lands on lakes and ponds as flocks:mallard (behaviour tuning and sounds in entities/mallard.json).
+// Fields: see Flocks/Species.cs.
+{
+	code: "mallard",
+	name: "mallards",
+	shapes: [
+		{ name: "mallard", shape: "flocks:shapes/entity/bird/mallard.json", flap: "fly-flap", soar: "fly-soar" }
+	],
+	// drawn at the landed entity's size (client.size 0.47: 0.9 blocks across)
+	sizeFromEntity: "flocks:mallard",
+	// fast, low and loose: rapid shallow wingbeats with hardly any gliding
+	speedMin: 18, speedMax: 23,
+	flapSeconds: 0.22, soarSeconds: 0.6, blendSeconds: 0.2,
+	flapBeatsMin: 24, flapBeatsMax: 48, soarLoopsMin: 1, soarLoopsMax: 1,
+	altitudeMin: 30, altitudeMax: 80,
+	loose: true,
+	// partial migrants: an early spring passage and a late autumn one, at dawn and dusk; most of the year they stay
+	// (resident from springStart to autumnStart)
+	springStart: 0.0, springEnd: 0.14, springWeight: 0.6, autumnStart: 0.72, autumnEnd: 0.92, autumnWeight: 0.6,
+	hours: [5, 8, 17, 20],
+	maxFlocksPerDay: 2, countMin: 4, countMax: 14,
+	callSound: "duck/call", callVariants: 2, callGapMin: 5, callGapMax: 12,
+	landedEntity: "flocks:mallard",
+	landingMin: 4, landingMax: 10,
+	// ponds will do: the centre of a 5x5 pond has open water two blocks all round
+	minLakeSize: 25
+}

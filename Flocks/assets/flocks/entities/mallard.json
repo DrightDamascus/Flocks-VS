@@ -1,0 +1,96 @@
+{
+	code: "mallard",
+	class: "EntityAgent",
+	tags: ["animal", "huntable", "adult", "habitat-water"],
+	hitboxSize: { x: 0.5, y: 0.45 },
+	deadHitboxSize: { x: 0.5, y: 0.28 },
+	eyeHeight: 0.4,
+	fallDamageMultiplier: 0.5,
+	drops: [],
+	attributes: {
+		handbook: { exclude: true }
+	},
+	client: {
+		renderer: "Shape",
+		// tools/make_mallard.py; the same bones as the greylag, so the same animations
+		shape: { base: "flocks:entity/bird/mallard" },
+		// drakes and hens at random: one UV layout, two paint jobs
+		textures: { "mallard": { base: "flocks:entity/bird/mallard-drake", alternates: [ { base: "flocks:entity/bird/mallard-hen" } ] } },
+		// 0.9-block wingspan (a real mallard is 0.8-1 m); passing mallard flocks read this too
+		size: 0.47,
+		behaviors: [
+			{ code: "repulseagents" },
+			{ code: "controlledphysics", stepHeight: 0.5 },
+			{ code: "floatupwhenstuck", onlyWhenDead: true },
+			{ code: "interpolateposition" },
+			{ code: "harvestable" }
+		],
+		animations: [
+			{ code: "swim", animation: "swim", blendMode: "Average", easeInSpeed: 4, easeOutSpeed: 4, triggeredBy: { defaultAnim: true } },
+			{ code: "idle-stand", animation: "idle-stand", blendMode: "Average", easeInSpeed: 4, easeOutSpeed: 4 },
+			{ code: "walk", animation: "walk", animationSpeed: 1.4, blendMode: "Average", easeInSpeed: 4, easeOutSpeed: 4 },
+			// ducks beat their wings much faster than geese
+			{ code: "fly-flap", animation: "fly-flap", animationSpeed: 3.2, blendMode: "Average", weight: 10, easeInSpeed: 8, easeOutSpeed: 8 },
+			{ code: "fly-soar", animation: "fly-soar", blendMode: "Average", weight: 10, easeInSpeed: 4, easeOutSpeed: 4 },
+			// a dabbling duck springs almost straight up off the water, thrashing its wings
+			{ code: "takeoff", animation: "takeoff", animationSpeed: 4, blendMode: "Average", weight: 10, easeInSpeed: 14, easeOutSpeed: 6 },
+			{ code: "land", animation: "land", animationSpeed: 1.8, blendMode: "Average", weight: 10, easeInSpeed: 6, easeOutSpeed: 4 },
+			{ code: "die", animation: "death", animationSpeed: 1.25, weight: 10, blendMode: "Average", triggeredBy: { onControls: ["dead"] } }
+		]
+	},
+	server: {
+		behaviors: [
+			{ code: "repulseagents" },
+			{ code: "controlledphysics", stepHeight: 0.5 },
+			// before "health": it zeroes spear and melee damage before health applies it. Mallards let you a little
+			// closer than geese, spring straight up instead of running, and fly faster.
+			{ code: "flocks.waterfowl", species: "mallard", fleeRange: 12, takeoffRange: 6, lifeHours: 6, sink: 0.1,
+			  cruiseSpeedMin: 15, cruiseSpeedMax: 18, takeoffRunSeconds: 0.15, takeoffRunSpeed: 4,
+			  takeoffWingsChance: 0.7, takeoffCallChance: 0.5 },
+			{ code: "health", currenthealth: 3, maxhealth: 3 },
+			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
+			{ code: "harvestable", drops: [
+				{ type: "item", code: "game:poultry-raw", quantity: { avg: 1, var: 0 } },
+				{ type: "item", code: "game:feather", quantity: { avg: 7, var: 2 } }
+			] },
+			{ code: "floatupwhenstuck", onlyWhenDead: true }
+		],
+		// Vanilla spawning, as for the greylag (see entities/greylag.json). Mallards are the most widespread duck:
+		// a wider climate, smaller groups, and smaller ponds (species minLakeSize; season and the rest in Residents.cs).
+		spawnconditions: {
+			worldgen: {
+				TriesPerChunk: { avg: 0.04, var: 0 },
+				tryOnlySurface: true,
+				groupSize: { dist: "verynarrowgaussian", avg: 6, var: 3 },
+				insideBlockCodes: ["game:water-still-7"],
+				minTemp: -15,
+				maxTemp: 32,
+				minRain: 0.25
+			},
+			runtime: {
+				group: "passive",
+				MinDistanceToPlayer: 32,
+				chance: 0.01,
+				maxQuantity: 20,
+				tryOnlySurface: true,
+				groupSize: { dist: "verynarrowgaussian", avg: 6, var: 3 },
+				insideBlockCodes: ["game:water-still-7"],
+				minTemp: -15,
+				maxTemp: 32,
+				minRain: 0.25
+			}
+		}
+	},
+	sounds: {
+		hurt: "flocks:duck/hurt",
+		death: "flocks:duck/death",
+		// single quacks and soft feeding mutters
+		idle: { path: "flocks:duck/idle/*", pitch: { avg: 1, var: 0.12 }, range: 28 },
+		takeoffsplash: { path: "game:environment/smallsplash", pitch: { avg: 1.15, var: 0.1 }, range: 24, volume: { avg: 0.45 } },
+		// the goose wingbeats, pitched up: a duck's wings are smaller and faster
+		takeoffwings: { path: "flocks:wings/flap*", pitch: { avg: 1.35, var: 0.1 }, range: 28, volume: { avg: 0.8 } },
+		takeoffcall: { path: "flocks:duck/call*", pitch: { avg: 1, var: 0.08 }, range: 40, volume: { avg: 0.7 } },
+		landsplash: { path: "game:environment/mediumsplash", pitch: { avg: 1.15, var: 0.1 }, range: 24, volume: { avg: 0.4 } }
+	},
+	idleSoundChance: 0.03
+}

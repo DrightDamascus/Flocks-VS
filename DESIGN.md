@@ -141,7 +141,11 @@ Decisions (Dright, 0.13.0), Phase 1 AI:
   sounds are in its entity file (flocks.waterfowl attributes, entity sounds), as vanilla does. Resident spawning,
   landing flocks and /flocks land work for every species that lands. Each side keeps its own species dictionary (client
   and server share a process in singleplayer; only the client has meshes).
-- Next: Phase 2, the roster (mallard, heron, eagle, gull, crow on top of goose, crane, hawk).
+- Phase 2, the roster (mallard, heron, eagle, gull, crow on top of goose, crane, hawk). Done in 0.15.0: the mallard,
+  the first bird added as content on the data-driven AI: tools/make_mallard.py (greylag bones, so the greylag
+  animations; drake and hen textures picked at random per bird), entities/mallard.json, config/flocks-species/
+  mallard.json and sounds/duck/. New per-species data it needed: takeoffRunSeconds/takeoffRunSpeed (a dabbling duck
+  springs straight up instead of running) and minLakeSize (ducks take ponds of 25 surface blocks).
 
 Next steps:
 - Hand-off from the sky: when a planned goose flock passes a suitable lake (fresh water, 36+ surface blocks, 64+

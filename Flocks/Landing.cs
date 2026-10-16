@@ -24,15 +24,16 @@ namespace Flocks
             var rand = sapi.World.Rand;
             // the species' landing flock size, like a landing flock or a natural group
             int n = count > 0 ? GameMath.Clamp(count, 1, 30) : sp.LandingMin + rand.Next(Math.Max(1, sp.LandingMax - sp.LandingMin + 1));
-            var patch = FindPatch(sapi.World.BlockAccessor, caller.Pos.AsBlockPos);
-            if (patch == null) return TextCommandResult.Error($"No open water with {MinPatch}+ surface blocks at least {Clear:0} blocks from you (the geese would flee at once) within {Radius} blocks.");
+            int minPatch = sp.MinLake(MinPatch);
+            var patch = FindPatch(sapi.World.BlockAccessor, caller.Pos.AsBlockPos, minPatch);
+            if (patch == null) return TextCommandResult.Error($"No open water with {minPatch}+ surface blocks at least {Clear:0} blocks from you (they would flee at once) within {Radius} blocks.");
 
             // a compact group on the nearest water past Clear: the columns closest to the first such column
             double px = caller.Pos.X, pz = caller.Pos.Z;
             double Dist(BlockPos c) => Math.Sqrt((c.X + 0.5 - px) * (c.X + 0.5 - px) + (c.Z + 0.5 - pz) * (c.Z + 0.5 - pz));
             var spots = patch.Where(c => Dist(c) >= Clear).ToList();
             var anchor = spots.OrderBy(Dist).First();
-            spots = spots.OrderBy(c => (c.X - anchor.X) * (c.X - anchor.X) + (c.Z - anchor.Z) * (c.Z - anchor.Z)).Take(Math.Max(MinPatch, n * 4)).ToList();
+            spots = spots.OrderBy(c => (c.X - anchor.X) * (c.X - anchor.X) + (c.Z - anchor.Z) * (c.Z - anchor.Z)).Take(Math.Max(minPatch, n * 4)).ToList();
             int spawned = 0;
             // one flock record for the whole group, so they leave together and are tracked as one
             var flock = FlockRegistry.Instance?.Create(sp.Code, n, new Vec3d(anchor.X + 0.5, anchor.Y + 1, anchor.Z + 0.5));
@@ -52,7 +53,7 @@ namespace Flocks
 
         /// <summary>Nearest fresh-water surface patch (rain-map top is still water) with at least MinPatch columns
         /// Clear or more blocks from <paramref name="center"/>.</summary>
-        private static List<BlockPos> FindPatch(IBlockAccessor ba, BlockPos center)
+        private static List<BlockPos> FindPatch(IBlockAccessor ba, BlockPos center, int minPatch)
         {
             var seen = new HashSet<long>();
             var starts = new List<(double d, int x, int z)>();
@@ -79,7 +80,7 @@ namespace Flocks
                         if (Surface(ba, nx, nz, out int ny) && ny == y) { seen.Add(Key(nx, nz)); queue.Enqueue((nx, nz)); }
                     }
                 }
-                if (patch.Count(c => Math.Sqrt((c.X - center.X) * (c.X - center.X) + (c.Z - center.Z) * (c.Z - center.Z)) >= Clear) >= MinPatch) return patch;
+                if (patch.Count(c => Math.Sqrt((c.X - center.X) * (c.X - center.X) + (c.Z - center.Z) * (c.Z - center.Z)) >= Clear) >= minPatch) return patch;
             }
             return null;
         }

@@ -64,6 +64,11 @@ namespace Flocks
         public string LandedEntity;
         /// <summary>Birds in a landing flock (a new one; a returning flock comes back with whoever survived).</summary>
         public int LandingMin = 7, LandingMax = 12;
+        /// <summary>Smallest lake (fresh-water surface blocks) it lands on or spawns on; 0 = the server's MinLakeSize.
+        /// Ducks take smaller ponds than geese.</summary>
+        public int MinLakeSize;
+
+        public int MinLake(int serverDefault) => MinLakeSize > 0 ? MinLakeSize : serverDefault;
 
         public bool Lands => !string.IsNullOrEmpty(LandedEntity);
         public AssetLocation LandedEntityCode => Lands ? new AssetLocation(LandedEntity) : null;

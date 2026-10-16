@@ -2,7 +2,8 @@
 
 ## Sounds (Flocks/assets/flocks/sounds)
 All clips were cut from the recordings below, mixed to mono, high-passed at 120 Hz, faded at the ends, loudness/peak
-normalized and encoded as Ogg Vorbis. goose/hurt is pitched up 15% and goose/death down 15%. The CC BY-SA clips are
+normalized and encoded as Ogg Vorbis. goose/hurt and duck/hurt are pitched up 15%, goose/death and duck/death down 15%; the duck clips are high-passed at
+150 Hz. The CC BY-SA clips are
 adaptations and are themselves licensed CC BY-SA under the same version as their source.
 
 | Files | Source | Author | License |
@@ -12,6 +13,9 @@ adaptations and are themselves licensed CC BY-SA under the same version as their
 | wings/flap1-2 (mute swan wingbeats) | [Cygnus olor - Mute Swan XC434964](https://commons.wikimedia.org/wiki/File:Cygnus_olor_-_Mute_Swan_XC434964.mp3) (xeno-canto [XC434964](https://xeno-canto.org/434964)) | Joost van Bruggen | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 | crane/call1-5 | [Grus grus hunneberget](https://commons.wikimedia.org/wiki/File:Grus_grus_hunneberget.ogg) | Wikimalte (Wikimedia Commons) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 | crane/call6 | [Grus grus](https://commons.wikimedia.org/wiki/File:Grus_grus.ogg) | Vladislav Petrovich Volkov | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| duck/idle/quack1-4, duck/call1, duck/hurt, duck/death (female mallard) | [Mallard (Anas platyrhynchos) (W1CDR0001518 BD17)](https://commons.wikimedia.org/wiki/File:Mallard_(Anas_platyrhynchos)_(W1CDR0001518_BD17).ogg) (British Library) | Aubrey John Williams | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+| duck/idle/quack5-6, duck/call2 | [Anas platyrhynchos - Mallard - XC112828](https://commons.wikimedia.org/wiki/File:Anas_platyrhynchos_-_Mallard_-_XC112828.ogg) (xeno-canto [XC112828](https://xeno-canto.org/112828)) | Jonathon Jongsma | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) |
+| duck/idle/mutter1-2 (female mallard feeding) | [Anas platyrhynchos - Mallard XC518422](https://commons.wikimedia.org/wiki/File:Anas_platyrhynchos_-_Mallard_XC518422.mp3) (xeno-canto [XC518422](https://xeno-canto.org/518422)) | Marie-Lan Taÿ Pamart | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 
 The NPS/Yellowstone sound library (public domain) was checked first. It has Canada geese and sandhill cranes, but no
 greylag, common crane or clean wingbeat takeoffs, so the clips above were used instead.

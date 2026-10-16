@@ -52,7 +52,9 @@ namespace Flocks
         // ---- flight, in blocks and seconds (Motion is per 1/60 s, hence the /60 where it is set)
         private enum Phase { Water, Run, Fly, Glide, Splash }
         /// <summary>The run across the water before the feet leave it, and its top speed.</summary>
-        private const double RunSeconds = 0.55, RunSpeed = 7;
+        /// <summary>takeoffRunSeconds / takeoffRunSpeed attributes: geese run 0.55 s across the water; dabbling ducks
+        /// spring almost straight up.</summary>
+        private double RunSeconds = 0.55, RunSpeed = 7;
         private double cruiseMin = 11, cruiseMax = 13.5;
         private const double Accel = 7, TurnRate = 1.4, ClimbMax = 4.5, SinkMax = 3, GroundClear = 6;
         /// <summary>Gliding in: blocks forward per block down, and the speed at touchdown.</summary>
@@ -65,6 +67,8 @@ namespace Flocks
         /// <summary>Chances a bird plays its takeoffwings and takeoffcall sounds (entity sounds) as it takes off, so a
         /// group doesn't play one of each per bird.</summary>
         private double takeoffWingsChance = 0.6, takeoffCallChance = 0.4;
+        /// <summary>Smallest lake this species lands on (its species data; else the server default).</summary>
+        private int MinLake => SpeciesData?.MinLakeSize > 0 ? SpeciesData.MinLakeSize : Landing.MinPatch;
         /// <summary>Simulation range while flying: the server ticks an entity, and sends it to players, only within this
         /// of some player (vanilla default 128). Landing flocks arrive from up to ~320 blocks out and departing ones are
         /// removed at 360 (FlockRegistry.DepartRange), so it must cover both.</summary>
@@ -123,6 +127,8 @@ namespace Flocks
             cruiseMax = attributes["cruiseSpeedMax"].AsDouble(cruiseMax);
             species = attributes["species"].AsString(species);
             takeoffWingsChance = attributes["takeoffWingsChance"].AsDouble(takeoffWingsChance);
+            RunSeconds = Math.Max(0.05, attributes["takeoffRunSeconds"].AsDouble(RunSeconds));
+            RunSpeed = attributes["takeoffRunSpeed"].AsDouble(RunSpeed);
             takeoffCallChance = attributes["takeoffCallChance"].AsDouble(takeoffCallChance);
             heading = rand.NextDouble() * Math.PI * 2;
         }
@@ -211,7 +217,7 @@ namespace Flocks
             double tx = threat?.Pos.X ?? threatAt?.X ?? pos.X, tz = threat?.Pos.Z ?? threatAt?.Z ?? pos.Z;
             // every flush disturbs the flock; disturbed often enough, it leaves this lake and rejoins the migration
             if (!depart && FlockRegistry.Instance?.Disturb(FlockId, 1, pos.XYZ) == true) depart = true;
-            List<Vec3d> spots = depart ? null : LakeSearch.FindSpots(entity.World.BlockAccessor, pos.XYZ, tx, tz, Landing.MinPatch, rand);
+            List<Vec3d> spots = depart ? null : LakeSearch.FindSpots(entity.World.BlockAccessor, pos.XYZ, tx, tz, MinLake, rand);
             if (spots == null || spots.Count == 0) depart = true; // nowhere to land nearby: they rejoin the migration
             Takeoff(away, Pick(spots), depart, tx, tz, 0);
             foreach (var e in entity.World.GetEntitiesAround(pos.XYZ, 16, 8, e => e.Code == entity.Code && e.Alive && e != entity))
@@ -287,7 +293,7 @@ namespace Flocks
                     if (target == null && !departing && (searchTimer -= dt) <= 0)
                     {
                         searchTimer = 4;
-                        NewTarget(Pick(LakeSearch.FindSpots(entity.World.BlockAccessor, pos.XYZ, threatX, threatZ, Landing.MinPatch, rand)));
+                        NewTarget(Pick(LakeSearch.FindSpots(entity.World.BlockAccessor, pos.XYZ, threatX, threatZ, MinLake, rand)));
                         if (target != null) { target.Y -= sink; Persist(); }
                         else { departing = true; Persist(); } // nowhere (left) to land: rejoin the migration
                     }
@@ -415,10 +421,15 @@ namespace Flocks
         /// top within dist along towards, sampled every 1.5 blocks down the middle and at each wingtip; -infinity if
         /// nothing is in the way. Open water never counts.
         /// </summary>
-        private double NeededSlope(double towards, double dist)
+        private double NeededSlope(double towards, double dist) => NeededSlope(towards, dist, out _, out _);
+
+        /// <summary>NeededSlope, also giving the nearest obstacle in the way: how far ahead, and how far the feet must
+        /// rise to clear it (0 / infinity when nothing is in the way).</summary>
+        private double NeededSlope(double towards, double dist, out double nearest, out double rise)
         {
             var pos = entity.Pos; var ba = entity.World.BlockAccessor;
             double sx = Math.Sin(towards), sz = Math.Cos(towards), worst = double.NegativeInfinity;
+            nearest = double.PositiveInfinity; rise = 0;
             var tmp = new BlockPos(0, 0, 0);
             for (double d = 1; d <= dist; d += 1.5)
                 for (int side = -1; side <= 1; side++)
@@ -430,6 +441,8 @@ namespace Flocks
                     if (ba.GetBlock(tmp, BlockLayersAccess.Fluid)?.IsLiquid() == true) continue;
                     // the face may be up to one sample spacing nearer than the sample that sees it
                     worst = Math.Max(worst, (h + 1 + Clearance - pos.Y) / Math.Max(d - 2.1, 0.4));
+                    if (d < nearest) { nearest = d; rise = h + 1 + Clearance - pos.Y; }
+                    else if (d == nearest) rise = Math.Max(rise, h + 1 + Clearance - pos.Y);
                 }
             return worst;
         }
@@ -446,20 +459,35 @@ namespace Flocks
             int x = (int)Math.Floor(pos.X), z = (int)Math.Floor(pos.Z), above = ba.GetRainMapHeightAt(x, z);
             if (above + 1 > pos.Y + 1.2 && ba.GetBlock(new BlockPos(x, above, z), BlockLayersAccess.Fluid)?.IsLiquid() != true)
             {
-                double best = flyHeading, bestSlope = double.MaxValue;
-                foreach (double off in new[] { 0, 0.8, -0.8, 1.6, -1.6, Math.PI })
-                {
-                    double sl = NeededSlope(flyHeading + off, 6);
-                    if (sl < bestSlope) { bestSlope = sl; best = flyHeading + off; }
-                }
-                Steer(best, TurnRate * 2.5, dt);
+                Steer(MostOpenHeading(), TurnRate * 2.5, dt);
                 vy = Math.Min(vy, 0.5); cap = Math.Min(cap, 4);
                 return;
             }
-            double slope = NeededSlope(flyHeading, Math.Max(8, speed * LookSeconds));
+            double slope = NeededSlope(flyHeading, Math.Max(8, speed * LookSeconds), out double near, out double rise);
             if (double.IsNegativeInfinity(slope)) return;
+            // Too close to climb over in time (a go-round low inside a ring of trees, say): rising takes rise/SteepClimb,
+            // reaching it (near - 0.6)/speed. Turn hard for the most open side, slow, and climb while turning.
+            if (near < 6 && rise / SteepClimb > (near - 0.6) / Math.Max(speed, 0.5))
+            {
+                Steer(MostOpenHeading(), TurnRate * 2.5, dt);
+                vy = SteepClimb; cap = Math.Min(cap, 3);
+                return;
+            }
             vy = Math.Max(vy, Math.Min(slope * Math.Max(speed, MinPullSpeed) * 1.35 + 0.6, SteepClimb));
             cap = Math.Min(cap, Math.Max(MinPullSpeed, SteepClimb / (slope * 1.35)));
+        }
+
+        /// <summary>Of straight on, 45 and 90 degrees either way, and back, the direction whose next 6 blocks need the
+        /// gentlest climb.</summary>
+        private double MostOpenHeading()
+        {
+            double best = flyHeading, bestSlope = double.MaxValue;
+            foreach (double off in new[] { 0, 0.8, -0.8, 1.6, -1.6, Math.PI })
+            {
+                double sl = NeededSlope(flyHeading + off, 6);
+                if (sl < bestSlope) { bestSlope = sl; best = flyHeading + off; }
+            }
+            return best;
         }
 
         /// <summary>

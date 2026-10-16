@@ -37,6 +37,7 @@ namespace FlocksTest
             public int Collided, InTerrain, Samples, Still, GoArounds;
             public double MaxAlt, MaxSpeed, MaxCommanded, LastT, FlightSeconds;
             public Vec3d Last; public string LastPhase = "Water";
+            public bool LoggedHit, LoggedLow;
         }
 
         private string stepName;
@@ -120,8 +121,12 @@ namespace FlocksTest
             var gt = sapi.World.GetEntityType(new AssetLocation("flocks", "greylag"));
             Check(gt?.Sounds != null && gt.Sounds.ContainsKey("takeoffwings") && gt.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.waterfowl") == true,
                 "greylag entity file loaded whole (sounds and flocks.waterfowl behaviour present)");
+            var mt = sapi.World.GetEntityType(new AssetLocation("flocks", "mallard"));
+            Check(mt?.Sounds != null && mt.Sounds.ContainsKey("takeoffwings") && mt.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.waterfowl") == true,
+                "mallard entity file loaded whole (sounds and flocks.waterfowl behaviour present)");
             var spc = sapi.ModLoader.GetModSystem<FlocksModSystem>().SpeciesByCode;
-            Check(spc.ContainsKey("goose") && spc["goose"].Lands && spc["goose"].LandingMin == 7 && spc.ContainsKey("crane") && spc.ContainsKey("hawk"),
+            Check(spc.ContainsKey("goose") && spc["goose"].Lands && spc["goose"].LandingMin == 7 && spc.ContainsKey("crane") && spc.ContainsKey("hawk")
+                  && spc.ContainsKey("mallard") && spc["mallard"].MinLakeSize == 25,
                 $"species data loaded: {string.Join(", ", spc.Keys)}");
             Check(top + 12 <= ba.MapSizeY - 60, $"test site above the terrain (terrain max {top}, slab {y0})");
             Check(ba.GetRainMapHeightAt(x0 - 40, z0) == y0 && ba.GetRainMapHeightAt(x0 - 11, z0) == y0 + 14 && ba.GetRainMapHeightAt(x0 + 50 - 17, z0 + 30) == y0 + 8,
@@ -303,20 +308,45 @@ namespace FlocksTest
                     ReportFlight($"cycle {n}", 2);
                 }, 90));
             }
+            // ---- mallards: the same AI from data alone (a smaller bird, a short takeoff, smaller ponds)
+            FlockRecord ducks = null;
+            steps.Enqueue(("mallard landing flock", () =>
+            {
+                ResetStats(); FlockRegistry.Instance.Calm();
+                bool ok = FrameArrive(out string msg, "mallard");
+                Log("arrive: " + msg);
+                Check(ok, "mallard landing flock started: " + msg);
+                // the landing flock by the id in the message: world generation also puts wild mallards on lakes nearby
+                var m = System.Text.RegularExpressions.Regex.Match(msg ?? "", @"flock #(\d+)");
+                ducks = m.Success ? FlockRegistry.Instance.Get(long.Parse(m.Groups[1].Value)) : null;
+                testFlock = ducks?.Id ?? -2;
+            }, () => Elapsed > 5 && LoadedGeese().Count > 0 && LoadedGeese().All(e => Phase(e) == "Water"), () =>
+            {
+                var g = LoadedGeese();
+                Check(ducks?.Species == "mallard" && g.Count >= 4 && g.Count <= 10 && g.All(e => e.Code.Path == "mallard"), $"a mallard flock of 4-10 came in ({g.Count}, species {ducks?.Species})");
+                ReportFlight("mallard landing", 2);
+            }, 150));
+            steps.Enqueue(("mallard flush", () =>
+            {
+                ResetStats();
+                LoadedGeese()[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 1);
+            }, () => Elapsed > 3 && LoadedGeese().All(e => Phase(e) == "Water"), () => ReportFlight("mallard flush", 2), 90));
+
             steps.Enqueue(("memory", () => { }, () => true, () =>
             {
                 Check(memory.Count >= 3 && memory.Last() - memory[1] < 64, $"managed memory over cycles (MB): {string.Join(", ", memory)}");
-                Check(LoadedGeese().Count == 7, $"still 7 geese after the cycles ({LoadedGeese().Count})");
+                int left = sapi.World.LoadedEntities.Values.Count(e => e.Alive && e.WatchedAttributes.GetLong(FlockRegistry.FlockIdKey, -1) == flock.Id);
+                Check(left == 7, $"still 7 geese after the cycles ({left})");
             }, 5));
         }
 
         private readonly List<long> memory = new();
 
-        private bool FrameArrive(out string msg)
+        private bool FrameArrive(out string msg, string species = "goose")
         {
             var flocks = sapi.ModLoader.GetModSystem<FlocksModSystem>();
             // stand-in for the player: on the slab, 60 blocks north of the site centre
-            return flocks.Landings.Arrive(new Vec3d(c.X, y0 + 1, c.Z - 60), flocks.SpeciesByCode["goose"], true, out msg);
+            return flocks.Landings.Arrive(new Vec3d(c.X, y0 + 1, c.Z - 60), flocks.SpeciesByCode[species], true, out msg);
         }
 
         private double Elapsed => sapi.World.ElapsedMilliseconds / 1000.0 - stepStart;
@@ -354,7 +384,7 @@ namespace FlocksTest
         // ------------------------------------------------------------------------------------------------ measuring
 
         /// <summary>The test flock's geese (world generation puts natural geese on real lakes nearby too; those are left out).</summary>
-        private List<Entity> LoadedGeese() => sapi.World.LoadedEntities.Values.Where(e => e.Alive && e.Code?.Path == "greylag"
+        private List<Entity> LoadedGeese() => sapi.World.LoadedEntities.Values.Where(e => e.Alive && e.Code?.Domain == "flocks"
             && e.WatchedAttributes.GetLong(FlockRegistry.FlockIdKey, -1) == testFlock).ToList();
         private long testFlock = -2;
 
@@ -382,6 +412,13 @@ namespace FlocksTest
 
         private void ResetStats() => stats.Clear();
 
+        /// <summary>The block in front of a bird, n blocks along its yaw at its height (for the hit log).</summary>
+        private string Ahead(IBlockAccessor ba, Entity e, double n)
+        {
+            var b = ba.GetBlock(new BlockPos((int)Math.Floor(e.Pos.X + Math.Sin(e.Pos.Yaw) * n), (int)Math.Floor(e.Pos.Y + 0.3), (int)Math.Floor(e.Pos.Z + Math.Cos(e.Pos.Yaw) * n)));
+            return b?.Code?.Path ?? "?";
+        }
+
         private void Sample(float dt)
         {
             var ba = sapi.World.BlockAccessor;
@@ -403,12 +440,21 @@ namespace FlocksTest
                 if (!flying) { s.Last = e.Pos.XYZ; continue; }
                 s.Samples++; s.FlightSeconds += sdt;
                 s.MaxCommanded = Math.Max(s.MaxCommanded, e.GetBehavior<EntityBehaviorWaterfowl>()?.FlySpeed ?? 0);
-                if (e.CollidedHorizontally) s.Collided++;
-                int ground = ba.GetRainMapHeightAt((int)Math.Floor(e.Pos.X), (int)Math.Floor(e.Pos.Z));
+                int gx = (int)Math.Floor(e.Pos.X), gz = (int)Math.Floor(e.Pos.Z);
+                int ground = ba.GetRainMapHeightAt(gx, gz);
+                if (e.CollidedHorizontally)
+                {
+                    s.Collided++;
+                    if (!s.LoggedHit) { s.LoggedHit = true; Log($"hit: {e.Code.Path} {e.EntityId} {ph} at site {e.Pos.X - c.X:0.0},{e.Pos.Y - y0:0.0},{e.Pos.Z - c.Z:0.0} heading {e.Pos.Yaw:0.00} speed {e.GetBehavior<EntityBehaviorWaterfowl>()?.FlySpeed:0.0}; ground here {ground - y0} ({ba.GetBlock(new BlockPos(gx, ground, gz))?.Code}); ahead 1 block {Ahead(ba, e, 1)}, 2 {Ahead(ba, e, 2)}"); }
+                }
                 if (ground > 0 && e.Pos.Y < ground + 1 - 0.3 && ph != "Run")
                 {
-                    var b = ba.GetBlock(new BlockPos((int)Math.Floor(e.Pos.X), ground, (int)Math.Floor(e.Pos.Z)), BlockLayersAccess.Fluid);
-                    if (b == null || !b.IsLiquid()) s.InTerrain++;
+                    var b = ba.GetBlock(new BlockPos(gx, ground, gz), BlockLayersAccess.Fluid);
+                    if (b == null || !b.IsLiquid())
+                    {
+                        s.InTerrain++;
+                        if (!s.LoggedLow) { s.LoggedLow = true; Log($"low: {e.Code.Path} {e.EntityId} {ph} at site {e.Pos.X - c.X:0.0},{e.Pos.Y - y0:0.0},{e.Pos.Z - c.Z:0.0}; top of the column {ground + 1 - y0} ({ba.GetBlock(new BlockPos(gx, ground, gz))?.Code}); feet {e.Pos.Y - ground - 1:0.00} below it"); }
+                    }
                 }
                 s.MaxAlt = Math.Max(s.MaxAlt, e.Pos.Y - y0);
                 double moved = e.Pos.XYZ.DistanceTo(s.Last);

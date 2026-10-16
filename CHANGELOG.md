@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.15.0
+The mallard, the first bird of the roster (Phase 2):
+- New model (tools/make_mallard.py, built from the greylag generator's pieces with duck proportions: plump body, short
+  neck, round head, broad flat bill, short pointed tail with the drake's black curl, shorter pointed wings). Same bones
+  as the greylag, so the same animations. Drake (green head, white collar, chestnut breast, grey flanks, black stern,
+  blue speculum) and hen (mottled brown, dark eye stripe, orange bill with a dark saddle) textures on one layout; each
+  mallard is one or the other at random.
+- flocks:mallard (entities/mallard.json): size 0.47 (0.9-block wingspan; real mallards 0.8-1 m), 3 health, 1 poultry
+  and ~7 feathers. Lets you a little closer than a goose (flee 12, takeoff 6), springs almost straight up off the water
+  (0.15 s instead of a 0.55 s run), beats its wings twice as fast and cruises faster. Spawns on lakes and ponds of 25+
+  surface blocks in a wider climate than the greylag, in groups of 3-9; resident most of the year.
+- Passing mallard flocks (config/flocks-species/mallard.json): loose fast groups of 4-14, 30-80 blocks up, at dawn and
+  dusk in an early spring and a late autumn passage. Landing flocks of 4-10.
+- Sounds (sounds/duck/): single quacks and feeding mutters while idle, quack series as flight and alarm calls, hurt and
+  death; cut from a female mallard (Aubrey John Williams, British Library, CC BY-SA 4.0), XC112828 (Jonathon Jongsma,
+  CC BY-SA 3.0) and XC518422 (Marie-Lan Tay Pamart, CC BY-SA 4.0). See CREDITS.md. Wingbeats reuse the goose's,
+  pitched up.
+- New per-species settings: takeoffRunSeconds / takeoffRunSpeed (waterfowl behaviour) and minLakeSize (species data),
+  used by spawning, landing flocks, the post-flush lake search and /flocks land.
+- A goose or duck that finds an obstacle too close to climb over in time (a go-round low inside a ring of trees) now
+  turns hard toward the most open side while climbing, instead of only pulling up and scraping it.
+- Engine tests: mallard entity and species files load whole; a mallard landing flock and a mallard flush.
+
 ## 0.14.0
 Birds are data (Phase 1, last part). No change in how the geese, cranes and hawks behave.
 - Each bird is a file in config/flocks-species/ (any mod's domain, so other mods can add birds): drawn-flock shapes and

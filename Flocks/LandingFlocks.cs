@@ -90,7 +90,7 @@ namespace Flocks
             var code = sp.LandedEntityCode;
             string name = sp.Name ?? sp.Code;
             var ba = sapi.World.BlockAccessor;
-            var spots = LakeSearch.FindSpots(ba, p, p.X, p.Z, Landing.MinPatch, rand);
+            var spots = LakeSearch.FindSpots(ba, p, p.X, p.Z, sp.MinLake(Landing.MinPatch), rand);
             if (spots == null || spots.Count == 0) { msg = "No lake to land on within 160 blocks."; return false; }
             var centre = spots[spots.Count / 2];
             if (centre.HorizontalSquareDistanceTo(p.X, p.Z) < MinFromPlayer * MinFromPlayer) { msg = $"The nearest landing water is under {MinFromPlayer:0} blocks from you."; return false; }
