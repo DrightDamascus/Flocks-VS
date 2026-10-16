@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.19.0
+The carrion crow, the first land bird, and the straw dummy as a scarecrow:
+- New model (tools/make_crow.py): all black with a blue-purple sheen on the back and wing coverts, a big head, a stout
+  bill, a rounded tail, legs to walk on, and broad wings with five spread fingers. Its own animations: rowing flight
+  and glides, takeoff, landing, standing and looking round (also on a perch), walking, pecking at the ground, death.
+- flocks:crow (entities/crow.json, behaviour flocks.corvid, Corvid.cs): size 0.75 (1.5-block wingspan, half again a
+  real crow's 1 m), 4 health; drops poultry and feathers. A group of about 2-8 feeds together on open ground (soil,
+  sand or gravel open to the sky) around its patch: walking about, pecking, looking round, and walking off from anyone
+  who comes within 18 blocks. Closer than 10, a shot flying past, or a hit, and the whole group flies up, cawing, into
+  the nearest trees (or onto a wall or a crag) away from the threat, sits there for 25-70 s and comes back down to feed
+  when nobody is near: on its old patch, or on new ground away from whoever is about. At dusk (19:30) the group goes up
+  into the trees to roost and comes down after 6:00. Leaves have no collision box in this game, so a perched crow holds
+  itself at the perch's height. Disturbances count toward the flock's wariness as for the waterfowl, for the place
+  instead of a lake: flushed again and again, the flock leaves the area for a couple of days. Spears and melee are
+  dodged; arrows kill.
+- Crop raiding (server config CropRaiding, on by default): every 3-6 game hours (CropRaidHoursMin/Max) a crow looks
+  for a crop within 24 blocks, flies over to it (fences don't stop it) and eats it the way vanilla's hares and deer do
+  (Dright: no reason crows should be gentler): through the farmland's own food-source code, so the crop dies and still
+  gives its seed back. Crows find crops as hares and deer do, through the game's food points of interest (farmland),
+  and two crows never go for the same crop.
+- The scarecrow is vanilla's straw dummy (2 hay blocks over a stick; Dright): crows don't raid crops, don't come down
+  to feed and don't spawn within 15 blocks of a standing one (server config ScarecrowRadius, measured across the
+  ground); crows already feeding there when it goes up fly off to ground out of its reach, and one coming in to land
+  there goes elsewhere. They never get used to it, wherever it stands. One knocked down doesn't count. Its handbook page says
+  so now.
+- Spawns on its own on open land with trees about (forest edges, farmland, meadows), all year, in small groups; not
+  under trees, not near a scarecrow, at most MaxCrowsNearby (16) within NearbyRadius. No landing flocks. Loose groups
+  of 4-20 pass over in the early morning and the evening, out from the roost and back to it.
+- Sounds (sounds/crow/): caws, caw series, alarm calls on takeoff, a feeding flock overhead, hurt and death, from
+  recordings by Marie-Lan Taÿ Pamart (xeno-canto, CC BY-SA 4.0).
+- Handbook: the crow's page, and a "Crows and crops" section on the Birds page.
+- Air traffic: passing flocks no longer wait for the sky to be empty (Dright), so local gulls and crows don't hold up
+  the migration. Several flocks can be up at once, kept apart in height: a new flock cruises at least 15 blocks clear
+  of every flock already in the sky, and when two flocks come within about 120 blocks of each other without that
+  separation, the newer one climbs over the older and settles back to its cruise once past. Only storms hold flocks
+  back now.
+- `/flocks near` lists the birds within 48 blocks: what each is doing, how close it lets you come, and whether it
+  senses you (for checking in game). A landing crow whose spot has someone standing at it comes down elsewhere.
+- `/flocks land crow` puts a group on open ground near you; `/flocks arrive` says which birds don't come in landing
+  flocks. `/flocks residents` counts spawns vetoed by a scarecrow or for not being on open ground.
+- The departure hand-off works for any bird behaviour (EntityBehaviorBird.DepartingInFlight), so a flock of crows that
+  leaves the area flies off and is removed far from every player, like the waterfowl.
+- Tests: two soil fields with flax and a small oak on the test site. Crows settle and feed on the soil, raid the bed
+  (one dead crop per raid, the vanilla dead crop), take off as a stand-in player walks up (at about 10 blocks), flush up into the oak with the flock disturbed, come back down to feed, leave
+  a straw dummy's field alone (and the feeding ground it covers), fly off when put down beside one, roost in the trees at dusk and come down at dawn.
+
 ## 0.18.0
 The herring gull, the first sea bird, and the birds in the handbook:
 - New model (tools/make_gull.py, on the greylag's bones, so the greylag's animations): white head and body, silver-grey

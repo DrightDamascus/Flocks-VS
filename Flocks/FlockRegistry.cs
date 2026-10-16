@@ -213,12 +213,12 @@ namespace Flocks
             if (lastDepartCheck.TryGetValue(id, out double last) && now - last < 0.5) return;
             lastDepartCheck[id] = now;
 
-            var members = new List<(Entity e, EntityBehaviorWaterfowl b)>();
+            var members = new List<(Entity e, EntityBehaviorBird b)>();
             foreach (var e in sapi.World.LoadedEntities.Values)
             {
                 if (!e.Alive || !e.Code.Equals(goose.Code) || e.WatchedAttributes.GetLong(FlockIdKey, 0) != id) continue;
                 if (id == 0 && e != goose) continue; // flockless: hand it off on its own
-                var b = e.GetBehavior<EntityBehaviorWaterfowl>();
+                var b = e.GetBehavior<EntityBehaviorBird>();
                 if (b != null && b.DepartingInFlight) members.Add((e, b));
             }
             if (members.Count == 0) return;

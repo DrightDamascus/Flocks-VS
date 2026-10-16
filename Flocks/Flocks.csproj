@@ -10,6 +10,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="VintagestoryAPI"><HintPath>$(VINTAGE_STORY)\VintagestoryAPI.dll</HintPath><Private>false</Private></Reference>
+    <!-- the game's own essentials mod: POIRegistry, which crows search for farmland (IAnimalFoodSource) -->
+    <Reference Include="VSEssentials"><HintPath>$(VINTAGE_STORY)\Mods\VSEssentials.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="protobuf-net"><HintPath>$(VINTAGE_STORY)\Lib\protobuf-net.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Newtonsoft.Json"><HintPath>$(VINTAGE_STORY)\Lib\Newtonsoft.Json.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>

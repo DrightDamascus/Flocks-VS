@@ -1,0 +1,94 @@
+{
+	code: "crow",
+	class: "EntityAgent",
+	tags: ["animal", "huntable", "adult"],
+	hitboxSize: { x: 0.6, y: 0.7 },
+	deadHitboxSize: { x: 0.6, y: 0.35 },
+	eyeHeight: 0.6,
+	fallDamageMultiplier: 0.3,
+	drops: [],
+	attributes: {
+		handbook: { exclude: true }
+	},
+	client: {
+		renderer: "Shape",
+		// tools/make_crow.py: its own bones and animations
+		shape: { base: "flocks:entity/bird/crow" },
+		textures: { "crow": { base: "flocks:entity/bird/crow" } },
+		// 1.5-block wingspan: half again a real carrion crow's 1 m, like the other birds. Passing crow flocks read this too
+		size: 0.75,
+		behaviors: [
+			{ code: "repulseagents" },
+			{ code: "controlledphysics", stepHeight: 1.1 },
+			{ code: "floatupwhenstuck", onlyWhenDead: true },
+			{ code: "interpolateposition" },
+			{ code: "harvestable" }
+		],
+		animations: [
+			{ code: "idle-stand", animation: "idle-stand", blendMode: "Average", easeInSpeed: 4, easeOutSpeed: 4, triggeredBy: { defaultAnim: true } },
+			{ code: "walk", animation: "walk", animationSpeed: 1.2, blendMode: "Average", easeInSpeed: 5, easeOutSpeed: 5 },
+			{ code: "eat", animation: "eat", blendMode: "Average", easeInSpeed: 5, easeOutSpeed: 5 },
+			{ code: "fly-flap", animation: "fly-flap", animationSpeed: 1.5, blendMode: "Average", weight: 10, easeInSpeed: 6, easeOutSpeed: 6 },
+			{ code: "fly-soar", animation: "fly-soar", blendMode: "Average", weight: 10, easeInSpeed: 4, easeOutSpeed: 4 },
+			{ code: "takeoff", animation: "takeoff", animationSpeed: 2.2, blendMode: "Average", weight: 10, easeInSpeed: 12, easeOutSpeed: 6 },
+			{ code: "land", animation: "land", animationSpeed: 1.3, blendMode: "Average", weight: 10, easeInSpeed: 6, easeOutSpeed: 4 },
+			{ code: "die", animation: "death", animationSpeed: 1.25, weight: 10, blendMode: "Average", triggeredBy: { onControls: ["dead"] } }
+		]
+	},
+	server: {
+		behaviors: [
+			{ code: "repulseagents" },
+			{ code: "controlledphysics", stepHeight: 1.1 },
+			// feed on open ground, up into the trees when disturbed, roost at night, raid crops (Corvid.cs). Before
+			// "health": it zeroes spear and melee damage. Crows are wary: they walk off from 18 blocks and fly at 10.
+			{ code: "flocks.corvid", species: "crow", fleeRange: 18, takeoffRange: 10, flySpeed: 9, walkSpeed: 1.1,
+			  perchSecondsMin: 25, perchSecondsMax: 70, raidRange: 24 },
+			{ code: "health", currenthealth: 4, maxhealth: 4 },
+			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
+			{ code: "harvestable", drops: [
+				{ type: "item", code: "game:poultry-raw", quantity: { avg: 1, var: 0 } },
+				{ type: "item", code: "game:feather", quantity: { avg: 5, var: 2 } }
+			] },
+			{ code: "floatupwhenstuck", onlyWhenDead: true }
+		],
+		// Open land with trees about (forest edges, farmland, meadows), all year, in small groups. Residents.cs adds:
+		// on open ground (not under trees), not near a scarecrow, not too many about.
+		spawnconditions: {
+			worldgen: {
+				TriesPerChunk: { avg: 0.03, var: 0 },
+				tryOnlySurface: true,
+				groupSize: { dist: "verynarrowgaussian", avg: 5, var: 3 },
+				insideBlockCodes: ["air", "tallgrass-*", "snowlayer-1"],
+				minTemp: -15,
+				maxTemp: 30,
+				minRain: 0.2,
+				minForest: 0.03,
+				maxForest: 0.65
+			},
+			runtime: {
+				group: "neutral",
+				MinDistanceToPlayer: 40,
+				chance: 0.004,
+				maxQuantity: 12,
+				tryOnlySurface: true,
+				groupSize: { dist: "verynarrowgaussian", avg: 5, var: 3 },
+				insideBlockCodes: ["air", "tallgrass-*", "snowlayer-1"],
+				minTemp: -15,
+				maxTemp: 30,
+				minRain: 0.2,
+				minForest: 0.03,
+				maxForest: 0.65
+			}
+		}
+	},
+	sounds: {
+		hurt: "flocks:crow/hurt",
+		death: "flocks:crow/death",
+		// a single caw now and then
+		idle: { path: "flocks:crow/idle/*", pitch: { avg: 1, var: 0.08 }, range: 48 },
+		takeoffwings: { path: "flocks:wings/flap*", pitch: { avg: 1.25, var: 0.1 }, range: 24, volume: { avg: 0.7 } },
+		// the alarm: harsh caws as they go up
+		takeoffcall: { path: "flocks:crow/alarm*", pitch: { avg: 1, var: 0.06 }, range: 64, volume: { avg: 0.9 } }
+	},
+	idleSoundChance: 0.04
+}

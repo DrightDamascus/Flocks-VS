@@ -25,6 +25,7 @@ namespace Flocks
             var rand = sapi.World.Rand;
             // the species' landing flock size, like a landing flock or a natural group
             int n = count > 0 ? GameMath.Clamp(count, 1, 30) : sp.LandingMin + rand.Next(Math.Max(1, sp.LandingMax - sp.LandingMin + 1));
+            if (sp.Ground) return LandOnGround(sapi, caller, n, sp);
             int minPatch = sp.MinLake(MinPatch);
             var patch = FindPatch(sapi.World.BlockAccessor, caller.Pos.AsBlockPos, minPatch, sp.Liquid);
             if (patch == null) return TextCommandResult.Error($"No open {(sp.Sea ? "sea" : "water")} with {minPatch}+ surface blocks at least {Clear:0} blocks from you (they would flee at once) within {Radius} blocks.");
@@ -50,6 +51,26 @@ namespace Flocks
                 spawned++;
             }
             return TextCommandResult.Success($"Landed {spawned} {sp.Name ?? sp.Code} on water at {anchor.X}, {anchor.Y}, {anchor.Z} (~{Dist(anchor):0} blocks away, patch of {patch.Count}+ blocks).");
+        }
+
+        /// <summary>Land birds (crows): a group on open ground at least Clear from the player.</summary>
+        private static TextCommandResult LandOnGround(ICoreServerAPI sapi, Entity caller, int n, Species sp)
+        {
+            var type = sapi.World.GetEntityType(sp.LandedEntityCode);
+            var spots = EntityBehaviorCorvid.GroundSpots(sapi.World, caller.Pos.XYZ, caller.Pos.X, caller.Pos.Z, Clear, Clear, sapi.World.Rand);
+            if (spots == null || spots.Count == 0) return TextCommandResult.Error($"No open ground (soil, sand or gravel, open to the sky) {Clear:0}-64 blocks from you.");
+            var flock = FlockRegistry.Instance?.Create(sp.Code, n, spots[0]);
+            for (int i = 0; i < n; i++)
+            {
+                var e = sapi.World.ClassRegistry.CreateEntity(type);
+                if (flock != null) e.WatchedAttributes.SetLong(FlockRegistry.FlockIdKey, flock.Id);
+                var s = spots[sapi.World.Rand.Next(spots.Count)];
+                e.Pos.SetPos(s.X + (sapi.World.Rand.NextDouble() - 0.5) * 0.6, s.Y, s.Z + (sapi.World.Rand.NextDouble() - 0.5) * 0.6);
+                e.Pos.Yaw = (float)(sapi.World.Rand.NextDouble() * Math.PI * 2);
+                sapi.World.SpawnEntity(e);
+            }
+            var at = spots[0];
+            return TextCommandResult.Success($"Landed {n} {sp.Name ?? sp.Code} on the ground at {at.X:0}, {at.Y:0}, {at.Z:0} (~{caller.Pos.HorDistanceTo(at):0} blocks away).");
         }
 
         /// <summary>Nearest surface patch of the liquid (rain-map top is still water, or sea water) with at least MinPatch

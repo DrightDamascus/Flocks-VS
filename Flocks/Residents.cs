@@ -32,6 +32,14 @@ namespace Flocks
         /// <summary>At this wariness the flock leaves the lake and rejoins the migration; no geese land or spawn within
         /// 64 blocks of it for AbandonDays in-game days. A careful hunter gets about two geese before they go.</summary>
         public double LeaveAt = 2.5, KillWariness = 0.5, WarinessDecayPerDay = 1, AbandonDays = 2;
+
+        /// <summary>Crows raid crops: a crow near farmland now and then pecks at a growing crop and knocks it back one
+        /// growth stage. Never within ScarecrowRadius blocks (horizontally) of a standing straw dummy, where crows don't
+        /// come down to feed at all. Each crow raids at most once every CropRaidHoursMin to CropRaidHoursMax game hours.</summary>
+        public bool CropRaiding = true;
+        public double ScarecrowRadius = 15, CropRaidHoursMin = 3, CropRaidHoursMax = 6;
+        /// <summary>Safety cap for land birds (crows): no new spawn when this many are already within NearbyRadius.</summary>
+        public int MaxCrowsNearby = 16;
     }
 
     /// <summary>
@@ -47,14 +55,17 @@ namespace Flocks
         private readonly ICoreServerAPI sapi;
         public readonly FlocksServerConfig Cfg;
         private readonly Dictionary<string, Species> species;
-        public int Allowed, VetoSeason, VetoLake, VetoShore, VetoCrowded, VetoOff, VetoAbandoned, VetoDepth;
+        public int Allowed, VetoSeason, VetoLake, VetoShore, VetoCrowded, VetoOff, VetoAbandoned, VetoDepth, VetoScarecrow, VetoGround;
         /// <summary>Config ShoreDistance, for EntityBehaviorWaterfowl (server side).</summary>
         public static int ShoreDistanceCfg = 20;
+        /// <summary>The server config, for the bird behaviours (crop raiding, the scarecrow radius).</summary>
+        public static FlocksServerConfig Config = new();
 
         public ResidentGeese(ICoreServerAPI sapi, FlocksServerConfig cfg, Dictionary<string, Species> species)
         {
             this.sapi = sapi; Cfg = cfg; this.species = species;
             ShoreDistanceCfg = Math.Max(1, cfg.ShoreDistance);
+            Config = cfg;
             sapi.Event.OnTrySpawnEntity += TrySpawn;
         }
 
@@ -73,6 +84,16 @@ namespace Flocks
                     // birds of prey: resident all year, no water; a territory each, so at most two within 192 blocks
                     if (FlockRegistry.Instance?.IsAbandoned(pos.X, pos.Z) == true) { VetoAbandoned++; return false; }
                     if (sapi.World.GetEntitiesAround(pos, 192, 96, e => e.Alive && e.Code.Equals(code)).Length >= 2) { VetoCrowded++; return false; }
+                    Allowed++;
+                    return true;
+                }
+                if (sp.Ground)
+                {
+                    // land birds (crows): all year, on open ground; never where a scarecrow stands, and not too many
+                    if (FlockRegistry.Instance?.IsAbandoned(pos.X, pos.Z) == true) { VetoAbandoned++; return false; }
+                    if (!EntityBehaviorCorvid.OpenGround(ba, bp.X, bp.Z, out _)) { VetoGround++; return false; }
+                    if (Scarecrows.Protects(sapi.World, pos, Cfg.ScarecrowRadius)) { VetoScarecrow++; return false; }
+                    if (sapi.World.GetEntitiesAround(pos, Cfg.NearbyRadius, 32, e => e.Alive && e.Code.Equals(code)).Length >= Cfg.MaxCrowsNearby) { VetoCrowded++; return false; }
                     Allowed++;
                     return true;
                 }
@@ -163,7 +184,7 @@ namespace Flocks
         public string Report()
         {
             var sb = new StringBuilder($"Resident birds {(Cfg.ResidentGeese ? "on" : "OFF")} (vanilla spawning + season/lake veto). " +
-                $"Spawn checks since start: {Allowed} allowed, vetoed {VetoSeason} out of season, {VetoLake} small lake, {VetoShore} too far from shore (>{Cfg.ShoreDistance}), {VetoCrowded} crowded, {VetoAbandoned} abandoned lake, {VetoDepth} too deep to wade, {VetoOff} disabled.");
+                $"Spawn checks since start: {Allowed} allowed, vetoed {VetoSeason} out of season, {VetoLake} small lake, {VetoShore} too far from shore (>{Cfg.ShoreDistance}), {VetoCrowded} crowded, {VetoAbandoned} abandoned lake, {VetoDepth} too deep to wade, {VetoScarecrow} by a scarecrow, {VetoGround} not on open ground, {VetoOff} disabled.");
             foreach (var sp in species.Values.Where(s => s.Lands))
             {
                 var code = sp.LandedEntityCode;

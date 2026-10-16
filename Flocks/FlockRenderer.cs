@@ -22,7 +22,7 @@ namespace Flocks
         public double Wander1, Wander2;               // phases of the slow heading drift
         public double Speed, Travel, Length, Age;
         public double CruiseY, TargetY, ClimbRate;
-        public double Tail, HalfWidth, Drop;          // formation extent: behind the leader, to either side, below the leader
+        public double Tail, HalfWidth, Drop, Rise;    // formation extent: behind the leader, to either side, below and above the leader
         public double NextSample;
         public double NextCall;                       // flock age (s) of its next distant call
         public List<Bird> Birds = new();
@@ -38,6 +38,13 @@ namespace Flocks
 
         /// <summary>The lowest bird keeps at least this far above the highest ground under or near the flock.</summary>
         public double Clearance = 35;
+        /// <summary>
+        /// Air traffic: several flocks may be in the sky at once, kept apart in height. A new flock cruises at least
+        /// Separation blocks clear of every flock already up (its lowest bird over their highest, or the other way round),
+        /// and in flight, when two flocks come within ConflictRange of each other (plus their lengths) without that much
+        /// height between them, the newer one climbs over the older and comes back down to its cruise once clear.
+        /// </summary>
+        public double Separation = 15, ConflictRange = 120;
         /// <summary>How far ahead (blocks) a flock looks for rising ground.</summary>
         public double LookAhead = 320;
         public double MaxClimb = 6, MaxSink = 1.5; // blocks/s
@@ -88,6 +95,15 @@ namespace Flocks
                 f.Birds.Add(NewBird(sp, slot));
             }
             f.Length = 2 * horiz + f.Tail + span;
+            // a cruising height clear of every flock already in the sky
+            for (int pass = 0; pass <= flocks.Count; pass++)
+            {
+                Flock clash = null;
+                foreach (var o in flocks) if (Overlap(f.CruiseY, f, o)) { clash = o; break; }
+                if (clash == null) break;
+                f.CruiseY = clash.Pos.Y + clash.Rise + Separation + f.Drop;
+            }
+            f.TargetY = f.Pos.Y = f.CruiseY;
             // if it starts over known high ground, start already clear of it rather than climbing out of a hillside
             SampleTerrain(f);
             f.Pos.Y = Math.Max(f.Pos.Y, f.TargetY);
@@ -115,8 +131,13 @@ namespace Flocks
 
         private static void Extend(Flock f, Vec3d o)
         {
-            f.Tail = Math.Max(f.Tail, -o.X); f.HalfWidth = Math.Max(f.HalfWidth, Math.Abs(o.Z)); f.Drop = Math.Max(f.Drop, -o.Y);
+            f.Tail = Math.Max(f.Tail, -o.X); f.HalfWidth = Math.Max(f.HalfWidth, Math.Abs(o.Z));
+            f.Drop = Math.Max(f.Drop, -o.Y); f.Rise = Math.Max(f.Rise, o.Y);
         }
+
+        /// <summary>Whether flock f at leader height y would come within Separation, in height, of flock o.</summary>
+        private bool Overlap(double y, Flock f, Flock o)
+            => y - f.Drop < o.Pos.Y + o.Rise + Separation && y + f.Rise > o.Pos.Y - o.Drop - Separation;
 
         private Bird NewBird(Species sp, Vec3d offset) => new Bird
         {
@@ -165,6 +186,14 @@ namespace Flocks
                     if (h <= 0) continue;
                     need = Math.Max(need, h + Clearance + f.Drop - Math.Max(0, d) * climbPerBlock);
                 }
+            }
+            // keep clear of the flocks that were up before this one: over any that come near at about its height
+            foreach (var o in flocks)
+            {
+                if (o == f) break;
+                double hx = o.Pos.X - f.Pos.X, hz = o.Pos.Z - f.Pos.Z, near = ConflictRange + o.Tail + f.Tail;
+                if (hx * hx + hz * hz > near * near || !Overlap(need, f, o)) continue;
+                need = Math.Max(need, o.Pos.Y + o.Rise + Separation + f.Drop);
             }
             f.TargetY = Math.Min(need, ba.MapSizeY + 100);
         }

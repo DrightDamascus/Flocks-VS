@@ -13,7 +13,7 @@ namespace Flocks
         public float StormWind = 0.85f;
         /// <summary>Precipitation intensity (0..1) counted as a storm even without storm winds.</summary>
         public float StormPrecipitation = 0.8f;
-        /// <summary>A flock held back by a storm or another flock still in the sky gives up after this many game hours.</summary>
+        /// <summary>A flock held back by a storm gives up after this many game hours.</summary>
         public float MaxDelayHours = 3f;
         /// <summary>Testing: every day is a peak autumn migration day for every species, whatever the season.</summary>
         public bool ForceMigration = false;

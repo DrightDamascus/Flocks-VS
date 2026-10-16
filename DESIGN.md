@@ -5,7 +5,9 @@
 - Flocks spawn out of view, cross the sky ~60-120 blocks above the player's ground level, and despawn out of view.
 - Species (real migrants): greylag goose, common crane -> V/echelon formations of 7-25, slow wingbeats, calls;
   barn swallow, common starling -> loose flocks of 20-80 (starlings may murmurate briefly in autumn dusk).
-- Only one flock in the sky at a time; a few per migration day at most.
+- A few flocks per migration day at most. Until 0.19.0 only one flock could be in the sky at a time; now several can
+  (Dright: why one at a time?), kept apart like air traffic: a new flock cruises at least 15 blocks above or below
+  every flock already up, and when two come near each other without that separation, the newer climbs over the older.
 
 ## Timing rules
 - Inputs: vanilla calendar GetSeasonRel(pos) (hemisphere-aware, 0 = start of spring) and OnGetLatitude(z).
@@ -181,6 +183,22 @@ Decisions (Dright, 0.13.0), Phase 1 AI:
   already has a handbook page; its text is the lang key "<domain>:item-handbooktext-<item code>" written out in full
   (keys with a colon are taken as they are). One guide page, "Birds" (config/handbook/birds.json, like vanilla's
   game-mechanic pages), covers what the birds share and links to each bird's page.
+- Done in 0.19.0: the carrion crow, the third behaviour type: a land bird (species habitat "ground", flocks.corvid,
+  Corvid.cs on EntityBehaviorBird). Dright: crows should act like real crows. A group feeds on open ground (soil, sand,
+  gravel open to the sky) around a shared patch, walks off from people, flies up into trees (or onto prominent walls and
+  crags) away from a threat and comes back down when nobody is near, and roosts in the trees from dusk to dawn.
+  Vintage Story's leaves have no collision box, so a perched crow holds its own height. Flushes count toward the
+  flock's wariness as for the waterfowl; the abandon check is by position, so it works for an area as for a lake.
+- Crop raiding and the scarecrow (decided with Dright, 0.19.0): crows eat crops exactly as vanilla's hares and deer do
+  (Dright: you can't farm without fences because of hares, so why would crows be gentler): the farmland's own
+  IAnimalFoodSource.ConsumeOnePortion, so the crop becomes a dead crop that still gives its seed. Players fence hares
+  out; crows fly over fences, so the scarecrow is the defence. Each crow eats a crop every 3-6 game hours. The
+  scarecrow is vanilla's straw dummy (its recipe, 2 hay blocks over a stick, is what Dright had in mind): within 15
+  blocks across the ground of a standing one, crows don't raid, feed or spawn, and crows feeding there when it goes up fly off (not a disturbance). It never stops working and doesn't need
+  moving (Dright: realism that turns into a chore isn't wanted). Crows find crops through vanilla's POIRegistry, the
+  food points of interest farmland registers for hares and deer. Server config: CropRaiding, CropRaidHoursMin/Max,
+  ScarecrowRadius, MaxCrowsNearby. Not done (ideas for Dright): mobbing the eagle, gathering at carcasses, following
+  players who till or harvest.
 
 Next steps:
 - Hand-off from the sky: when a planned goose flock passes a suitable lake (fresh water, 36+ surface blocks, 64+

@@ -1,0 +1,26 @@
+// Carrion crow. Our own model (tools/make_crow.py). A land bird (habitat "ground"): a small group feeds on open ground,
+// flies up into the trees when disturbed, roosts in the trees at night and raids crops (entities/crow.json,
+// Corvid.cs). Resident all year; no landing flocks: they spawn on their own. Loose groups pass over in the early
+// morning and the evening, on their way out from the roost and back to it. Fields: see Flocks/Species.cs.
+{
+	code: "crow",
+	name: "carrion crows",
+	shapes: [
+		{ name: "crow", shape: "flocks:shapes/entity/bird/crow.json", flap: "fly-flap", soar: "fly-soar" }
+	],
+	sizeFromEntity: "flocks:crow",
+	// steady rowing wingbeats, hardly any gliding
+	speedMin: 9, speedMax: 12,
+	flapSeconds: 0.4, soarSeconds: 1.5, blendSeconds: 0.3,
+	flapBeatsMin: 6, flapBeatsMax: 14, soarLoopsMin: 1, soarLoopsMax: 1,
+	altitudeMin: 25, altitudeMax: 55,
+	loose: true,
+	yearRound: true,
+	hours: [6, 8, 17.5, 19.5],
+	maxFlocksPerDay: 1.5, countMin: 4, countMax: 20,
+	callSound: "crow/call", callVariants: 3, callGapMin: 6, callGapMax: 16,
+	landedEntity: "flocks:crow",
+	habitat: "ground",
+	arriveInFlocks: false,
+	landingMin: 3, landingMax: 8
+}

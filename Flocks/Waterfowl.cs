@@ -627,7 +627,7 @@ namespace Flocks
         }
 
         /// <summary>Climbing away for good, ready to be handed to the sky renderer.</summary>
-        public bool DepartingInFlight => phase == Phase.Fly && departing;
+        public override bool DepartingInFlight => phase == Phase.Fly && departing;
         /// <summary>Why the last glide was aborted (diagnostics and the in-engine tests).</summary>
         public string LastGoAround { get; private set; }
 
@@ -635,6 +635,7 @@ namespace Flocks
 
         /// <summary>For diagnostics and the in-engine tests: Water, Run, Fly, Glide or Splash, and the landing spot.</summary>
         public string PhaseName => phase.ToString();
+        protected override string StateText => $"{phase}, flees within {fleeRange * rangeMult:0} and takes off within {takeoffRange * rangeMult:0} (times your sensing)";
         public Vec3d Target => target;
         public double FlyHeading => flyHeading;
         public double FlySpeed => speed;

@@ -53,6 +53,7 @@ namespace Flocks
 
         /// <summary>For diagnostics and the in-engine tests.</summary>
         public string StateName => state.ToString();
+        protected override string StateText => $"{state}, takes off from a perch within {takeoffRange:0} (times your sensing)";
         public Entity Prey => prey;
         public Entity Meal => meal;
         public float StateTime => stateTime;

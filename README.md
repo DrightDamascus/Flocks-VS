@@ -17,7 +17,10 @@ DESIGN.md. Version history: CHANGELOG.md.
   hares and ducks from high up, then feed on the kill.
 - **Herring gulls** live on the sea along the coast all year. They are bold and loud, wheel over the water after taking
   off, and now and then go up of their own accord and settle further along the shore.
-- **The handbook** has a page for each bird and a "Birds" guide page (migration, wary birds, hunting).
+- **Carrion crows** feed in small groups on open ground, fly up into the trees cawing when you come close, roost in
+  the trees at night, and raid crops, killing them as hares do. Fences don't stop them; a **straw dummy** does:
+  no crow raids crops or comes down to feed within 15 blocks of one, ever.
+- **The handbook** has a page for each bird and a "Birds" guide page (migration, wary birds, crows and crops, hunting).
 - The birds are deliberately bigger than life (about half again), so they read as birds next to the game's animals.
 - **Geese on the water** drift, paddle away from you, and take off in a hurry when you get close, shoot at them, or
   miss them. They fly to another part of the lake or another lake, coming in along a clear lane, and climb over hills
@@ -35,7 +38,8 @@ spawning, loaded birds, flocks and abandoned lakes.
 
 ## Settings
 `ModConfig/flocks.json` (client): automatic migration, flocks per day, storm thresholds, call volume, species on/off.
-`ModConfig/flocks-server.json` (server): resident spawning, lake size and shore distance, crowding cap, lake wariness.
+`ModConfig/flocks-server.json` (server): resident spawning, lake size and shore distance, crowding caps, lake wariness,
+crop raiding (on/off, how often) and the scarecrow's radius.
 
 ## Birds are data
 Each bird is a file in `assets/<domain>/config/flocks-species/` (any mod can add one): its drawn-flock shapes, size,
@@ -46,7 +50,7 @@ entity file with the `flocks.waterfowl` behaviour, like vanilla animals. See `co
 
 ## Tools
 - Models: `python tools/make_greylag.py` (and `make_crane.py`, `make_mallard.py`, `make_heron.py`, `make_eagle.py`,
-  `make_gull.py`) regenerate a
+  `make_gull.py`, `make_crow.py`) regenerate a
   bird's shape and animations (`--texture` repaints the texture, overwriting hand edits); `python tools/preview_greylag.py` renders it without the game.
 - Build: `./build_zip.ps1 [-GamePath <folder with VintagestoryAPI.dll>]` -> `dist/flocks_<version>.zip`
   (default GamePath: the 1.22.7 reference DLLs at %USERPROFILE%\agent-tools\vsref1227).

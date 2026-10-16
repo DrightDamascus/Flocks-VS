@@ -3,7 +3,7 @@
 ## Sounds (Flocks/assets/flocks/sounds)
 All clips were cut from the recordings below, mixed to mono, high-passed at 120 Hz, faded at the ends, loudness/peak
 normalized and encoded as Ogg Vorbis (the duck and heron clips high-passed at 150 Hz, the eagle's and the gull's at
-400 Hz, the gull colony at 600 Hz). The hurt sounds are pitched up
+400 Hz, the gull colony at 600 Hz, the crow clips at 500 Hz). The hurt sounds are pitched up
 15% and the death sounds down 15%. The CC BY-SA clips are adaptations and are themselves licensed CC BY-SA under the
 same version as their source.
 
@@ -21,6 +21,10 @@ same version as their source.
 | eagle/call1-3, eagle/hurt, eagle/death (captive) | [Golden eagle](https://commons.wikimedia.org/wiki/File:Golden_eagle.ogg) | Bubulcus | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 | eagle/call4 | [Golden Eagle (Aquila chrysaetos) (W1CDR0001387 BD6)](https://commons.wikimedia.org/wiki/File:Golden_Eagle_(Aquila_chrysaetos)_(W1CDR0001387_BD6).ogg) (British Library) | Lawrence Shove | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 | gull/idle/call1-4, gull/laugh1-2, gull/hurt, gull/death | [XC707075 - European Herring Gull - Larus argentatus](https://commons.wikimedia.org/wiki/File:XC707075_-_European_Herring_Gull_-_Larus_argentatus.mp3) (xeno-canto [XC707075](https://xeno-canto.org/707075)) | Sonothèque ADVL | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| crow/idle/caw1-3, crow/hurt, crow/death | [Corvus corone - Carrion Crow XC509838](https://commons.wikimedia.org/wiki/File:Corvus_corone_-_Carrion_Crow_XC509838.mp3) (xeno-canto [XC509838](https://xeno-canto.org/509838)) | Marie-Lan Taÿ Pamart | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+| crow/idle/caw4-6, crow/call1-3 | [Corvus corone - Carrion Crow XC520224](https://commons.wikimedia.org/wiki/File:Corvus_corone_-_Carrion_Crow_XC520224.mp3) (xeno-canto [XC520224](https://xeno-canto.org/520224)) | Marie-Lan Taÿ Pamart | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+| crow/alarm1-2 | [Corvus corone - Carrion Crow XC482407](https://commons.wikimedia.org/wiki/File:Corvus_corone_-_Carrion_Crow_XC482407.mp3) (xeno-canto [XC482407](https://xeno-canto.org/482407)) | Marie-Lan Taÿ Pamart | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+| crow/flock1-2 (a feeding flock) | [Corvus corone - Carrion Crow XC530166](https://commons.wikimedia.org/wiki/File:Corvus_corone_-_Carrion_Crow_XC530166.mp3) (xeno-canto [XC530166](https://xeno-canto.org/530166)) | Marie-Lan Taÿ Pamart | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 | gull/flock1-3 (a colony overhead) | [Larus argentatus - European Herring Gull XC488995](https://commons.wikimedia.org/wiki/File:Larus_argentatus_-_European_Herring_Gull_XC488995.mp3) (xeno-canto [XC488995](https://xeno-canto.org/488995)) | Marie-Lan Taÿ Pamart | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 
 The NPS/Yellowstone sound library (public domain) was checked first. It has Canada geese and sandhill cranes, but no

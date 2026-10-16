@@ -20,7 +20,8 @@ namespace Flocks
 
     /// <summary>
     /// Plans each in-game day's flocks from the world seed and day number (so the plan is the same on every reload),
-    /// then sends each one when the clock reaches its hour, unless a storm is on or another flock is still overhead.
+    /// then sends each one when the clock reaches its hour, unless a storm is on. Several flocks can be up at once; the
+    /// renderer keeps them apart in height (FlockRenderer.Separation).
     /// </summary>
     public class MigrationScheduler
     {
@@ -53,7 +54,7 @@ namespace Flocks
                 if (p.Species.Meshes?.Ok != true) { Finish(p, "skipped: no meshes"); continue; }
                 // sea birds pass along the coast: only where there is sea near the player
                 if (p.Species.Sea && !SeaNear(player.Pos.AsBlockPos)) { Finish(p, "skipped: no sea nearby"); continue; }
-                string hold = renderer.Count > 0 ? "sky busy" : (Stormy(player.Pos.AsBlockPos) ? "storm" : null);
+                string hold = Stormy(player.Pos.AsBlockPos) ? "storm" : null;
                 if (hold == null && !late)
                 {
                     renderer.Send(p.Species, p.Count, p.Heading, p.Altitude);

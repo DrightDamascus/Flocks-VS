@@ -39,6 +39,7 @@ namespace Flocks
             api.Network.RegisterChannel("flocks").RegisterMessageType<SendFlockPacket>();
             api.RegisterEntityBehaviorClass(EntityBehaviorWaterfowl.Code, typeof(EntityBehaviorWaterfowl));
             api.RegisterEntityBehaviorClass(EntityBehaviorRaptor.Code, typeof(EntityBehaviorRaptor));
+            api.RegisterEntityBehaviorClass(EntityBehaviorCorvid.Code, typeof(EntityBehaviorCorvid));
         }
 
         public override void AssetsLoaded(ICoreAPI api)
@@ -77,7 +78,7 @@ namespace Flocks
                     return TextCommandResult.Success();
                 })
                 .EndSubCommand()
-                .BeginSubCommand("land").WithDescription("Debug: put a group of landing birds on open water near you: /flocks land [count] [species, default goose]").RequiresPlayer()
+                .BeginSubCommand("land").WithDescription("Debug: put a group of birds on open water (crows: open ground) near you: /flocks land [count] [species, default goose]").RequiresPlayer()
                 .RequiresPrivilege(Privilege.controlserver)
                 .WithArgs(p.OptionalInt("count", 0), p.OptionalWord("species"))
                 .HandleWith(args =>
@@ -100,6 +101,19 @@ namespace Flocks
                 .BeginSubCommand("calm").WithDescription("Admin: calm every flock and forget abandoned lakes (lake wariness)")
                 .RequiresPrivilege(Privilege.controlserver)
                 .HandleWith(args => { registry.Calm(); return TextCommandResult.Success("All flocks calm; no lakes abandoned."); })
+                .EndSubCommand()
+                .BeginSubCommand("near").WithDescription("Debug: the birds within 48 blocks of you, what they are doing, and whether they sense you").RequiresPlayer()
+                .HandleWith(args =>
+                {
+                    var me = args.Caller.Entity;
+                    var lines = new List<string>();
+                    foreach (var e in sapi.World.GetEntitiesAround(me.Pos.XYZ, 48, 48, e => e.Alive && e.GetBehavior<EntityBehaviorBird>() != null))
+                    {
+                        if (lines.Count >= 12) { lines.Add("..."); break; }
+                        lines.Add(e.GetBehavior<EntityBehaviorBird>().Diagnose(args.Caller.Player));
+                    }
+                    return TextCommandResult.Success(lines.Count == 0 ? "No Flocks birds within 48 blocks." : string.Join("\n", lines));
+                })
                 .EndSubCommand()
                 .BeginSubCommand("residents").WithDescription("Debug: resident geese state (spawn checks and vetoes, geese near each player, season)")
                 .RequiresPrivilege(Privilege.controlserver)

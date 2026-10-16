@@ -122,13 +122,21 @@ namespace FlocksTest
                         for (int y = y0 + 1; y <= y0 + 8; y++) { pos.Set(x, y, z); bulk.SetBlock(stone, pos); }
                 }
             bulk.Commit();
+            // crow country: two soil fields with a 5x5 bed of flax on farmland (field 2 gets a straw dummy later), and a
+            // little oak to perch in. Farmland is set one block at a time so its block entity registers as food.
+            BuildField(x0 - 2, z0 + 60); BuildField(x0 - 52, z0 + 62);
+            int log = sapi.World.GetBlock(new AssetLocation("game", "log-placed-oak-ud"))?.BlockId ?? stone;
+            int leaves = sapi.World.GetBlock(new AssetLocation("game", "leaves-placed-oak"))?.BlockId ?? stone;
+            for (int y = y0 + 1; y <= y0 + 6; y++) ba.SetBlock(log, new BlockPos(x0 + 15, y, z0 + 66));
+            for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) for (int y = y0 + 5; y <= y0 + 7; y++)
+                if (dx != 0 || dz != 0 || y == y0 + 7) ba.SetBlock(leaves, new BlockPos(x0 + 15 + dx, y, z0 + 66 + dz));
             Log($"site built: slab top y={y0} (terrain max {top}); rain map at pond A {ba.GetRainMapHeightAt(x0 - 40, z0)}, " +
                 $"slab {ba.GetRainMapHeightAt(x0, z0 + 60)}, wall {ba.GetRainMapHeightAt(x0 - 11, z0)}");
             // the goose entity file parsed whole (a bad field makes the game drop most of it, silently but for one log line)
             var gt = sapi.World.GetEntityType(new AssetLocation("flocks", "greylag"));
             Check(gt?.Sounds != null && gt.Sounds.ContainsKey("takeoffwings") && gt.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.waterfowl") == true,
                 "greylag entity file loaded whole (sounds and flocks.waterfowl behaviour present)");
-            var items = new[] { "greylag", "mallard", "heron", "eagle", "gull" };
+            var items = new[] { "greylag", "mallard", "heron", "eagle", "gull", "crow" };
             Check(items.All(b => sapi.World.GetItem(new AssetLocation("flocks", "creature-" + b))?.GetType().Name == "ItemCreature"
                                  && sapi.World.GetEntityType(new AssetLocation("flocks", b)) != null),
                 "creature items (creative inventory) loaded, each placing an existing bird");
@@ -144,13 +152,19 @@ namespace FlocksTest
             Check(Lang.HasTranslation("flocks:item-handbooktext-flocks:creature-gull") && Lang.HasTranslation("flocks:gamemechanicinfo-birds-text")
                   && sapi.Assets.Exists(new AssetLocation("flocks", "config/handbook/birds.json")),
                 "handbook texts and the Birds guide page loaded");
+            var ct = sapi.World.GetEntityType(new AssetLocation("flocks", "crow"));
+            Check(ct?.Sounds != null && ct.Sounds.ContainsKey("takeoffcall") && ct.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.corvid") == true,
+                "crow entity file loaded whole (sounds and flocks.corvid)");
+            Check(Lang.HasTranslation("flocks:item-handbooktext-flocks:creature-crow") && Lang.Get("game:item-handbooktext-strawdummy").Contains("crows"),
+                $"the crow's handbook text, and the straw dummy's mentions the crows ({Lang.Get("game:item-handbooktext-strawdummy")})");
             var mt = sapi.World.GetEntityType(new AssetLocation("flocks", "mallard"));
             Check(mt?.Sounds != null && mt.Sounds.ContainsKey("takeoffwings") && mt.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.waterfowl") == true,
                 "mallard entity file loaded whole (sounds and flocks.waterfowl behaviour present)");
             var spc = sapi.ModLoader.GetModSystem<FlocksModSystem>().SpeciesByCode;
             Check(spc.ContainsKey("goose") && spc["goose"].Lands && spc["goose"].LandingMin == 7 && spc.ContainsKey("crane") && spc.ContainsKey("hawk")
                   && spc.ContainsKey("mallard") && spc["mallard"].MinLakeSize == 25 && spc.ContainsKey("heron") && spc["heron"].Wades && !spc["heron"].ArriveInFlocks
-                  && spc.ContainsKey("gull") && spc["gull"].Sea && spc["gull"].Liquid == "saltwater" && spc["gull"].YearRound && spc["gull"].WarinessFactor == 0.5,
+                  && spc.ContainsKey("gull") && spc["gull"].Sea && spc["gull"].Liquid == "saltwater" && spc["gull"].YearRound && spc["gull"].WarinessFactor == 0.5
+                  && spc.ContainsKey("crow") && spc["crow"].Ground && spc["crow"].YearRound && !spc["crow"].ArriveInFlocks,
                 $"species data loaded: {string.Join(", ", spc.Keys)}");
             Check(top + 12 <= ba.MapSizeY - 60, $"test site above the terrain (terrain max {top}, slab {y0})");
             Check(ba.GetRainMapHeightAt(x0 - 40, z0) == y0 && ba.GetRainMapHeightAt(x0 - 11, z0) == y0 + 14 && ba.GetRainMapHeightAt(x0 + 50 - 17, z0 + 30) == y0 + 8,
@@ -166,6 +180,36 @@ namespace FlocksTest
             sapi.Event.RegisterGameTickListener(Physics, 20);
             sapi.Event.RegisterGameTickListener(_ => Advance(), 500);
             NextStep();
+        }
+
+        /// <summary>A soil field, with a 5x5 bed of flax (stage 5) on farmland from (fx, fz).</summary>
+        private void BuildField(int fx, int fz)
+        {
+            var ba = sapi.World.BlockAccessor;
+            int soil = sapi.World.GetBlock(new AssetLocation("game", "soil-medium-normal")).BlockId;
+            int farmland = sapi.World.GetBlock(new AssetLocation("game", "farmland-moist-medium")).BlockId;
+            int flax = sapi.World.GetBlock(new AssetLocation("game", "crop-flax-5")).BlockId;
+            for (int x = fx - 10; x <= fx + 14; x++)
+                for (int z = fz - 6; z <= fz + 16; z++) ba.SetBlock(soil, new BlockPos(x, y0, z));
+            for (int x = fx; x < fx + 5; x++)
+                for (int z = fz; z < fz + 5; z++)
+                {
+                    ba.SetBlock(farmland, new BlockPos(x, y0, z));
+                    ba.SetBlock(flax, new BlockPos(x, y0 + 1, z));
+                }
+        }
+
+        /// <summary>Growth stages of a field's 25 crops.</summary>
+        private List<int> CropStages(int fx, int fz)
+        {
+            var ba = sapi.World.BlockAccessor; var list = new List<int>();
+            for (int x = fx; x < fx + 5; x++)
+                for (int z = fz; z < fz + 5; z++)
+                {
+                    var b = ba.GetBlock(new BlockPos(x, y0 + 1, z));
+                    list.Add(b?.CropProps != null && int.TryParse(b.LastCodePart(), out int s) ? s : 0);
+                }
+            return list;
         }
 
         private bool InPondA(int x, int z) => Math.Abs(x - ((int)c.X - 40)) <= 18 && Math.Abs(z - (int)c.Z) <= 18;
@@ -609,6 +653,159 @@ namespace FlocksTest
                 ReportFlight("gull loaf", 0);
                 foreach (var e in g) e.Die(EnumDespawnReason.Expire);
             }, 120));
+
+            // ---- crows: feeding on open ground, raiding crops, the scarecrow, up into the trees and back down
+            FlockRecord crows = null, guarded = null;
+            var crowList = new List<Entity>();
+            int f1x = (int)c.X - 2, f1z = (int)c.Z + 60, f2x = (int)c.X - 52, f2z = (int)c.Z + 62;
+            Entity dummy = null;
+            System.Func<Entity, EntityBehaviorCorvid> CB = e => e.GetBehavior<EntityBehaviorCorvid>();
+            System.Func<FlockRecord, int, int, List<Entity>> spawnCrows = (rec, x, z) =>
+            {
+                var type = sapi.World.GetEntityType(new AssetLocation("flocks", "crow"));
+                var list = new List<Entity>();
+                for (int i = 0; i < 5; i++)
+                {
+                    var e = sapi.World.ClassRegistry.CreateEntity(type);
+                    e.WatchedAttributes.SetLong(FlockRegistry.FlockIdKey, rec.Id);
+                    e.Pos.SetPos(x + 0.5 + (i % 3) * 1.5 - 1.5, y0 + 1, z + 0.5 + (i / 3) * 1.5);
+                    sapi.World.SpawnEntity(e); list.Add(e);
+                }
+                return list;
+            };
+            steps.Enqueue(("crow settle", () =>
+            {
+                FlockRegistry.Instance.Calm();
+                crows = FlockRegistry.Instance.Create("crow", 5, c);
+                testFlock = crows.Id;
+                crowList = spawnCrows(crows, (int)c.X, (int)c.Z + 72);
+            }, () => Elapsed > 6, () =>
+            {
+                Check(crowList.All(e => e.Alive && CB(e)?.StateName == "Forage" && e.OnGround),
+                    $"5 crows feeding on the ground ({string.Join(" ", crowList.Select(e => $"{CB(e)?.StateName}{(e.OnGround ? "" : "(air)")}"))})");
+                var ba = sapi.World.BlockAccessor;
+                Check(EntityBehaviorCorvid.OpenGround(ba, (int)c.X, (int)c.Z + 72, out _) && !EntityBehaviorCorvid.OpenGround(ba, (int)c.X + 15, (int)c.Z + 66, out _)
+                      && !EntityBehaviorCorvid.OpenGround(ba, (int)c.X + 30, (int)c.Z, out _), "open ground is the soil field, not under the oak nor bare stone");
+            }, 15));
+            steps.Enqueue(("crow raid", () =>
+            {
+                foreach (var e in crowList) CB(e)?.RaidNow();
+            }, () => CropStages(f1x, f1z).Any(s => s < 5) || Elapsed > 60, () =>
+            {
+                var st = CropStages(f1x, f1z);
+                var ba = sapi.World.BlockAccessor;
+                var dead = new List<string>();
+                for (int x = f1x; x < f1x + 5; x++)
+                    for (int z = f1z; z < f1z + 5; z++)
+                    {
+                        var b = ba.GetBlock(new BlockPos(x, y0 + 1, z));
+                        if (b?.CropProps == null) dead.Add(b?.Code?.Path ?? "air");
+                    }
+                Check(dead.Count >= 1 && dead.All(p => p.StartsWith("deadcrop")) && st.All(s => s == 5 || s == 0),
+                    $"crows ate crops the vanilla way: dead crops ({dead.Count}: {string.Join(" ", dead)}), the rest untouched");
+                int raids = crowList.Sum(e => CB(e)?.Raids ?? 0);
+                Check(raids == dead.Count, $"one crop per raid ({raids} raids, {dead.Count} dead crops)");
+            }, 70));
+            Entity walker = null;
+            double walkedFrom = 0, flewAt = -1;
+            steps.Enqueue(("crows flee a player", () =>
+            {
+                // a stand-in player, sensed as one (EntityBehaviorBird.TestPlayers), walking in from 30 blocks
+                walker = sapi.World.ClassRegistry.CreateEntity(sapi.World.GetEntityType(new AssetLocation("game", "chicken-hen")));
+                double cx = crowList.Average(e => e.Pos.X), cz = crowList.Average(e => e.Pos.Z);
+                walker.Pos.SetPos(cx - 30, y0 + 1, cz);
+                sapi.World.SpawnEntity(walker);
+                EntityBehaviorBird.TestPlayers.Add(walker);
+                walkedFrom = crowList.Average(e => e.Pos.X);
+            }, () =>
+            {
+                double cx = crowList.Average(e => e.Pos.X), cz = crowList.Average(e => e.Pos.Z);
+                double d = Math.Sqrt((cx - walker.Pos.X) * (cx - walker.Pos.X) + (cz - walker.Pos.Z) * (cz - walker.Pos.Z));
+                if (flewAt < 0 && crowList.Any(e => CB(e)?.StateName != "Forage")) flewAt = d;
+                if (flewAt < 0) walker.Pos.SetPos(walker.Pos.X + 1, walker.Pos.Y, walker.Pos.Z);   // 2 blocks a second
+                return crowList.All(e => CB(e)?.StateName == "Perch") || Elapsed > 40;
+            }, () =>
+            {
+                Check(crowList.All(e => CB(e)?.StateName == "Perch"), $"the crows flew up to perches as the player came near ({string.Join(" ", crowList.Select(e => CB(e)?.StateName))})");
+                Check(flewAt >= 6 && flewAt <= 14, $"they went up at about 10 blocks ({flewAt:0.0})");
+                EntityBehaviorBird.TestPlayers.Remove(walker);
+                walker.Die(EnumDespawnReason.Expire);
+            }, 50));
+            steps.Enqueue(("crow flush", () =>
+            {
+                FlockRegistry.Instance.Calm();
+                crowList[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 1);
+            }, () => crowList.All(e => CB(e)?.StateName == "Perch") || Elapsed > 40, () =>
+            {
+                Check(crowList.All(e => CB(e)?.StateName == "Perch"), $"the group flew up to perches ({string.Join(" ", crowList.Select(e => CB(e)?.StateName))})");
+                Check(crowList.All(e => e.Pos.Y > y0 + 5), $"up off the ground ({string.Join(" ", crowList.Select(e => (e.Pos.Y - y0).ToString("0.0")))} above the slab)");
+                Check(crowList.Count(e => Math.Abs(e.Pos.X - (c.X + 15)) < 2.5 && Math.Abs(e.Pos.Z - (c.Z + 66)) < 2.5) >= 3,
+                    $"most in the oak ({string.Join(" ", crowList.Select(e => $"{e.Pos.X - c.X:0},{e.Pos.Y - y0:0},{e.Pos.Z - c.Z:0}"))})");
+                double w = FlockRegistry.Instance.Wariness(crows.Id);
+                Check(Math.Abs(w - 1) < 0.05, $"a flush disturbs the flock (wariness {w:0.00})");
+            }, 50));
+            steps.Enqueue(("crow back down", () => { }, () => crowList.All(e => CB(e)?.StateName == "Forage" && e.OnGround) || Elapsed > 120, () =>
+            {
+                var ba = sapi.World.BlockAccessor;
+                Check(crowList.All(e => CB(e)?.StateName == "Forage" && e.OnGround), $"back down feeding ({string.Join(" ", crowList.Select(e => CB(e)?.StateName))})");
+                Check(crowList.All(e => EntityBehaviorCorvid.OpenGround(ba, (int)Math.Floor(e.Pos.X), (int)Math.Floor(e.Pos.Z), out _) || CropStages(f1x, f1z).Count > 0 && Math.Abs(e.Pos.Z - c.Z - 62) < 4),
+                    $"on open ground ({string.Join(" ", crowList.Select(e => $"{e.Pos.X - c.X:0},{e.Pos.Z - c.Z:0}"))})");
+                foreach (var e in crowList) e.Die(EnumDespawnReason.Expire);
+            }, 130));
+            steps.Enqueue(("scarecrow", () =>
+            {
+                FlockRegistry.Instance.Calm();
+                dummy = sapi.World.ClassRegistry.CreateEntity(sapi.World.GetEntityType(new AssetLocation("game", "strawdummy")));
+                dummy.Pos.SetPos(f2x + 2.5, y0 + 1, f2z - 3.5);
+                sapi.World.SpawnEntity(dummy);
+                guarded = FlockRegistry.Instance.Create("crow", 5, c);
+                testFlock = guarded.Id;
+                crowList = spawnCrows(guarded, f2x + 2, f2z + 22);    // 22 blocks from the bed, 25 from the dummy
+            }, () =>
+            {
+                if (Elapsed > 2 && Elapsed < 2.6) foreach (var e in crowList) CB(e)?.RaidNow();
+                return Elapsed > 30;
+            }, () =>
+            {
+                var st = CropStages(f2x, f2z);
+                Check(dummy.Alive && st.All(s => s == 5), $"no crop within the straw dummy's 15 blocks was touched (stages {string.Join("", st)})");
+                Check(crowList.Sum(e => CB(e)?.Raids ?? 0) == 0 && crowList.All(e => CB(e)?.Crop == null), "no crow went for them");
+                var spots = EntityBehaviorCorvid.GroundSpots(sapi.World, new Vec3d(f2x + 2.5, y0 + 1, f2z + 2.5), c.X, c.Z - 200, 0, 0, new Random(3));
+                Check(spots != null && spots.All(p => p.HorizontalSquareDistanceTo(dummy.Pos.X, dummy.Pos.Z) > 15 * 15),
+                    $"crows don't come down to feed near it ({spots?.Count ?? 0} spots offered, nearest {(spots == null || spots.Count == 0 ? 0 : spots.Min(p => Math.Sqrt(p.HorizontalSquareDistanceTo(dummy.Pos.X, dummy.Pos.Z)))):0.0} blocks from it)");
+                Check(Scarecrows.Protects(sapi.World, new Vec3d(f2x + 2.5, y0 + 1, f2z + 2.5), 15) && !Scarecrows.Protects(sapi.World, new Vec3d(f1x, y0 + 1, f1z), 15),
+                    "the straw dummy protects its own field and not the other");
+            }, 40));
+            steps.Enqueue(("crows leave a scarecrow", () =>
+            {
+                foreach (var e in crowList) e.Die(EnumDespawnReason.Expire);
+                crowList = spawnCrows(guarded, f2x + 2, f2z + 4);      // about 8 blocks from the straw dummy
+            }, () => Elapsed > 3 && crowList.All(e => CB(e)?.StateName == "Forage" && e.Pos.HorDistanceTo(dummy.Pos.XYZ) > 15) || Elapsed > 40, () =>
+            {
+                Check(crowList.All(e => CB(e)?.StateName == "Forage" && e.Pos.HorDistanceTo(dummy.Pos.XYZ) > 15),
+                    $"crows put down by a straw dummy fly off and feed out of its reach ({string.Join(" ", crowList.Select(e => $"{CB(e)?.StateName} {e.Pos.HorDistanceTo(dummy.Pos.XYZ):0}"))} blocks from it)");
+                Check(FlockRegistry.Instance.Wariness(guarded.Id) < 0.01, "the scarecrow isn't counted as a disturbance");
+                Check(CropStages(f2x, f2z).All(s => s == 5), "and they leave its crops alone");
+            }, 50));
+            steps.Enqueue(("crows roost at dusk", () =>
+            {
+                // the clock on to 20:00
+                double h = sapi.World.Calendar.HourOfDay;
+                sapi.World.Calendar.Add((float)((20.2 - h + 24) % 24));
+            }, () => crowList.All(e => CB(e)?.StateName == "Perch" && CB(e).Roosting) || Elapsed > 45, () =>
+            {
+                Check(crowList.All(e => CB(e)?.StateName == "Perch" && CB(e).Roosting),
+                    $"up in the trees for the night at {sapi.World.Calendar.HourOfDay:0.0} h ({string.Join(" ", crowList.Select(e => CB(e)?.StateName + (CB(e)?.Roosting == true ? "(roost)" : "")))})");
+            }, 50));
+            steps.Enqueue(("crows down at dawn", () =>
+            {
+                double h = sapi.World.Calendar.HourOfDay;
+                sapi.World.Calendar.Add((float)((7 - h + 24) % 24));
+            }, () => crowList.All(e => CB(e)?.StateName == "Forage") || Elapsed > 60, () =>
+            {
+                Check(crowList.All(e => CB(e)?.StateName == "Forage" && !CB(e).Roosting), $"down again in the morning ({string.Join(" ", crowList.Select(e => CB(e)?.StateName))})");
+                foreach (var e in crowList) e.Die(EnumDespawnReason.Expire);
+            }, 70));
 
             steps.Enqueue(("memory", () => { }, () => true, () =>
             {

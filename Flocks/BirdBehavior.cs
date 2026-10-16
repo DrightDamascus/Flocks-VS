@@ -33,6 +33,9 @@ namespace Flocks
 
         protected EntityBehaviorBird(Entity entity) : base(entity) { }
 
+        /// <summary>Flying away for good, ready to be removed once far from every player (FlockRegistry.TryDepart).</summary>
+        public virtual bool DepartingInFlight => false;
+
         /// <summary>Animation speed the server starts an animation with (the entity file's animations set their own too).</summary>
         protected virtual float AnimSpeed(string code) => 1f;
 
@@ -152,7 +155,13 @@ namespace Flocks
         /// </summary>
         protected Entity NearestPlayer(float range, out double senseMul)
         {
-            EntityPlayer best = null; double bestD = double.MaxValue; senseMul = 1;
+            Entity best = null; double bestD = double.MaxValue; senseMul = 1;
+            foreach (var t in TestPlayers)
+            {
+                if (t == null || !t.Alive || t.World != entity.World) continue;
+                double d = t.Pos.DistanceTo(entity.Pos);
+                if (d < range && d < bestD) { best = t; bestD = d; }
+            }
             foreach (var p in entity.World.AllOnlinePlayers)
             {
                 var ep = p.Entity;
@@ -166,6 +175,23 @@ namespace Flocks
             }
             return best;
         }
+
+        /// <summary>/flocks near: what this bird is doing and whether it senses the player, for checking in game.</summary>
+        public string Diagnose(IPlayer player)
+        {
+            var ep = player.Entity;
+            double d = ep.Pos.DistanceTo(entity.Pos);
+            var mode = player.WorldData?.CurrentGameMode;
+            var sensed = NearestPlayer(64, out double mul);
+            string who = sensed == null ? "nobody within 64" : sensed == ep ? $"you (sensing x{mul:0.00})" : "someone else";
+            return $"{entity.Code.ToShortString()} #{entity.EntityId}: {StateText}, {d:0.0} blocks from you ({mode}); senses {who}";
+        }
+
+        /// <summary>What it is doing, for Diagnose.</summary>
+        protected virtual string StateText => "";
+
+        /// <summary>The in-engine tests: entities sensed as if they were players (no player can join the test server).</summary>
+        public static readonly System.Collections.Generic.List<Entity> TestPlayers = new();
 
         protected void SetAnim(string code)
         {
