@@ -64,17 +64,27 @@ namespace Flocks
         public string LandedEntity;
         /// <summary>Birds in a landing flock (a new one; a returning flock comes back with whoever survived).</summary>
         public int LandingMin = 7, LandingMax = 12;
-        /// <summary>Smallest lake (fresh-water surface blocks) it lands on or spawns on; 0 = the server's MinLakeSize.
+        /// <summary>Smallest lake (surface blocks of its liquid) it lands on or spawns on; 0 = the server's MinLakeSize.
         /// Ducks take smaller ponds than geese.</summary>
         public int MinLakeSize;
 
         public int MinLake(int serverDefault) => MinLakeSize > 0 ? MinLakeSize : serverDefault;
-        /// <summary>"water": floats on open water (geese, ducks). "wade": stands on the bottom of water one block deep
-        /// (herons): rests, stalks and strikes there, and lands and spawns only in such water. "air": a bird of prey that
-        /// perches and soars over open high ground (eagles, flocks.raptor), resident all year, no water needed.</summary>
+        /// <summary>"water": floats on open fresh water (geese, ducks). "sea": the same on salt water, the sea along the
+        /// coast (gulls). "wade": stands on the bottom of water one block deep (herons): rests, stalks and strikes there,
+        /// and lands and spawns only in such water. "air": a bird of prey that perches and soars over open high ground
+        /// (eagles, flocks.raptor), resident all year, no water needed.</summary>
         public string Habitat = "water";
         public bool Wades => Habitat == "wade";
         public bool Soars => Habitat == "air";
+        public bool Sea => Habitat == "sea";
+        /// <summary>The liquid it floats on, lands on and spawns on (a block's LiquidCode).</summary>
+        public string Liquid => Sea ? "saltwater" : "water";
+        /// <summary>Resident all year: no resident season, no autumn departure, and its drawn flocks (if any) pass on any
+        /// day, in no particular direction, instead of in migration windows.</summary>
+        public bool YearRound;
+        /// <summary>Scales how much a flush or a kill disturbs its flock (lake wariness): bold birds like gulls get used
+        /// to people and take longer to give up a place.</summary>
+        public double WarinessFactor = 1;
         /// <summary>Whether landing flocks of it arrive on spring migration days (herons don't; they spawn on their own).</summary>
         public bool ArriveInFlocks = true;
 

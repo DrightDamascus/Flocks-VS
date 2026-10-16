@@ -168,6 +168,19 @@ Decisions (Dright, 0.13.0), Phase 1 AI:
   an eagle hunting a pond drives the ducks off it for a few days), or pulls up if the prey got under cover. Flushes from a perch like
   the geese; a missed shot startles it. Spawns alone on open high ground, at most two within 192 blocks; resident
   all year; no landing flocks and no drawn sky flocks.
+- Done in 0.18.0: the herring gull, the first sea bird (Dright: gulls stay by the sea). Species habitat "sea" is the
+  ducks' floating on salt water: every place the waterfowl look for or check water (lake search, spawn checks, /flocks
+  land, paddling back to water) takes the species' liquid, so lakes and the sea never mix. yearRound: resident all
+  year, and its passing groups come any day in any direction, drawn only when the player has sea within 96 blocks.
+  Gulls are bold (short flee and takeoff distances; warinessFactor 0.5 halves what a flush or a kill adds to the
+  flock's wariness) and fly like gulls through three new flocks.waterfowl attributes that are off for the other birds:
+  after a takeoff the group wheels round its takeoff spot for 8-20 s before heading for its spot, now and then it goes
+  up of its own accord (a loafing flight, no disturbance), and it glides half of its level flight. Not done (maybe
+  later): gulls standing on beaches, and scavenging at kills.
+- Handbook (0.18.0, Dright: the birds need handbook entries without clogging it): vanilla's way. Each creature item
+  already has a handbook page; its text is the lang key "<domain>:item-handbooktext-<item code>" written out in full
+  (keys with a colon are taken as they are). One guide page, "Birds" (config/handbook/birds.json, like vanilla's
+  game-mechanic pages), covers what the birds share and links to each bird's page.
 
 Next steps:
 - Hand-off from the sky: when a planned goose flock passes a suitable lake (fresh water, 36+ surface blocks, 64+

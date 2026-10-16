@@ -8,7 +8,8 @@ namespace Flocks
     /// <summary>
     /// Where a flushed group of geese should come down: first another part of the lake they are on, far enough from
     /// whatever scared them; failing that, the nearest other lake within SearchRadius, preferring lakes that don't lie
-    /// toward the threat. Only loaded chunks are seen (unloaded columns read as no water).
+    /// toward the threat. Only loaded chunks are seen (unloaded columns read as no water). Sea birds search salt water
+    /// the same way: the stretch of sea along the coast they are on, else another within reach.
     /// </summary>
     public static class LakeSearch
     {
@@ -23,14 +24,15 @@ namespace Flocks
         /// (3.6 worst case in a flight simulation), so a margin of 2 keeps them off the bank.</summary>
         public const int Margin = 2;
 
-        /// <summary>Landing points (column centre at the water's surface) for a group, or null if no lake qualifies.</summary>
-        public static List<Vec3d> FindSpots(IBlockAccessor ba, Vec3d from, double threatX, double threatZ, int minLake, Random rand)
+        /// <summary>Landing points (column centre at the water's surface) for a group, or null if no lake qualifies.
+        /// liquid: the water it lands on ("water", or "saltwater" for sea birds).</summary>
+        public static List<Vec3d> FindSpots(IBlockAccessor ba, Vec3d from, double threatX, double threatZ, int minLake, Random rand, string liquid = "water")
         {
             int fx = (int)Math.Floor(from.X), fz = (int)Math.Floor(from.Z);
             var seen = new HashSet<long>();
-            if (Surface(ba, fx, fz, out int y))
+            if (Surface(ba, fx, fz, out int y, liquid))
             {
-                var lake = Flood(ba, fx, fz, y, MaxLakeFill, seen);
+                var lake = Flood(ba, fx, fz, y, MaxLakeFill, seen, liquid);
                 var spot = PickSpot(ba, lake, y, from, threatX, threatZ, SafeSameLake, MinHop, rand);
                 if (spot != null) return Around(lake, spot.Value, y);
             }
@@ -49,8 +51,8 @@ namespace Flocks
             starts.Sort((p, q) => p.score.CompareTo(q.score));
             foreach (var (_, sx, sz) in starts)
             {
-                if (seen.Contains(Key(sx, sz)) || !Surface(ba, sx, sz, out int sy)) continue;
-                var lake = Flood(ba, sx, sz, sy, OtherLakeFill, seen);
+                if (seen.Contains(Key(sx, sz)) || !Surface(ba, sx, sz, out int sy, liquid)) continue;
+                var lake = Flood(ba, sx, sz, sy, OtherLakeFill, seen, liquid);
                 if (lake.Count < minLake) continue;
                 var spot = PickSpot(ba, lake, sy, from, threatX, threatZ, SafeOtherLake, 0, rand);
                 if (spot != null) return Around(lake, spot.Value, sy);
@@ -108,8 +110,8 @@ namespace Flocks
             return true;
         }
 
-        /// <summary>Fresh-water surface columns connected to (sx, sz) at level y, up to cap; marks them in seen.</summary>
-        private static HashSet<long> Flood(IBlockAccessor ba, int sx, int sz, int y, int cap, HashSet<long> seen)
+        /// <summary>Surface columns of the liquid connected to (sx, sz) at level y, up to cap; marks them in seen.</summary>
+        private static HashSet<long> Flood(IBlockAccessor ba, int sx, int sz, int y, int cap, HashSet<long> seen, string liquid = "water")
         {
             var lake = new HashSet<long>();
             var q = new Queue<(int x, int z)>();
@@ -119,7 +121,7 @@ namespace Flocks
                 var (x, z) = q.Dequeue();
                 lake.Add(Key(x, z));
                 foreach (var (nx, nz) in new[] { (x + 1, z), (x - 1, z), (x, z + 1), (x, z - 1) })
-                    if (!seen.Contains(Key(nx, nz)) && Surface(ba, nx, nz, out int ny) && ny == y) { seen.Add(Key(nx, nz)); q.Enqueue((nx, nz)); }
+                    if (!seen.Contains(Key(nx, nz)) && Surface(ba, nx, nz, out int ny, liquid) && ny == y) { seen.Add(Key(nx, nz)); q.Enqueue((nx, nz)); }
             }
             return lake;
         }
@@ -194,13 +196,13 @@ namespace Flocks
             return false;
         }
 
-        /// <summary>Rain-map top of the column is fresh water; y = that block.</summary>
-        public static bool Surface(IBlockAccessor ba, int x, int z, out int y)
+        /// <summary>Rain-map top of the column is the liquid (fresh "water" unless told otherwise); y = that block.</summary>
+        public static bool Surface(IBlockAccessor ba, int x, int z, out int y, string liquid = "water")
         {
             y = ba.GetRainMapHeightAt(x, z);
             if (y <= 0) return false;
             var b = ba.GetBlock(new BlockPos(x, y, z), BlockLayersAccess.Fluid);
-            return b != null && b.IsLiquid() && b.LiquidCode == "water";
+            return b != null && b.IsLiquid() && b.LiquidCode == liquid;
         }
     }
 }

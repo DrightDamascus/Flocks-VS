@@ -1,0 +1,95 @@
+{
+	code: "gull",
+	class: "EntityAgent",
+	tags: ["animal", "huntable", "adult", "habitat-water"],
+	hitboxSize: { x: 0.8, y: 0.7 },
+	deadHitboxSize: { x: 0.8, y: 0.45 },
+	eyeHeight: 0.64,
+	fallDamageMultiplier: 0.5,
+	drops: [],
+	attributes: {
+		handbook: { exclude: true }
+	},
+	client: {
+		renderer: "Shape",
+		// tools/make_gull.py; the same bones as the greylag, so the same animations
+		shape: { base: "flocks:entity/bird/gull" },
+		textures: { "gull": { base: "flocks:entity/bird/gull" } },
+		// 2.1-block wingspan: half again a real herring gull's 1.4 m, like the other birds. Passing gull flocks read
+		// this too
+		size: 0.8,
+		behaviors: [
+			{ code: "repulseagents" },
+			{ code: "controlledphysics", stepHeight: 0.5 },
+			{ code: "floatupwhenstuck", onlyWhenDead: true },
+			{ code: "interpolateposition" },
+			{ code: "harvestable" }
+		],
+		animations: [
+			{ code: "swim", animation: "swim", blendMode: "Average", easeInSpeed: 4, easeOutSpeed: 4, triggeredBy: { defaultAnim: true } },
+			{ code: "idle-stand", animation: "idle-stand", blendMode: "Average", easeInSpeed: 4, easeOutSpeed: 4 },
+			{ code: "walk", animation: "walk", animationSpeed: 1.2, blendMode: "Average", easeInSpeed: 4, easeOutSpeed: 4 },
+			// slow, easy wingbeats
+			{ code: "fly-flap", animation: "fly-flap", animationSpeed: 1.3, blendMode: "Average", weight: 10, easeInSpeed: 6, easeOutSpeed: 6 },
+			{ code: "fly-soar", animation: "fly-soar", blendMode: "Average", weight: 10, easeInSpeed: 3, easeOutSpeed: 3 },
+			{ code: "takeoff", animation: "takeoff", animationSpeed: 2.4, blendMode: "Average", weight: 10, easeInSpeed: 12, easeOutSpeed: 6 },
+			{ code: "land", animation: "land", animationSpeed: 1.3, blendMode: "Average", weight: 10, easeInSpeed: 6, easeOutSpeed: 4 },
+			{ code: "die", animation: "death", animationSpeed: 1.25, weight: 10, blendMode: "Average", triggeredBy: { onControls: ["dead"] } }
+		]
+	},
+	server: {
+		behaviors: [
+			{ code: "repulseagents" },
+			{ code: "controlledphysics", stepHeight: 0.5 },
+			// before "health": it zeroes spear and melee damage before health applies it. Gulls are bold: they let you
+			// much closer than ducks. After a takeoff the group wheels over the water for a while before settling again
+			// further along; every 1.5-4 game hours it goes up of its own accord; and it glides half the time it flies.
+			{ code: "flocks.waterfowl", species: "gull", fleeRange: 9, takeoffRange: 4.5, lifeHours: 6, sink: 0.1,
+			  cruiseSpeedMin: 10, cruiseSpeedMax: 13, takeoffRunSeconds: 0.3, takeoffRunSpeed: 4,
+			  takeoffWingsChance: 0.5, takeoffCallChance: 0.3,
+			  wheelSecondsMin: 8, wheelSecondsMax: 20, loafHoursMin: 1.5, loafHoursMax: 4, soarShare: 0.5 },
+			{ code: "health", currenthealth: 4, maxhealth: 4 },
+			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
+			{ code: "harvestable", drops: [
+				{ type: "item", code: "game:poultry-raw", quantity: { avg: 1, var: 0 } },
+				{ type: "item", code: "game:feather", quantity: { avg: 8, var: 2 } }
+			] },
+			{ code: "floatupwhenstuck", onlyWhenDead: true }
+		],
+		// Vanilla spawning, as for the greylag (see entities/greylag.json), but on the sea: inside salt water at the
+		// surface, near the shore (Residents.cs: ShoreDistance), on a stretch of sea (species minLakeSize). All year.
+		spawnconditions: {
+			worldgen: {
+				TriesPerChunk: { avg: 0.05, var: 0 },
+				tryOnlySurface: true,
+				groupSize: { dist: "verynarrowgaussian", avg: 9, var: 5 },
+				insideBlockCodes: ["game:saltwater-still-7"],
+				minTemp: -20,
+				maxTemp: 32
+			},
+			runtime: {
+				group: "passive",
+				MinDistanceToPlayer: 32,
+				chance: 0.01,
+				maxQuantity: 24,
+				tryOnlySurface: true,
+				groupSize: { dist: "verynarrowgaussian", avg: 9, var: 5 },
+				insideBlockCodes: ["game:saltwater-still-7"],
+				minTemp: -20,
+				maxTemp: 32
+			}
+		}
+	},
+	sounds: {
+		hurt: "flocks:gull/hurt",
+		death: "flocks:gull/death",
+		// gulls are noisy: single "kyow" calls
+		idle: { path: "flocks:gull/idle/*", pitch: { avg: 1, var: 0.1 }, range: 48 },
+		takeoffsplash: { path: "game:environment/smallsplash", pitch: { avg: 1.1, var: 0.1 }, range: 24, volume: { avg: 0.4 } },
+		takeoffwings: { path: "flocks:wings/flap*", pitch: { avg: 1.2, var: 0.1 }, range: 28, volume: { avg: 0.7 } },
+		// the laughing long call
+		takeoffcall: { path: "flocks:gull/laugh*", pitch: { avg: 1, var: 0.06 }, range: 64, volume: { avg: 0.8 } },
+		landsplash: { path: "game:environment/mediumsplash", pitch: { avg: 1.1, var: 0.1 }, range: 24, volume: { avg: 0.35 } }
+	},
+	idleSoundChance: 0.06
+}

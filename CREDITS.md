@@ -2,7 +2,8 @@
 
 ## Sounds (Flocks/assets/flocks/sounds)
 All clips were cut from the recordings below, mixed to mono, high-passed at 120 Hz, faded at the ends, loudness/peak
-normalized and encoded as Ogg Vorbis (the duck and heron clips high-passed at 150 Hz, the eagle's at 400 Hz). The hurt sounds are pitched up
+normalized and encoded as Ogg Vorbis (the duck and heron clips high-passed at 150 Hz, the eagle's and the gull's at
+400 Hz, the gull colony at 600 Hz). The hurt sounds are pitched up
 15% and the death sounds down 15%. The CC BY-SA clips are adaptations and are themselves licensed CC BY-SA under the
 same version as their source.
 
@@ -19,6 +20,8 @@ same version as their source.
 | heron/croak1-3, heron/hurt, heron/death | [Grey heron call recorded in January 2023 at Sangli](https://commons.wikimedia.org/wiki/File:Grey_heron_call_recorded_in_January_2023_at_Sangli.wav) | Sharad Apte (Sharadapte) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 | eagle/call1-3, eagle/hurt, eagle/death (captive) | [Golden eagle](https://commons.wikimedia.org/wiki/File:Golden_eagle.ogg) | Bubulcus | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 | eagle/call4 | [Golden Eagle (Aquila chrysaetos) (W1CDR0001387 BD6)](https://commons.wikimedia.org/wiki/File:Golden_Eagle_(Aquila_chrysaetos)_(W1CDR0001387_BD6).ogg) (British Library) | Lawrence Shove | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+| gull/idle/call1-4, gull/laugh1-2, gull/hurt, gull/death | [XC707075 - European Herring Gull - Larus argentatus](https://commons.wikimedia.org/wiki/File:XC707075_-_European_Herring_Gull_-_Larus_argentatus.mp3) (xeno-canto [XC707075](https://xeno-canto.org/707075)) | Sonothèque ADVL | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| gull/flock1-3 (a colony overhead) | [Larus argentatus - European Herring Gull XC488995](https://commons.wikimedia.org/wiki/File:Larus_argentatus_-_European_Herring_Gull_XC488995.mp3) (xeno-canto [XC488995](https://xeno-canto.org/488995)) | Marie-Lan Taÿ Pamart | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 
 The NPS/Yellowstone sound library (public domain) was checked first. It has Canada geese and sandhill cranes, but no
 greylag, common crane or clean wingbeat takeoffs, so the clips above were used instead.

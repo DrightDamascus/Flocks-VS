@@ -51,6 +51,8 @@ namespace Flocks
                 if (p.Finished || hour < p.Hour) continue;
                 bool late = hour > p.Hour + cfg.MaxDelayHours;
                 if (p.Species.Meshes?.Ok != true) { Finish(p, "skipped: no meshes"); continue; }
+                // sea birds pass along the coast: only where there is sea near the player
+                if (p.Species.Sea && !SeaNear(player.Pos.AsBlockPos)) { Finish(p, "skipped: no sea nearby"); continue; }
                 string hold = renderer.Count > 0 ? "sky busy" : (Stormy(player.Pos.AsBlockPos) ? "storm" : null);
                 if (hold == null && !late)
                 {
@@ -91,7 +93,8 @@ namespace Flocks
                 if (strength <= 0) continue;
                 var rnd = new Random(StableSeed(capi.World.Seed, day, sp.Code));
                 int n = (int)Math.Floor(sp.MaxFlocksPerDay * strength * cfg.FlocksPerDayMultiplier + rnd.NextDouble());
-                // spring heads poleward, autumn toward the equator; in VS north is -Z, which is heading pi here
+                // spring heads poleward, autumn toward the equator; in VS north is -Z, which is heading pi here.
+                // Birds that stay all year go wherever they like.
                 bool headNorth = spring == (lat >= 0);
                 double baseHeading = headNorth ? Math.PI : 0;
                 for (int i = 0; i < n; i++)
@@ -99,7 +102,7 @@ namespace Flocks
                     plan.Add(new PlannedFlock
                     {
                         Species = sp, Hour = PickHour(sp, rnd), Count = rnd.Next(sp.CountMin, sp.CountMax + 1),
-                        Heading = baseHeading + (rnd.NextDouble() * 2 - 1) * 20 * GameMath.DEG2RAD,
+                        Heading = sp.YearRound ? rnd.NextDouble() * Math.PI * 2 : baseHeading + (rnd.NextDouble() * 2 - 1) * 20 * GameMath.DEG2RAD,
                         Altitude = sp.AltitudeMin + rnd.NextDouble() * (sp.AltitudeMax - sp.AltitudeMin),
                     });
                 }
@@ -120,6 +123,7 @@ namespace Flocks
         public static double Strength(Species sp, float rel, double lat, out bool spring)
         {
             spring = false;
+            if (sp.YearRound) return 1;     // no migration: about the same every day
             double a = Math.Abs(lat);
             if (a < 0.11) return 0;
             float shift = (float)((a - 0.5) * 0.06);
@@ -139,6 +143,16 @@ namespace Flocks
             if (a < 0.11) return true;
             float shift = (float)((a - 0.5) * 0.06);
             return rel >= springStart + shift && rel < autumnStart - shift;
+        }
+
+        /// <summary>Sea (salt water at the surface) within 96 blocks of pos, sampled every 8 blocks in loaded chunks.</summary>
+        private bool SeaNear(BlockPos pos)
+        {
+            var ba = capi.World.BlockAccessor;
+            for (int dx = -96; dx <= 96; dx += 8)
+                for (int dz = -96; dz <= 96; dz += 8)
+                    if (dx * dx + dz * dz <= 96 * 96 && LakeSearch.Surface(ba, pos.X + dx, pos.Z + dz, out _, "saltwater")) return true;
+            return false;
         }
 
         private static double Window(float rel, float start, float end)
@@ -202,6 +216,7 @@ namespace Flocks
             {
                 double s = Strength(sp, rel, lat, out bool spring);
                 if (!cfg.SpeciesEnabled(sp.Code)) { sb.Append($"\n{sp.Code}: off in flocks.json"); continue; }
+                if (sp.YearRound) { sb.Append($"\n{sp.Code}: resident all year{(sp.Sea ? (SeaNear(pos) ? ", sea nearby" : ", no sea nearby") : "")}"); continue; }
                 sb.Append($"\n{sp.Code}: " + (s > 0 ? $"{(spring ? "spring" : "autumn")} migration, strength {s:0.00}" : "not migrating today"));
             }
             sb.Append("\nToday: " + (plan.Count == 0 ? "no flocks" : Describe().Replace("; ", "\n  ")));

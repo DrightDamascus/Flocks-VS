@@ -6,19 +6,21 @@
 	class: "ItemCreature",
 	maxstacksize: 64,
 	variantgroups: [
-		{ code: "type", states: ["greylag", "mallard", "heron", "eagle"] }
+		{ code: "type", states: ["greylag", "mallard", "heron", "eagle", "gull"] }
 	],
 	shapeByType: {
 		"*-greylag": { base: "flocks:entity/bird/greylag" },
 		"*-mallard": { base: "flocks:entity/bird/mallard" },
 		"*-heron": { base: "flocks:entity/bird/heron" },
-		"*-eagle": { base: "flocks:entity/bird/eagle" }
+		"*-eagle": { base: "flocks:entity/bird/eagle" },
+		"*-gull": { base: "flocks:entity/bird/gull" }
 	},
 	texturesByType: {
 		"*-greylag": { "greylag": { base: "flocks:entity/bird/greylag" } },
 		"*-mallard": { "mallard": { base: "flocks:entity/bird/mallard-drake" } },
 		"*-heron": { "heron": { base: "flocks:entity/bird/heron" } },
-		"*-eagle": { "eagle": { base: "flocks:entity/bird/eagle" } }
+		"*-eagle": { "eagle": { base: "flocks:entity/bird/eagle" } },
+		"*-gull": { "gull": { base: "flocks:entity/bird/gull" } }
 	},
 	creativeinventory: { "general": ["*"], "items": ["*"], "creatures": ["*"] },
 	materialDensity: 600,

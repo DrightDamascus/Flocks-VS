@@ -8,7 +8,8 @@ using Vintagestory.API.Server;
 
 namespace Flocks
 {
-    /// <summary>/flocks land: finds open fresh water near the player and spawns a group of a landing species on it.</summary>
+    /// <summary>/flocks land: finds open water of the species' kind (fresh, or the sea for sea birds) near the player and
+    /// spawns a group of a landing species on it.</summary>
     public static class Landing
     {
         public const int Radius = 64, MinPatch = 36, MaxFill = 2000;
@@ -25,8 +26,8 @@ namespace Flocks
             // the species' landing flock size, like a landing flock or a natural group
             int n = count > 0 ? GameMath.Clamp(count, 1, 30) : sp.LandingMin + rand.Next(Math.Max(1, sp.LandingMax - sp.LandingMin + 1));
             int minPatch = sp.MinLake(MinPatch);
-            var patch = FindPatch(sapi.World.BlockAccessor, caller.Pos.AsBlockPos, minPatch);
-            if (patch == null) return TextCommandResult.Error($"No open water with {minPatch}+ surface blocks at least {Clear:0} blocks from you (they would flee at once) within {Radius} blocks.");
+            var patch = FindPatch(sapi.World.BlockAccessor, caller.Pos.AsBlockPos, minPatch, sp.Liquid);
+            if (patch == null) return TextCommandResult.Error($"No open {(sp.Sea ? "sea" : "water")} with {minPatch}+ surface blocks at least {Clear:0} blocks from you (they would flee at once) within {Radius} blocks.");
 
             // a compact group on the nearest water past Clear: the columns closest to the first such column
             double px = caller.Pos.X, pz = caller.Pos.Z;
@@ -51,9 +52,9 @@ namespace Flocks
             return TextCommandResult.Success($"Landed {spawned} {sp.Name ?? sp.Code} on water at {anchor.X}, {anchor.Y}, {anchor.Z} (~{Dist(anchor):0} blocks away, patch of {patch.Count}+ blocks).");
         }
 
-        /// <summary>Nearest fresh-water surface patch (rain-map top is still water) with at least MinPatch columns
-        /// Clear or more blocks from <paramref name="center"/>.</summary>
-        private static List<BlockPos> FindPatch(IBlockAccessor ba, BlockPos center, int minPatch)
+        /// <summary>Nearest surface patch of the liquid (rain-map top is still water, or sea water) with at least MinPatch
+        /// columns Clear or more blocks from <paramref name="center"/>.</summary>
+        private static List<BlockPos> FindPatch(IBlockAccessor ba, BlockPos center, int minPatch, string liquid)
         {
             var seen = new HashSet<long>();
             var starts = new List<(double d, int x, int z)>();
@@ -66,7 +67,7 @@ namespace Flocks
             starts.Sort((p, q) => p.d.CompareTo(q.d));
             foreach (var (_, sx, sz) in starts)
             {
-                if (seen.Contains(Key(sx, sz)) || !Surface(ba, sx, sz, out int y)) continue;
+                if (seen.Contains(Key(sx, sz)) || !LakeSearch.Surface(ba, sx, sz, out int y, liquid)) continue;
                 var patch = new List<BlockPos>();
                 var queue = new Queue<(int x, int z)>();
                 queue.Enqueue((sx, sz)); seen.Add(Key(sx, sz));
@@ -77,7 +78,7 @@ namespace Flocks
                     foreach (var (nx, nz) in new[] { (x + 1, z), (x - 1, z), (x, z + 1), (x, z - 1) })
                     {
                         if (seen.Contains(Key(nx, nz))) continue;
-                        if (Surface(ba, nx, nz, out int ny) && ny == y) { seen.Add(Key(nx, nz)); queue.Enqueue((nx, nz)); }
+                        if (LakeSearch.Surface(ba, nx, nz, out int ny, liquid) && ny == y) { seen.Add(Key(nx, nz)); queue.Enqueue((nx, nz)); }
                     }
                 }
                 if (patch.Count(c => Math.Sqrt((c.X - center.X) * (c.X - center.X) + (c.Z - center.Z) * (c.Z - center.Z)) >= Clear) >= minPatch) return patch;
@@ -86,13 +87,5 @@ namespace Flocks
         }
 
         private static long Key(int x, int z) => ((long)x << 32) ^ (uint)z;
-
-        private static bool Surface(IBlockAccessor ba, int x, int z, out int y)
-        {
-            y = ba.GetRainMapHeightAt(x, z);
-            if (y <= 0) return false;                 // unloaded
-            var b = ba.GetBlock(new BlockPos(x, y, z), BlockLayersAccess.Fluid);
-            return b != null && b.IsLiquid() && b.LiquidCode == "water";
-        }
     }
 }

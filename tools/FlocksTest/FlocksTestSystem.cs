@@ -36,6 +36,8 @@ namespace FlocksTest
         {
             public int Collided, InTerrain, Samples, Still, GoArounds;
             public double MaxAlt, MaxSpeed, MaxCommanded, LastT, FlightSeconds;
+            /// <summary>How far it turned in flight (radians): gulls wheel before they settle.</summary>
+            public double Turned, LastYaw = double.NaN;
             public Vec3d Last; public string LastPhase = "Water";
             public bool LoggedHit, LoggedLow;
         }
@@ -95,17 +97,18 @@ namespace FlocksTest
             c = new Vec3d(x0 + 0.5, y0, z0 + 0.5);
             int stone = sapi.World.GetBlock(new AssetLocation("game", "rock-granite")).BlockId;
             int water = sapi.World.GetBlock(new AssetLocation("game", "water-still-7")).BlockId;
+            int salt = sapi.World.GetBlock(new AssetLocation("game", "saltwater-still-7")).BlockId;
             var bulk = sapi.World.GetBlockAccessorBulkUpdate(true, false);
             var pos = new BlockPos(0, 0, 0);
             for (int x = x0 - half; x <= x0 + half; x++)
                 for (int z = z0 - half; z <= z0 + half; z++)
                 {
-                    bool pond = InPondA(x, z) || InPondB(x, z);
+                    bool pond = InPondA(x, z) || InPondB(x, z), sea = InPondC(x, z);
                     for (int y = y0 - 3; y <= y0; y++)
                     {
                         pos.Set(x, y, z);
                         bool deep = !InPondARim(x, z) || y == y0;   // pond A's rim is one block deep (shallows for waders)
-                        if (pond && y > y0 - 3 && deep) { bulk.SetBlock(0, pos); bulk.SetBlock(water, pos, BlockLayersAccess.Fluid); }
+                        if ((pond || sea) && y > y0 - 3 && deep) { bulk.SetBlock(0, pos); bulk.SetBlock(sea ? salt : water, pos, BlockLayersAccess.Fluid); }
                         else bulk.SetBlock(stone, pos);
                     }
                     if (x >= x0 - 12 && x <= x0 - 10 && Math.Abs(z - z0) <= 30)
@@ -125,7 +128,7 @@ namespace FlocksTest
             var gt = sapi.World.GetEntityType(new AssetLocation("flocks", "greylag"));
             Check(gt?.Sounds != null && gt.Sounds.ContainsKey("takeoffwings") && gt.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.waterfowl") == true,
                 "greylag entity file loaded whole (sounds and flocks.waterfowl behaviour present)");
-            var items = new[] { "greylag", "mallard", "heron", "eagle" };
+            var items = new[] { "greylag", "mallard", "heron", "eagle", "gull" };
             Check(items.All(b => sapi.World.GetItem(new AssetLocation("flocks", "creature-" + b))?.GetType().Name == "ItemCreature"
                                  && sapi.World.GetEntityType(new AssetLocation("flocks", b)) != null),
                 "creature items (creative inventory) loaded, each placing an existing bird");
@@ -135,12 +138,19 @@ namespace FlocksTest
             var ht = sapi.World.GetEntityType(new AssetLocation("flocks", "heron"));
             Check(ht?.Sounds != null && ht.Sounds.ContainsKey("takeoffcall") && ht.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.waterfowl") == true,
                 "heron entity file loaded whole");
+            var gu = sapi.World.GetEntityType(new AssetLocation("flocks", "gull"));
+            Check(gu?.Sounds != null && gu.Sounds.ContainsKey("takeoffcall") && gu.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.waterfowl" && b["wheelSecondsMax"].AsDouble() > 0) == true,
+                "gull entity file loaded whole (sounds and a wheeling flocks.waterfowl)");
+            Check(Lang.HasTranslation("flocks:item-handbooktext-flocks:creature-gull") && Lang.HasTranslation("flocks:gamemechanicinfo-birds-text")
+                  && sapi.Assets.Exists(new AssetLocation("flocks", "config/handbook/birds.json")),
+                "handbook texts and the Birds guide page loaded");
             var mt = sapi.World.GetEntityType(new AssetLocation("flocks", "mallard"));
             Check(mt?.Sounds != null && mt.Sounds.ContainsKey("takeoffwings") && mt.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.waterfowl") == true,
                 "mallard entity file loaded whole (sounds and flocks.waterfowl behaviour present)");
             var spc = sapi.ModLoader.GetModSystem<FlocksModSystem>().SpeciesByCode;
             Check(spc.ContainsKey("goose") && spc["goose"].Lands && spc["goose"].LandingMin == 7 && spc.ContainsKey("crane") && spc.ContainsKey("hawk")
-                  && spc.ContainsKey("mallard") && spc["mallard"].MinLakeSize == 25 && spc.ContainsKey("heron") && spc["heron"].Wades && !spc["heron"].ArriveInFlocks,
+                  && spc.ContainsKey("mallard") && spc["mallard"].MinLakeSize == 25 && spc.ContainsKey("heron") && spc["heron"].Wades && !spc["heron"].ArriveInFlocks
+                  && spc.ContainsKey("gull") && spc["gull"].Sea && spc["gull"].Liquid == "saltwater" && spc["gull"].YearRound && spc["gull"].WarinessFactor == 0.5,
                 $"species data loaded: {string.Join(", ", spc.Keys)}");
             Check(top + 12 <= ba.MapSizeY - 60, $"test site above the terrain (terrain max {top}, slab {y0})");
             Check(ba.GetRainMapHeightAt(x0 - 40, z0) == y0 && ba.GetRainMapHeightAt(x0 - 11, z0) == y0 + 14 && ba.GetRainMapHeightAt(x0 + 50 - 17, z0 + 30) == y0 + 8,
@@ -161,8 +171,12 @@ namespace FlocksTest
         private bool InPondA(int x, int z) => Math.Abs(x - ((int)c.X - 40)) <= 18 && Math.Abs(z - (int)c.Z) <= 18;
         private bool InPondARim(int x, int z) => InPondA(x, z) && (Math.Abs(x - ((int)c.X - 40)) > 15 || Math.Abs(z - (int)c.Z) > 15);
         private bool InPondB(int x, int z) => Math.Abs(x - ((int)c.X + 50)) <= 15 && Math.Abs(z - ((int)c.Z + 30)) <= 15;
+        /// <summary>Pond C is salt water: the sea, for gulls.</summary>
+        private bool InPondC(int x, int z) => Math.Abs(x - ((int)c.X + 55)) <= 14 && Math.Abs(z - ((int)c.Z - 45)) <= 14;
         private string Where(Entity e) => InPondA((int)Math.Floor(e.Pos.X), (int)Math.Floor(e.Pos.Z)) ? "A" : InPondB((int)Math.Floor(e.Pos.X), (int)Math.Floor(e.Pos.Z)) ? "B"
-            : (e.FeetInLiquid || e.Swimming) ? "lake" : "LAND";
+            : InPondC((int)Math.Floor(e.Pos.X), (int)Math.Floor(e.Pos.Z)) ? "C" : (e.FeetInLiquid || e.Swimming) ? "lake" : "LAND";
+        /// <summary>Floating on salt water.</summary>
+        private bool OnSea(Entity e) => sapi.World.BlockAccessor.GetBlock(new BlockPos((int)Math.Floor(e.Pos.X), (int)Math.Floor(e.Pos.Y + 0.1), (int)Math.Floor(e.Pos.Z)), BlockLayersAccess.Fluid)?.LiquidCode == "saltwater";
 
         // ------------------------------------------------------------------------------------------------ steps
 
@@ -531,6 +545,71 @@ namespace FlocksTest
                     "a duck caught on the water is carried off, not left floating");
             }, 50));
 
+            // ---- herring gulls: the waterfowl AI on the sea (pond C is salt water): bold, wheeling, loafing
+            FlockRecord gulls = null;
+            double gullWary = 0;
+            steps.Enqueue(("gull settle", () =>
+            {
+                FlockRegistry.Instance.Calm();
+                var type = sapi.World.GetEntityType(new AssetLocation("flocks", "gull"));
+                gulls = FlockRegistry.Instance.Create("gull", 6, c);
+                testFlock = gulls.Id;
+                for (int i = 0; i < 6; i++)
+                {
+                    var e = sapi.World.ClassRegistry.CreateEntity(type);
+                    e.WatchedAttributes.SetLong(FlockRegistry.FlockIdKey, gulls.Id);
+                    e.Pos.SetPos(c.X + 55 - 3 + (i % 3) * 3, y0 + 0.8, c.Z - 45 + (i / 3) * 3);
+                    sapi.World.SpawnEntity(e);
+                }
+            }, () => Elapsed > 8, () =>
+            {
+                var g = LoadedGeese();
+                Check(g.Count == 6 && g.All(e => Phase(e) == "Water" && (e.FeetInLiquid || e.Swimming) && OnSea(e)),
+                    $"6 gulls floating on the sea ({string.Join(" ", g.Select(e => Phase(e) + "@" + Where(e)))})");
+            }, 20));
+            steps.Enqueue(("sea and lakes kept apart", () => { }, () => true, () =>
+            {
+                var ba = sapi.World.BlockAccessor;
+                var fromC = new Vec3d(c.X + 55.5, y0 + 1, c.Z - 44.5);
+                var sea = LakeSearch.FindSpots(ba, fromC, c.X + 55, c.Z - 70, 100, new Random(2), "saltwater");
+                Check(sea != null && sea.Count > 0 && sea.All(p => InPondC((int)Math.Floor(p.X), (int)Math.Floor(p.Z))), $"gulls find landing spots on the sea ({sea?.Count ?? 0})");
+                var fresh = LakeSearch.FindSpots(ba, fromC, c.X + 55, c.Z - 70, 36, new Random(2));
+                Check(fresh == null || fresh.All(p => !InPondC((int)Math.Floor(p.X), (int)Math.Floor(p.Z))), "geese and ducks never land on the sea");
+                var at = new BlockPos((int)Math.Floor(fromC.X), y0, (int)Math.Floor(fromC.Z));
+                Check(ResidentGeese.LakeSize(ba, at, 100, "saltwater") >= 100 && ResidentGeese.LakeSize(ba, at, 100) == 0, "the sea counts as water for gulls only");
+                Check(ResidentGeese.InSeason(sapi.World, at, sapi.ModLoader.GetModSystem<FlocksModSystem>().SpeciesByCode["gull"]), "gulls are in season (all year)");
+            }, 5));
+            steps.Enqueue(("gull flush", () =>
+            {
+                ResetStats();
+                LoadedGeese()[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 1);
+            }, () => Elapsed > 4 && LoadedGeese().All(e => Phase(e) == "Water"), () =>
+            {
+                var g = LoadedGeese();
+                Check(stats.Values.Count(st => st.Samples > 0) == 6, $"the whole group flew ({stats.Values.Count(st => st.Samples > 0)} of 6)");
+                double turned = stats.Count == 0 ? 0 : stats.Values.Max(st => st.Turned) / (2 * Math.PI);
+                Check(turned >= 1, $"wheeled over the water before settling (most turning: {turned:0.0} circles; per gull {string.Join(" ", stats.Values.Select(st => (st.Turned / (2 * Math.PI)).ToString("0.0")))})");
+                Check(g.All(OnSea), $"came down on the sea again ({string.Join(" ", g.Select(Where))})");
+                gullWary = FlockRegistry.Instance.Wariness(gulls.Id);
+                Check(Math.Abs(gullWary - 0.5) < 0.05, $"a flush disturbs bold gulls half as much as geese (wariness {gullWary:0.00})");
+                ReportFlight("gull flush", 0);
+            }, 120));
+            steps.Enqueue(("gull loafing flight", () =>
+            {
+                ResetStats();
+                gullWary = FlockRegistry.Instance.Wariness(gulls.Id);
+                Check(LoadedGeese()[0].GetBehavior<EntityBehaviorWaterfowl>().Loaf(), "a gull goes up of its own accord");
+            }, () => Elapsed > 4 && LoadedGeese().All(e => Phase(e) == "Water"), () =>
+            {
+                var g = LoadedGeese();
+                Check(stats.Values.Count(st => st.Samples > 0) == 6, $"the whole group went up ({stats.Values.Count(st => st.Samples > 0)} of 6)");
+                double w = FlockRegistry.Instance.Wariness(gulls.Id);
+                Check(w <= gullWary + 0.01, $"a loafing flight is no disturbance (wariness {gullWary:0.00} -> {w:0.00})");
+                Check(g.All(OnSea), $"back on the sea ({string.Join(" ", g.Select(Where))})");
+                ReportFlight("gull loaf", 0);
+                foreach (var e in g) e.Die(EnumDespawnReason.Expire);
+            }, 120));
+
             steps.Enqueue(("memory", () => { }, () => true, () =>
             {
                 Check(memory.Count >= 3 && memory.Last() - memory[1] < 64, $"managed memory over cycles (MB): {string.Join(", ", memory)}");
@@ -678,6 +757,11 @@ namespace FlocksTest
                 s.LastT = now;
                 if (!flying) { s.Last = e.Pos.XYZ; continue; }
                 s.Samples++; s.FlightSeconds += sdt;
+                if (ph == "Fly")
+                {
+                    if (!double.IsNaN(s.LastYaw)) s.Turned += Math.Abs(GameMath.AngleRadDistance((float)s.LastYaw, e.Pos.Yaw));
+                    s.LastYaw = e.Pos.Yaw;
+                }
                 s.MaxCommanded = Math.Max(s.MaxCommanded, e.GetBehavior<EntityBehaviorWaterfowl>()?.FlySpeed ?? 0);
                 int gx = (int)Math.Floor(e.Pos.X), gz = (int)Math.Floor(e.Pos.Z);
                 int ground = ba.GetRainMapHeightAt(gx, gz);

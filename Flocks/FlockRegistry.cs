@@ -190,12 +190,13 @@ namespace Flocks
         /// <summary>/flocks calm: every flock calm, no lake abandoned.</summary>
         public void Calm() { foreach (var f in flocks.Values) f.Wariness = 0; abandoned.Clear(); }
 
-        public void MemberDied(Entity goose)
+        /// <summary>A member was killed. factor: the species' WarinessFactor (bold birds mind a kill less).</summary>
+        public void MemberDied(Entity goose, double factor = 1)
         {
             var f = Get(goose.WatchedAttributes.GetLong(FlockIdKey, 0));
             if (f == null) return;
             // only adds: the flush that follows adds the rest and decides whether they leave
-            Disturb(f.Id, cfg.KillWariness, goose.Pos.XYZ, mayLeave: false);
+            Disturb(f.Id, cfg.KillWariness * factor, goose.Pos.XYZ, mayLeave: false);
             f.Count = Math.Max(0, f.Count - 1); f.Killed++;
             if (f.Count == 0) { f.State = FlockState.Lost; f.SinceHours = sapi.World.Calendar.TotalHours; }
         }

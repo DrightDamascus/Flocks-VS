@@ -1,0 +1,30 @@
+// Herring gull. Our own model (tools/make_gull.py). A sea bird (habitat "sea"): floats on the sea along the coast as
+// flocks:gull (behaviour tuning and sounds in entities/gull.json), resident all year, bold, wheels about after taking
+// off and now and then goes up of its own accord. Loose groups pass along the coast, only where the player is near the
+// sea. No landing flocks: they spawn on their own. Fields: see Flocks/Species.cs.
+{
+	code: "gull",
+	name: "herring gulls",
+	shapes: [
+		{ name: "gull", shape: "flocks:shapes/entity/bird/gull.json", flap: "fly-flap", soar: "fly-soar" }
+	],
+	sizeFromEntity: "flocks:gull",
+	// unhurried: a few easy beats, then long glides
+	speedMin: 10, speedMax: 14,
+	flapSeconds: 0.55, soarSeconds: 2.5, blendSeconds: 0.4,
+	flapBeatsMin: 3, flapBeatsMax: 6, soarLoopsMin: 1, soarLoopsMax: 3,
+	altitudeMin: 20, altitudeMax: 60,
+	loose: true,
+	yearRound: true,
+	hours: [6, 19.5],
+	maxFlocksPerDay: 3, countMin: 3, countMax: 12,
+	callSound: "gull/flock", callVariants: 3, callGapMin: 5, callGapMax: 14,
+	landedEntity: "flocks:gull",
+	habitat: "sea",
+	arriveInFlocks: false,
+	landingMin: 5, landingMax: 15,
+	// the sea, not a rock pool
+	minLakeSize: 100,
+	// bold: used to people, they take twice as long as geese to give a stretch of coast up
+	warinessFactor: 0.5
+}

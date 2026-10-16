@@ -67,6 +67,14 @@ namespace Flocks
         /// looks above the water and they stand instead of floating. In flight they use the entity's own box.</summary>
         private bool Wade => SpeciesData?.Wades == true;
         private float wadeHitboxHeight = 1.55f, flightHitboxHeight = -1, hitboxWidth = 0.6f;
+        /// <summary>Gulls (attributes wheelSecondsMin/Max, loafHoursMin/Max, soarShare): after taking off the group
+        /// wheels round over the water for a while, gaining height, before heading for its spot; every loafHours or so a
+        /// group takes to the air of its own accord (no disturbance) and comes down further along; and in level flight
+        /// it glides soarShare of the time. All 0 = off (geese, ducks, herons).</summary>
+        private double wheelMin, wheelMax, loafMin, loafMax, soarShare;
+        private double wheelLeft, wheelX, wheelZ, wheelY, wheelR = 12, wheelAlt = 12, nextLoaf = double.NaN;
+        private float glideCycle;
+        private bool gliding;
         // wading activity: rest, stalk (walk), strike; how long it lasts
         private string activity = "rest";
         private float activityTime = 3;
@@ -128,6 +136,9 @@ namespace Flocks
             wadeHitboxHeight = attributes["wadeHitboxHeight"].AsFloat(wadeHitboxHeight);
             RunSpeed = attributes["takeoffRunSpeed"].AsDouble(RunSpeed);
             takeoffCallChance = attributes["takeoffCallChance"].AsDouble(takeoffCallChance);
+            wheelMin = attributes["wheelSecondsMin"].AsDouble(0); wheelMax = attributes["wheelSecondsMax"].AsDouble(wheelMin);
+            loafMin = attributes["loafHoursMin"].AsDouble(0); loafMax = attributes["loafHoursMax"].AsDouble(loafMin);
+            soarShare = GameMath.Clamp(attributes["soarShare"].AsDouble(0), 0, 0.9);
             heading = rand.NextDouble() * Math.PI * 2;
         }
 
@@ -168,6 +179,12 @@ namespace Flocks
             {
                 shotCheck = 0.1f;
                 if (IncomingShot(out double shotAway, out Entity shooter, out Vec3d from)) { TakeoffGroup(shotAway, shooter, false, from); return; }
+            }
+            // a loafing flight: now and then the group goes up of its own accord, wheels and settles further along
+            if (loafMax > 0 && !Wade)
+            {
+                if (double.IsNaN(nextLoaf)) nextLoaf = now + loafMin + rand.NextDouble() * (loafMax - loafMin);
+                else if (now >= nextLoaf && scarer == null) { TakeoffGroup(rand.NextDouble() * Math.PI * 2, null, false, null, disturb: false); return; }
             }
             // the nearest player is looked up 4 times a second and kept in between, so fleeing is continuous;
             // a skittish flock (lake wariness) flees and takes off from further away
@@ -216,18 +233,27 @@ namespace Flocks
         /// departing for good, one search picks where the group comes down, and each bird gets its own spot there.
         /// threat: what scared them (null = nothing in particular; the search then just avoids their own spot).
         /// </summary>
-        private void TakeoffGroup(double away, Entity threat, bool depart, Vec3d threatAt = null)
+        private void TakeoffGroup(double away, Entity threat, bool depart, Vec3d threatAt = null, bool disturb = true)
         {
             var pos = entity.Pos;
             double tx = threat?.Pos.X ?? threatAt?.X ?? pos.X, tz = threat?.Pos.Z ?? threatAt?.Z ?? pos.Z;
-            // every flush disturbs the flock; disturbed often enough, it leaves this lake and rejoins the migration
-            if (!depart && FlockRegistry.Instance?.Disturb(FlockId, 1, pos.XYZ) == true) depart = true;
+            // every flush disturbs the flock (bold species less: WarinessFactor); disturbed often enough, it leaves this
+            // lake and rejoins the migration. A loafing flight is no disturbance.
+            if (!depart && disturb && FlockRegistry.Instance?.Disturb(FlockId, SpeciesData?.WarinessFactor ?? 1, pos.XYZ) == true) depart = true;
             List<Vec3d> spots = depart ? null : FindSpots(pos.XYZ, tx, tz);
             if (spots == null || spots.Count == 0) depart = true; // nowhere to land nearby: they rejoin the migration
             Takeoff(away, Pick(spots), depart, tx, tz, 0);
             foreach (var e in entity.World.GetEntitiesAround(pos.XYZ, 16, 8, e => e.Code == entity.Code && e.Alive && e != entity))
                 e.GetBehavior<EntityBehaviorWaterfowl>()?.Takeoff(away + (rand.NextDouble() - 0.5) * 0.6, Pick(spots), depart, tx, tz,
                     (float)(0.08 + rand.NextDouble() * 0.5));
+        }
+
+        /// <summary>Go up for a loafing flight now (tests). False unless it is on the water and its species loafs.</summary>
+        public bool Loaf()
+        {
+            if (phase != Phase.Water || loafMax <= 0 || Wade || !entity.Alive) return false;
+            TakeoffGroup(rand.NextDouble() * Math.PI * 2, null, false, null, disturb: false);
+            return true;
         }
 
         /// <summary>A bird of prey stooping at this bird or its group (Raptor.cs): they flush away from it, a disturbance
@@ -270,6 +296,11 @@ namespace Flocks
             badSpots.Clear(); spotChanges = 0;
             NewTarget(spot); if (target != null) target.Y -= sink;
             departing = depart; threatX = tx; threatZ = tz;
+            // gulls: wheel over the water first, the whole group the same way round
+            wheelLeft = depart || wheelMax <= 0 ? 0 : wheelMin + rand.NextDouble() * (wheelMax - wheelMin);
+            wheelX = entity.Pos.X; wheelZ = entity.Pos.Z; wheelY = entity.Pos.Y;
+            wheelR = 10 + rand.NextDouble() * 8; wheelAlt = 9 + rand.NextDouble() * 9;
+            nextLoaf = double.NaN;
             Persist();
         }
 
@@ -302,7 +333,9 @@ namespace Flocks
 
                 case Phase.Fly:
                 {
-                    if (target != null && TrackApproach(dt)) { GiveUpSpot(); break; }
+                    bool wheeling = wheelLeft > 0;
+                    if (wheeling) wheelLeft -= dt;
+                    if (target != null && !wheeling && TrackApproach(dt)) { GiveUpSpot(); break; }
                     if (target == null && !departing && (searchTimer -= dt) <= 0)
                     {
                         searchTimer = 4;
@@ -314,7 +347,15 @@ namespace Flocks
                     // the nose can sit inside the turning circle, where steering at it only orbits it: fly on until it
                     // is far enough to turn and line up (in a flight simulation every spot 14-110 blocks off, at any
                     // bearing, was reached in under 23 s with at most one go-round).
-                    if (target != null && phaseTime > 0.8)
+                    if (wheeling && phaseTime > 0.8)
+                    {
+                        // circle the takeoff spot: aim along the tangent, nudged in or out to hold the radius
+                        double dx = pos.X - wheelX, dz = pos.Z - wheelZ, r = Math.Sqrt(dx * dx + dz * dz);
+                        double dir = FlockId % 2 == 0 ? 1 : -1;
+                        double tangent = Math.Atan2(dx, dz) + dir * (Math.PI / 2 + GameMath.Clamp((r - wheelR) / wheelR, -0.6, 0.6));
+                        Steer(r > wheelR * 2.5 ? Math.Atan2(-dx, -dz) : tangent, TurnRate, dt);
+                    }
+                    else if (target != null && phaseTime > 0.8)
                     {
                         LaneAim(out double ax, out double az, out bool laneEnd);
                         double want = Math.Atan2(ax - pos.X, az - pos.Z);
@@ -324,14 +365,20 @@ namespace Flocks
                             && Math.Abs(GameMath.AngleRadDistance((float)flyHeading, (float)want)) > 1.2;
                         if (!tooClose) Steer(want, TurnRate, dt);
                     }
-                    vy = ClimbRate(CruiseY());
-                    double cap = cruise;
+                    vy = ClimbRate(wheeling ? Math.Max(wheelY + wheelAlt, GroundAhead() + GroundClear) : CruiseY());
+                    double cap = wheeling ? cruise * 0.85 : cruise;
                     AvoidTerrain(ref vy, ref cap, dt);
                     speed = speed < cap ? Math.Min(cap, speed + Accel * dt) : Math.Max(cap, speed - PullDecel * dt);
-                    // beat hard while climbing out or pulling up, cruise-flap otherwise (with some hysteresis)
+                    // beat hard while climbing out or pulling up, cruise-flap otherwise (with some hysteresis); a bird
+                    // that glides a lot (soarShare) holds its wings out for stretches of level flight
                     if (phaseTime < 1.4 || vy > 3) hardFlap = true; else if (vy < 2) hardFlap = false;
-                    SetAnim(hardFlap ? "takeoff" : "fly-flap");
-                    if (target != null)
+                    if (soarShare > 0 && (glideCycle -= dt) <= 0)
+                    {
+                        gliding = !gliding;
+                        glideCycle = (float)((gliding ? soarShare : 1 - soarShare) * (3 + rand.NextDouble() * 4));
+                    }
+                    SetAnim(hardFlap ? "takeoff" : (gliding && vy < 1.5 ? "fly-soar" : "fly-flap"));
+                    if (target != null && !wheeling)
                     {
                         double d = HorDist(target), drop = pos.Y - target.Y;
                         double err = Math.Abs(GameMath.AngleRadDistance((float)flyHeading, (float)Math.Atan2(target.X - pos.X, target.Z - pos.Z)));
@@ -417,18 +464,26 @@ namespace Flocks
         /// and always GroundClear above the ground and trees just ahead.</summary>
         private double CruiseY()
         {
-            var pos = entity.Pos; var ba = entity.World.BlockAccessor;
+            var pos = entity.Pos;
             // with a spot: high enough to come down at the angle its way in needs, from here
             double baseY = target?.Y ?? pos.Y, alt = 18;
             if (target != null) { double d = HorDist(target); alt = Math.Min(40, Math.Max(GameMath.Clamp(d * 0.25, 6, 22), approachSlope * Math.Min(d, LaneLength + 8) + 2)); }
+            double ground = GroundAhead();
+            if (target == null && ground > 0) baseY = ground;
+            return Math.Max(baseY + alt, ground + GroundClear);
+        }
+
+        /// <summary>The highest ground or tree top within 24 blocks straight ahead (0 if none is loaded).</summary>
+        private double GroundAhead()
+        {
+            var pos = entity.Pos; var ba = entity.World.BlockAccessor;
             double ground = 0;
             for (int d = 0; d <= 24; d += 6)
             {
                 int h = ba.GetRainMapHeightAt((int)Math.Floor(pos.X + Math.Sin(flyHeading) * d), (int)Math.Floor(pos.Z + Math.Cos(flyHeading) * d));
                 if (h > 0) ground = Math.Max(ground, h + 1);
             }
-            if (target == null && ground > 0) baseY = ground;
-            return Math.Max(baseY + alt, ground + GroundClear);
+            return ground;
         }
 
         /// <summary>
@@ -586,7 +641,7 @@ namespace Flocks
 
         public override void OnEntityDeath(DamageSource damageSourceForDeath)
         {
-            if (entity.World.Side == EnumAppSide.Server) FlockRegistry.Instance?.MemberDied(entity);
+            if (entity.World.Side == EnumAppSide.Server) FlockRegistry.Instance?.MemberDied(entity, SpeciesData?.WarinessFactor ?? 1);
         }
 
         // ------------------------------------------------------------------------------------------------ water
@@ -623,7 +678,7 @@ namespace Flocks
         /// <summary>Landing spots for this bird's habitat: open water, or water one block deep for waders.</summary>
         private List<Vec3d> FindSpots(Vec3d from, double tx, double tz) => Wade
             ? LakeSearch.FindWadeSpots(entity.World.BlockAccessor, from, tx, tz, MinLake, rand)
-            : LakeSearch.FindSpots(entity.World.BlockAccessor, from, tx, tz, MinLake, rand);
+            : LakeSearch.FindSpots(entity.World.BlockAccessor, from, tx, tz, MinLake, rand, SpeciesData?.Liquid ?? "water");
 
         /// <summary>
         /// A wading bird at rest: mostly standing hunched, now and then stalking slowly through the shallows or striking
@@ -695,16 +750,18 @@ namespace Flocks
             return current + Math.PI * (0.5 + rand.NextDouble());
         }
 
-        /// <summary>Water at the goose's level (or one below, for a goose standing ashore) dist blocks along heading.</summary>
+        /// <summary>Its water (fresh, or the sea for sea birds) at the goose's level (or one below, for a goose standing
+        /// ashore) dist blocks along heading.</summary>
         private bool WaterAt(double towards, double dist)
         {
             var ba = entity.World.BlockAccessor;
+            string liquid = SpeciesData?.Liquid ?? "water";
             int x = (int)Math.Floor(entity.Pos.X + Math.Sin(towards) * dist), z = (int)Math.Floor(entity.Pos.Z + Math.Cos(towards) * dist);
             int y = (int)Math.Floor(entity.Pos.Y);
             for (int dy = 0; dy >= -1; dy--)
             {
                 var b = ba.GetBlock(new BlockPos(x, y + dy, z), BlockLayersAccess.Fluid);
-                if (b != null && b.IsLiquid() && b.LiquidCode == "water") return true;
+                if (b != null && b.IsLiquid() && b.LiquidCode == liquid) return true;
             }
             return false;
         }

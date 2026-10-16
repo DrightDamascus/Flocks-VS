@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.18.0
+The herring gull, the first sea bird, and the birds in the handbook:
+- New model (tools/make_gull.py, on the greylag's bones, so the greylag's animations): white head and body, silver-grey
+  back, a long stout yellow bill with the red spot near its tip, pink legs, a short square white tail, and long,
+  narrow, pointed wings with a white trailing edge and black tips with white "mirrors".
+- flocks:gull (entities/gull.json): size 0.8 (2.1-block wingspan, half again a real gull's 1.4 m, like the other
+  birds), 4 health; drops poultry and feathers. Lives on the sea along the coast (species habitat "sea": everything
+  the ducks do, on salt water), all year (species yearRound: no resident season, no autumn departure). Bold: flees
+  from 9 blocks and takes off at 4.5 (geese 14 and 7), and a flush or a kill disturbs its flock half as much as a
+  goose's (species warinessFactor 0.5), so it takes twice as long to drive gulls off a stretch of coast. Noisy: single
+  calls while floating, the laughing long call on takeoff.
+- Gulls fly like gulls (new flocks.waterfowl attributes, off for the other birds): after taking off the group wheels
+  in circles over the water for 8-20 s, climbing, before heading for its new spot (wheelSecondsMin/Max); every 1.5-4
+  game hours a group goes up of its own accord, wheels and settles further along, which disturbs nobody
+  (loafHoursMin/Max); and they glide half the time they fly (soarShare).
+- Spawns on its own on the sea near the shore (inside salt water at the surface, within the server's ShoreDistance of
+  land, on at least 100 surface blocks of sea), in groups of about 4-14. No landing flocks. Loose groups of 3-12 pass
+  along the coast, any day of the year in any direction, but only when there is sea within 96 blocks of you.
+- Sounds (sounds/gull/): calls, the long call, hurt and death from a recording by the Sonothèque ADVL (xeno-canto,
+  CC0); the calling flocks overhead from a colony recording by Marie-Lan Taÿ Pamart (xeno-canto, CC BY-SA 4.0).
+- The handbook: every bird's creature page has a paragraph about it (where it lives, when it is around, how it
+  behaves), and a new guide page, "Birds", covers migration, lake wariness and hunting, and links to each bird.
+- Lakes and the sea are kept apart: the lake search, the spawn checks, /flocks land and the paddling-back-to-water
+  check all take the species' water ("water" or "saltwater"), so geese and ducks never settle on the sea and gulls
+  never on a lake. /flocks schedule says which birds are resident all year and whether there is sea nearby.
+- Tests: pond C on the test site is salt water. Gulls settle on it, wheel at least a full circle after a flush and come
+  back down on the sea with half a goose's wariness; a loafing flight disturbs nobody; the sea is offered to gulls only
+  and the lakes to everyone else; the gull entity file, the handbook texts and the Birds page load.
+
 ## 0.17.0
 The golden eagle, and bigger birds all round:
 - Every bird is about half again its real size (Dright: true-size birds looked tiny next to the game's boars and deer,

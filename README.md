@@ -7,7 +7,7 @@ DESIGN.md. Version history: CHANGELOG.md.
 ## What it does
 - **Passing flocks** (drawn by each client, no entities): geese, cranes, hawks, mallards and now and then a heron
   cross the sky on migration days in spring and autumn, at their own hours and heights, held back by storms. All but
-  the hawks call as they pass.
+  the hawks call as they pass. On the coast, loose groups of gulls pass at any time of year.
 - **Landing flocks** (real entities): on spring migration days a flock of greylag geese or mallards flies in from up
   to 320 blocks out and glides down onto a lake near you. Both also spawn naturally on lakes (mallards on ponds too)
   in their resident season.
@@ -15,6 +15,9 @@ DESIGN.md. Version history: CHANGELOG.md.
   close.
 - **Golden eagles** perch on the highest point around, soar in circles on thermals over open high ground, and stoop on
   hares and ducks from high up, then feed on the kill.
+- **Herring gulls** live on the sea along the coast all year. They are bold and loud, wheel over the water after taking
+  off, and now and then go up of their own accord and settle further along the shore.
+- **The handbook** has a page for each bird and a "Birds" guide page (migration, wary birds, hunting).
 - The birds are deliberately bigger than life (about half again), so they read as birds next to the game's animals.
 - **Geese on the water** drift, paddle away from you, and take off in a hurry when you get close, shoot at them, or
   miss them. They fly to another part of the lake or another lake, coming in along a clear lane, and climb over hills
@@ -42,7 +45,8 @@ entity file with the `flocks.waterfowl` behaviour, like vanilla animals. See `co
 `entities/greylag.json`; fields are documented in `Flocks/Species.cs`.
 
 ## Tools
-- Models: `python tools/make_greylag.py` (and `make_crane.py`, `make_mallard.py`, `make_heron.py`) regenerate a
+- Models: `python tools/make_greylag.py` (and `make_crane.py`, `make_mallard.py`, `make_heron.py`, `make_eagle.py`,
+  `make_gull.py`) regenerate a
   bird's shape and animations (`--texture` repaints the texture, overwriting hand edits); `python tools/preview_greylag.py` renders it without the game.
 - Build: `./build_zip.ps1 [-GamePath <folder with VintagestoryAPI.dll>]` -> `dist/flocks_<version>.zip`
   (default GamePath: the 1.22.7 reference DLLs at %USERPROFILE%\agent-tools\vsref1227).

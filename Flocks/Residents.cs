@@ -38,7 +38,8 @@ namespace Flocks
     /// Resident birds of every species that lands (its landedEntity, e.g. flocks:greylag) spawn through vanilla's spawner
     /// (spawnconditions in the entity file: inside still water at the surface, climate limits, maxQuantity). Vanilla
     /// spawnconditions don't know seasons or lake size, so this vetoes spawns out of the species' resident season, on
-    /// small ponds, far from shore, near an abandoned lake, or where they are already thick on the ground.
+    /// small ponds, far from shore, near an abandoned lake, or where they are already thick on the ground. Sea birds
+    /// (habitat "sea") are judged the same way on salt water: near the shore, on enough sea.
     /// The autumn departure is in EntityBehaviorWaterfowl.
     /// </summary>
     public class ResidentGeese
@@ -79,7 +80,7 @@ namespace Flocks
                 // a wading bird only where it can stand: water one block deep, the spawn on its bottom
                 if (sp.Wades && !(LakeSearch.IsWadeable(ba, bp.X, bp.Z, out int wy) && wy == bp.Y)) { VetoDepth++; return false; }
                 int minLake = sp.MinLake(Cfg.MinLakeSize);
-                if (LakeSize(ba, bp, minLake) < minLake) { VetoLake++; return false; }
+                if (LakeSize(ba, bp, minLake, sp.Liquid) < minLake) { VetoLake++; return false; }
                 if (ShoreDirection(ba, bp, ShoreDistanceCfg, out _) < 0) { VetoShore++; return false; }
                 if (FlockRegistry.Instance?.IsAbandoned(pos.X, pos.Z) == true) { VetoAbandoned++; return false; }
                 int near = sapi.World.GetEntitiesAround(pos, Cfg.NearbyRadius, 32, e => e.Alive && e.Code.Equals(code)).Length;
@@ -97,18 +98,21 @@ namespace Flocks
             return null;
         }
 
-        /// <summary>The species' resident season here: from its spring window to its autumn window (MigrationScheduler).</summary>
+        /// <summary>The species' resident season here: from its spring window to its autumn window (MigrationScheduler);
+        /// always, for a bird that stays all year.</summary>
         public static bool InSeason(IWorldAccessor world, BlockPos bp, Species sp)
         {
+            if (sp.YearRound) return true;
             var cal = world.Calendar;
             return MigrationScheduler.ResidentSeason(sp.SpringStart, sp.AutumnStart, cal.GetSeasonRel(bp), cal.OnGetLatitude(bp.Z));
         }
 
-        /// <summary>Fresh-water surface blocks connected to bp's column at its water level, counted up to <paramref name="enough"/>.</summary>
-        public static int LakeSize(IBlockAccessor ba, BlockPos bp, int enough)
+        /// <summary>Surface blocks of the liquid (fresh water unless told otherwise) connected to bp's column at its water
+        /// level, counted up to <paramref name="enough"/>.</summary>
+        public static int LakeSize(IBlockAccessor ba, BlockPos bp, int enough, string liquid = "water")
         {
             int sx = bp.X, sz = bp.Z;
-            if (!Surface(ba, sx, sz, out int y)) return 0;
+            if (!Surface(ba, sx, sz, out int y, liquid)) return 0;
             var seen = new System.Collections.Generic.HashSet<long> { ((long)sx << 32) ^ (uint)sz };
             var q = new System.Collections.Generic.Queue<(int, int)>(); q.Enqueue((sx, sz));
             int n = 0;
@@ -116,7 +120,7 @@ namespace Flocks
             {
                 var (x, z) = q.Dequeue(); n++;
                 foreach (var (nx, nz) in new[] { (x + 1, z), (x - 1, z), (x, z + 1), (x, z - 1) })
-                    if (seen.Add(((long)nx << 32) ^ (uint)nz) && Surface(ba, nx, nz, out int ny) && ny == y) q.Enqueue((nx, nz));
+                    if (seen.Add(((long)nx << 32) ^ (uint)nz) && Surface(ba, nx, nz, out int ny, liquid) && ny == y) q.Enqueue((nx, nz));
             }
             return n;
         }
@@ -129,7 +133,7 @@ namespace Flocks
         public static int ShoreDirection(IBlockAccessor ba, BlockPos bp, int maxDist, out double heading)
         {
             heading = 0;
-            int y = Surface(ba, bp.X, bp.Z, out int sy) ? sy : bp.Y;
+            int y = Surface(ba, bp.X, bp.Z, out int sy, null) ? sy : bp.Y;
             var tmp = new BlockPos(0, 0, 0);
             for (int d = 1; d <= maxDist; d++)
                 for (int i = 0; i < 8; i++)
@@ -147,12 +151,13 @@ namespace Flocks
             return -1;
         }
 
-        private static bool Surface(IBlockAccessor ba, int x, int z, out int y)
+        /// <summary>The column's rain-map top is the liquid; null = fresh or salt water alike.</summary>
+        private static bool Surface(IBlockAccessor ba, int x, int z, out int y, string liquid)
         {
             y = ba.GetRainMapHeightAt(x, z);
             if (y <= 0) return false;
             var b = ba.GetBlock(new BlockPos(x, y, z), BlockLayersAccess.Fluid);
-            return b != null && b.IsLiquid() && b.LiquidCode == "water";
+            return b != null && b.IsLiquid() && (liquid == null ? b.LiquidCode == "water" || b.LiquidCode == "saltwater" : b.LiquidCode == liquid);
         }
 
         public string Report()
