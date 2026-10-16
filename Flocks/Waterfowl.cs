@@ -59,6 +59,12 @@ namespace Flocks
         private const double GlideRatio = 3.5, LandSpeed = 6, SplashSeconds = 0.9;
         /// <summary>Species code of this bird's flock (FlockRegistry, Species.cs).</summary>
         private string species = "goose";
+        private Species speciesData;
+        /// <summary>This bird's species data (config/flocks-species/), from the server's mod system.</summary>
+        private Species SpeciesData => speciesData ??= entity.Api?.ModLoader.GetModSystem<FlocksModSystem>()?.SpeciesByCode.GetValueOrDefault(species);
+        /// <summary>Chances a bird plays its takeoffwings and takeoffcall sounds (entity sounds) as it takes off, so a
+        /// group doesn't play one of each per bird.</summary>
+        private double takeoffWingsChance = 0.6, takeoffCallChance = 0.4;
         /// <summary>Simulation range while flying: the server ticks an entity, and sends it to players, only within this
         /// of some player (vanilla default 128). Landing flocks arrive from up to ~320 blocks out and departing ones are
         /// removed at 360 (FlockRegistry.DepartRange), so it must cover both.</summary>
@@ -116,6 +122,8 @@ namespace Flocks
             cruiseMin = attributes["cruiseSpeedMin"].AsDouble(cruiseMin);
             cruiseMax = attributes["cruiseSpeedMax"].AsDouble(cruiseMax);
             species = attributes["species"].AsString(species);
+            takeoffWingsChance = attributes["takeoffWingsChance"].AsDouble(takeoffWingsChance);
+            takeoffCallChance = attributes["takeoffCallChance"].AsDouble(takeoffCallChance);
             heading = rand.NextDouble() * Math.PI * 2;
         }
 
@@ -138,7 +146,7 @@ namespace Flocks
                 seasonCheck = 30;
                 var bp = pos.AsBlockPos;
                 double lat = entity.World.Calendar.OnGetLatitude(bp.Z);
-                if (!ResidentGeese.InSeason(entity.World, bp))
+                if (SpeciesData != null && !ResidentGeese.InSeason(entity.World, bp, SpeciesData))
                 {
                     // autumn: the whole group leaves toward the equator (0 = south, pi = north)
                     TakeoffGroup((lat >= 0 ? 0 : Math.PI) + (rand.NextDouble() - 0.5) * 0.5, null, true);
@@ -260,10 +268,10 @@ namespace Flocks
                     {
                         runStarted = true;
                         flyHeading = ClearestHeading(flyHeading);
-                        var w = entity.World;
-                        w.PlaySoundAt(new AssetLocation("game", "environment/smallsplash"), entity, null, true, 24, 0.5f);
-                        if (rand.NextDouble() < 0.6) w.PlaySoundAt(new AssetLocation("flocks", "wings/flap" + (1 + rand.Next(2))), entity, null, true, 32, 0.9f);
-                        if (rand.NextDouble() < 0.4) w.PlaySoundAt(new AssetLocation("flocks", "goose/flight" + (1 + rand.Next(3))), entity, null, true, 48, 0.7f);
+                        // entity sounds (the entity file's sounds: takeoffsplash, takeoffwings, takeoffcall)
+                        entity.PlayEntitySound("takeoffsplash");
+                        if (rand.NextDouble() < takeoffWingsChance) entity.PlayEntitySound("takeoffwings");
+                        if (rand.NextDouble() < takeoffCallChance) entity.PlayEntitySound("takeoffcall");
                     }
                     SetAnim("takeoff");
                     // pattering along the surface, wings thrashing, then the feet leave the water
@@ -347,7 +355,7 @@ namespace Flocks
                     }
                     if (entity.Swimming || entity.FeetInLiquid || pos.Y <= target.Y + 0.15)
                     {
-                        entity.World.PlaySoundAt(new AssetLocation("game", "environment/mediumsplash"), entity, null, true, 24, 0.45f);
+                        entity.PlayEntitySound("landsplash");
                         SetPhase(Phase.Splash);
                     }
                     else if ((d < 1.5 && pos.Y - target.Y > 1.5) || phaseTime > 15) GoAround(phaseTime > 15 ? "glide too long" : $"overshot {pos.Y - target.Y:0.0} high"); // go round

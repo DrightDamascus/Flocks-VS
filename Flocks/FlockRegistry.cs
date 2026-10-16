@@ -127,16 +127,16 @@ namespace Flocks
         /// <summary>
         /// The flock that comes down in a landing: the flock away longest returns with whoever is left in it; failing
         /// that, a flock that was killed off is replaced by a new one (the old record goes); failing that, a new flock
-        /// of 7-12. Marked Landed at the lake.
+        /// of min-max (the species' landing flock size). Marked Landed at the lake.
         /// </summary>
-        public FlockRecord TakeForLanding(string species, Vec3d lake, Random rand)
+        public FlockRecord TakeForLanding(string species, Vec3d lake, Random rand, int min, int max)
         {
             var f = flocks.Values.Where(r => r.Species == species && r.State == FlockState.Away && r.Count > 0).OrderBy(r => r.SinceHours).FirstOrDefault();
             if (f == null)
             {
                 var lost = flocks.Values.Where(r => r.Species == species && r.State == FlockState.Lost).OrderBy(r => r.SinceHours).FirstOrDefault();
                 if (lost != null) flocks.Remove(lost.Id);
-                f = Create(species, 7 + rand.Next(6), lake);
+                f = Create(species, min + rand.Next(Math.Max(1, max - min + 1)), lake);
             }
             f.State = FlockState.Landed; f.X = lake.X; f.Y = lake.Y; f.Z = lake.Z; f.SinceHours = sapi.World.Calendar.TotalHours;
             return f;

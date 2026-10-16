@@ -1,0 +1,20 @@
+// Common crane. Our own model (tools/make_crane.py). Passes over only (no landed entity yet). Fields: see Flocks/Species.cs.
+{
+	code: "crane",
+	name: "common cranes",
+	shapes: [
+		{ name: "crane", shape: "flocks:shapes/entity/bird/crane.json", flap: "fly-flap", soar: "fly-soar" }
+	],
+	// common crane: 2.0-2.4 m wingspan
+	wingspan: 2.2,
+	// cranes beat slower and deeper than geese, glide more, and fly higher
+	speedMin: 15, speedMax: 19,
+	flapSeconds: 0.8, soarSeconds: 2.4, blendSeconds: 0.45,
+	flapBeatsMin: 6, flapBeatsMax: 12, soarLoopsMin: 1, soarLoopsMax: 2,
+	altitudeMin: 75, altitudeMax: 140,
+	// earlier than geese in autumn and early in spring, through the day, in V's of 7-25
+	springStart: 0.02, springEnd: 0.18, autumnStart: 0.55, autumnEnd: 0.75,
+	hours: [8, 17],
+	maxFlocksPerDay: 2, countMin: 7, countMax: 25,
+	callSound: "crane/call", callVariants: 6, callGapMin: 8, callGapMax: 20
+}

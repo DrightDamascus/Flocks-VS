@@ -90,6 +90,7 @@ namespace FlocksTest
             for (int x = x0 - half; x <= x0 + half; x += 4)
                 for (int z = z0 - half; z <= z0 + half; z += 4) top = Math.Max(top, ba.GetRainMapHeightAt(x, z));
             y0 = Math.Min(top + 12, ba.MapSizeY - 60);
+            if (top + 12 > ba.MapSizeY - 60) Log($"WARNING: terrain under the test site reaches {top}, so the slab is buried; the world seed in run_engine_tests.ps1 should be flatter here");
             c = new Vec3d(x0 + 0.5, y0, z0 + 0.5);
             int stone = sapi.World.GetBlock(new AssetLocation("game", "rock-granite")).BlockId;
             int water = sapi.World.GetBlock(new AssetLocation("game", "water-still-7")).BlockId;
@@ -115,6 +116,14 @@ namespace FlocksTest
             bulk.Commit();
             Log($"site built: slab top y={y0} (terrain max {top}); rain map at pond A {ba.GetRainMapHeightAt(x0 - 40, z0)}, " +
                 $"slab {ba.GetRainMapHeightAt(x0, z0 + 60)}, wall {ba.GetRainMapHeightAt(x0 - 11, z0)}");
+            // the goose entity file parsed whole (a bad field makes the game drop most of it, silently but for one log line)
+            var gt = sapi.World.GetEntityType(new AssetLocation("flocks", "greylag"));
+            Check(gt?.Sounds != null && gt.Sounds.ContainsKey("takeoffwings") && gt.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.waterfowl") == true,
+                "greylag entity file loaded whole (sounds and flocks.waterfowl behaviour present)");
+            var spc = sapi.ModLoader.GetModSystem<FlocksModSystem>().SpeciesByCode;
+            Check(spc.ContainsKey("goose") && spc["goose"].Lands && spc["goose"].LandingMin == 7 && spc.ContainsKey("crane") && spc.ContainsKey("hawk"),
+                $"species data loaded: {string.Join(", ", spc.Keys)}");
+            Check(top + 12 <= ba.MapSizeY - 60, $"test site above the terrain (terrain max {top}, slab {y0})");
             Check(ba.GetRainMapHeightAt(x0 - 40, z0) == y0 && ba.GetRainMapHeightAt(x0 - 11, z0) == y0 + 14 && ba.GetRainMapHeightAt(x0 + 50 - 17, z0 + 30) == y0 + 8,
                 "rain map follows the built site");
 
@@ -305,9 +314,9 @@ namespace FlocksTest
 
         private bool FrameArrive(out string msg)
         {
-            var landings = sapi.ModLoader.GetModSystem<FlocksModSystem>().Landings;
+            var flocks = sapi.ModLoader.GetModSystem<FlocksModSystem>();
             // stand-in for the player: on the slab, 60 blocks north of the site centre
-            return landings.Arrive(new Vec3d(c.X, y0 + 1, c.Z - 60), true, out msg);
+            return flocks.Landings.Arrive(new Vec3d(c.X, y0 + 1, c.Z - 60), flocks.SpeciesByCode["goose"], true, out msg);
         }
 
         private double Elapsed => sapi.World.ElapsedMilliseconds / 1000.0 - stepStart;

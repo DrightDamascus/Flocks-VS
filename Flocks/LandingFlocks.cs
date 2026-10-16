@@ -7,9 +7,10 @@ using Vintagestory.API.Server;
 namespace Flocks
 {
     /// <summary>
-    /// Landing flocks (server). On spring migration days each online player gets up to one landing a day (scaled by
-    /// the day's migration strength, at a goose flying hour). A landing needs open water 40-160 blocks from the
-    /// player with no geese on it yet, in the resident season. The flock is real geese from the start: they appear
+    /// Landing flocks (server), for every species that lands. On its spring migration days each online player gets up
+    /// to one landing a day per species (scaled by the day's migration strength, at one of its flying hours). A landing
+    /// needs open water 40-160 blocks from the player with none of that species on it yet, in its resident season. The
+    /// flock is real birds from the start: they appear
     /// in a V up to MaxEntry blocks out along the arrival heading (inside loaded chunks and the flight simulation
     /// range), already flying at Speed, each toward its own spot on the water, and glide in (Waterfowl).
     /// The flock is the one away longest, or a replacement for one that was killed off, or a new one (FlockRegistry).
@@ -24,14 +25,14 @@ namespace Flocks
         public const double FormBack = 1.2, FormOut = 1.5;
 
         private readonly ICoreServerAPI sapi;
-        private readonly Species goose;
+        private readonly Dictionary<string, Species> species;
         private readonly Random rand = new();
-        private readonly Dictionary<string, (int day, List<double> hours)> plans = new();
+        /// <summary>Today's planned landing hours, per player and species.</summary>
+        private readonly Dictionary<(string player, string species), (int day, List<double> hours)> plans = new();
 
-        public LandingFlocks(ICoreServerAPI sapi)
+        public LandingFlocks(ICoreServerAPI sapi, Dictionary<string, Species> species)
         {
-            this.sapi = sapi;
-            goose = Species.Create(null)["goose"]; // timing data only; meshes are never loaded on the server
+            this.sapi = sapi; this.species = species;
             sapi.Event.RegisterGameTickListener(Tick, 5000);
         }
 
@@ -43,52 +44,60 @@ namespace Flocks
             foreach (IServerPlayer plr in sapi.World.AllOnlinePlayers)
             {
                 if (plr.Entity == null || plr.ConnectionState != EnumClientState.Playing) continue;
-                if (!plans.TryGetValue(plr.PlayerUID, out var plan) || plan.day != day)
+                foreach (var sp in species.Values)
                 {
-                    plan = (day, PlanDay(plr.Entity.Pos.AsBlockPos, hour));
-                    plans[plr.PlayerUID] = plan;
-                }
-                for (int i = plan.hours.Count - 1; i >= 0; i--)
-                {
-                    if (hour < plan.hours[i]) continue;
-                    plan.hours.RemoveAt(i);
-                    Arrive(plr, false, out _);
+                    if (!sp.Lands) continue;
+                    var key = (plr.PlayerUID, sp.Code);
+                    if (!plans.TryGetValue(key, out var plan) || plan.day != day)
+                    {
+                        plan = (day, PlanDay(sp, plr.Entity.Pos.AsBlockPos, hour));
+                        plans[key] = plan;
+                    }
+                    for (int i = plan.hours.Count - 1; i >= 0; i--)
+                    {
+                        if (hour < plan.hours[i]) continue;
+                        plan.hours.RemoveAt(i);
+                        Arrive(plr, sp, false, out _);
+                    }
                 }
             }
         }
 
         /// <summary>Today's landing hours for a player: up to one, scaled by the spring migration strength there.
         /// Hours already well past (joined late, slept) are dropped.</summary>
-        private List<double> PlanDay(BlockPos pos, double now)
+        private List<double> PlanDay(Species sp, BlockPos pos, double now)
         {
             var hours = new List<double>();
             var cal = sapi.World.Calendar;
-            double s = MigrationScheduler.Strength(goose, cal.GetSeasonRel(pos), cal.OnGetLatitude(pos.Z), out bool spring);
+            double s = MigrationScheduler.Strength(sp, cal.GetSeasonRel(pos), cal.OnGetLatitude(pos.Z), out bool spring);
             if (!spring || s <= 0) return hours;
             int n = (int)Math.Floor(s + rand.NextDouble());
             for (int i = 0; i < n; i++)
             {
-                double h = MigrationScheduler.PickHour(goose, rand);
+                double h = MigrationScheduler.PickHour(sp, rand);
                 if (h > now - 1) hours.Add(h);
             }
             return hours;
         }
 
         /// <summary>Starts a landing flock for this player now. force (the /flocks arrive command) skips the season check.</summary>
-        public bool Arrive(IServerPlayer plr, bool force, out string msg) => Arrive(plr.Entity.Pos.XYZ, force, out msg);
+        public bool Arrive(IServerPlayer plr, Species sp, bool force, out string msg) => Arrive(plr.Entity.Pos.XYZ, sp, force, out msg);
 
         /// <summary>The same for a position standing in for the player (the in-engine tests use it).</summary>
-        public bool Arrive(Vec3d p, bool force, out string msg)
+        public bool Arrive(Vec3d p, Species sp, bool force, out string msg)
         {
+            if (!sp.Lands) { msg = $"{sp.Code} doesn't land."; return false; }
+            var code = sp.LandedEntityCode;
+            string name = sp.Name ?? sp.Code;
             var ba = sapi.World.BlockAccessor;
             var spots = LakeSearch.FindSpots(ba, p, p.X, p.Z, Landing.MinPatch, rand);
             if (spots == null || spots.Count == 0) { msg = "No lake to land on within 160 blocks."; return false; }
             var centre = spots[spots.Count / 2];
             if (centre.HorizontalSquareDistanceTo(p.X, p.Z) < MinFromPlayer * MinFromPlayer) { msg = $"The nearest landing water is under {MinFromPlayer:0} blocks from you."; return false; }
-            if (!force && !ResidentGeese.InSeason(sapi.World, centre.AsBlockPos)) { msg = "Not the geese's resident season there."; return false; }
-            if (sapi.World.GetEntitiesAround(centre, 48, 24, e => e.Alive && e.Code.Equals(ResidentGeese.Code)).Length > 0) { msg = "Geese are already on that lake."; return false; }
-            var type = sapi.World.GetEntityType(ResidentGeese.Code);
-            if (type == null) { msg = "Entity type flocks:greylag is not loaded."; return false; }
+            if (!force && !ResidentGeese.InSeason(sapi.World, centre.AsBlockPos, sp)) { msg = $"Out of season for {name} there."; return false; }
+            if (sapi.World.GetEntitiesAround(centre, 48, 24, e => e.Alive && e.Code.Equals(code)).Length > 0) { msg = $"There are {name} on that lake already."; return false; }
+            var type = sapi.World.GetEntityType(code);
+            if (type == null) { msg = $"Entity type {code} is not loaded."; return false; }
 
             // Spring heads poleward (north is heading pi, -Z), so they come in from the equator side, give or take 25 deg.
             double lat = sapi.World.Calendar.OnGetLatitude((int)centre.Z);
@@ -110,7 +119,7 @@ namespace Flocks
             // a comfortable height above the water and the ground at the start; Waterfowl climbs over anything later
             double ey = Math.Max(centre.Y + 24, MaxGround(ba, ex, ez, dx, dz, -8, 40) + 12);
 
-            var flock = FlockRegistry.Instance.TakeForLanding("goose", centre, rand);
+            var flock = FlockRegistry.Instance.TakeForLanding(sp.Code, centre, rand, sp.LandingMin, sp.LandingMax);
             int n = Math.Max(1, flock.Count);
             for (int i = 0; i < n; i++)
             {
@@ -124,7 +133,7 @@ namespace Flocks
                 e.Pos.SetPos(ex + dx * along + dz * across, ey + rank * 0.15 + (rand.NextDouble() - 0.5) * 0.4, ez + dz * along - dx * across);
                 sapi.World.SpawnEntity(e);
             }
-            msg = $"A flock of {n} greylag geese (flock #{flock.Id}) is flying in from {entry} blocks out to land at {centre.X:0}, {centre.Y:0}, {centre.Z:0}.";
+            msg = $"A flock of {n} {name} (flock #{flock.Id}) is flying in from {entry} blocks out to land at {centre.X:0}, {centre.Y:0}, {centre.Z:0}.";
             sapi.Logger.Notification("[Flocks] landing: {0}", msg);
             return true;
         }

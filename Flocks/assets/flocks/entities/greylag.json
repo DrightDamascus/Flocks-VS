@@ -41,7 +41,8 @@
 			{ code: "repulseagents" },
 			{ code: "controlledphysics", stepHeight: 0.6 },
 			// before "health": it zeroes spear and melee damage before health applies it
-			{ code: "flocks.waterfowl", fleeRange: 14, takeoffRange: 7, lifeHours: 6, sink: 0.15, cruiseSpeedMin: 11, cruiseSpeedMax: 13.5 },
+			{ code: "flocks.waterfowl", species: "goose", fleeRange: 14, takeoffRange: 7, lifeHours: 6, sink: 0.15, cruiseSpeedMin: 11, cruiseSpeedMax: 13.5,
+			  takeoffWingsChance: 0.6, takeoffCallChance: 0.4 },
 			{ code: "health", currenthealth: 4, maxhealth: 4 },
 			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
 			{ code: "harvestable", drops: [
@@ -84,7 +85,13 @@
 	sounds: {
 		hurt: "flocks:goose/hurt",
 		death: "flocks:goose/death",
-		idle: { path: "flocks:goose/honk*", pitch: { avg: 1, var: 0.15 }, range: 32 }
+		idle: { path: "flocks:goose/honk*", pitch: { avg: 1, var: 0.15 }, range: 32 },
+		// played by flocks.waterfowl: a splash as each bird runs off the water, wingbeats and an alarm call from some
+		// of them (takeoffWingsChance / takeoffCallChance), and a splash as each comes down
+		takeoffsplash: { path: "game:environment/smallsplash", pitch: { avg: 1, var: 0.1 }, range: 24, volume: { avg: 0.5 } },
+		takeoffwings: { path: "flocks:wings/flap*", pitch: { avg: 1, var: 0.1 }, range: 32, volume: { avg: 0.9 } },
+		takeoffcall: { path: "flocks:goose/flight*", pitch: { avg: 1, var: 0.1 }, range: 48, volume: { avg: 0.7 } },
+		landsplash: { path: "game:environment/mediumsplash", pitch: { avg: 1, var: 0.1 }, range: 24, volume: { avg: 0.45 } }
 	},
 	// vanilla's idle sound roll (chickens use 0.05); geese on the water call now and then
 	idleSoundChance: 0.02

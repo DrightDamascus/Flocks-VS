@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -21,7 +22,10 @@ namespace Flocks
     public class FlocksModSystem : ModSystem
     {
         private ICoreClientAPI capi;
-        private Dictionary<string, Species> species;
+        /// <summary>This side's species (config/flocks-species/), filled when assets load; the same dictionary is handed
+        /// to everything that needs it, so it is complete before the world runs.</summary>
+        private readonly Dictionary<string, Species> species = new();
+        public Dictionary<string, Species> SpeciesByCode => species;
         private FlockRenderer renderer;
         private MigrationScheduler scheduler;
         private FlocksConfig config;
@@ -36,6 +40,12 @@ namespace Flocks
             api.RegisterEntityBehaviorClass(EntityBehaviorWaterfowl.Code, typeof(EntityBehaviorWaterfowl));
         }
 
+        public override void AssetsLoaded(ICoreAPI api)
+        {
+            species.Clear();
+            foreach (var kv in Species.LoadAll(api)) species[kv.Key] = kv.Value;
+        }
+
         /// <summary>/flocks (typed with a slash) goes to the server; it only relays the subcommand to the caller's client.</summary>
         private ResidentGeese residents;
         private FlockRegistry registry;
@@ -45,13 +55,13 @@ namespace Flocks
 
         public override void StartServerSide(ICoreServerAPI sapi)
         {
-            residents = new ResidentGeese(sapi, LoadServerConfig(sapi));
+            residents = new ResidentGeese(sapi, LoadServerConfig(sapi), species);
             var ch = sapi.Network.GetChannel("flocks");
             registry = new FlockRegistry(sapi, residents.Cfg);
-            landings = new LandingFlocks(sapi);
+            landings = new LandingFlocks(sapi, species);
             var p = sapi.ChatCommands.Parsers;
             sapi.ChatCommands.Create("flocks").WithDescription("Flocks (client-side birds)").RequiresPrivilege(Privilege.chat)
-                .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [goose|crane|hawk]").RequiresPlayer()
+                .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [species, e.g. goose, crane, hawk]").RequiresPlayer()
                 .WithArgs(p.OptionalInt("count", 12), p.OptionalWord("species"))
                 .HandleWith(args =>
                 {
@@ -66,16 +76,23 @@ namespace Flocks
                     return TextCommandResult.Success();
                 })
                 .EndSubCommand()
-                .BeginSubCommand("land").WithDescription("Debug: spawn 7-12 greylag geese on open water near you: /flocks land [count]").RequiresPlayer()
+                .BeginSubCommand("land").WithDescription("Debug: put a group of landing birds on open water near you: /flocks land [count] [species, default goose]").RequiresPlayer()
                 .RequiresPrivilege(Privilege.controlserver)
-                .WithArgs(p.OptionalInt("count", 0))
-                .HandleWith(args => Landing.Land(sapi, args.Caller.Entity, (int)args[0]))
-                .EndSubCommand()
-                .BeginSubCommand("arrive").WithDescription("Debug: send a landing flock to a lake near you now (any season)").RequiresPlayer()
-                .RequiresPrivilege(Privilege.controlserver)
+                .WithArgs(p.OptionalInt("count", 0), p.OptionalWord("species"))
                 .HandleWith(args =>
                 {
-                    bool ok = landings.Arrive((IServerPlayer)args.Caller.Player, true, out string msg);
+                    var sp = LandingSpecies(args[1] as string, out string err);
+                    return sp == null ? TextCommandResult.Error(err) : Landing.Land(sapi, args.Caller.Entity, (int)args[0], sp);
+                })
+                .EndSubCommand()
+                .BeginSubCommand("arrive").WithDescription("Debug: send a landing flock to a lake near you now (any season): /flocks arrive [species, default goose]").RequiresPlayer()
+                .RequiresPrivilege(Privilege.controlserver)
+                .WithArgs(p.OptionalWord("species"))
+                .HandleWith(args =>
+                {
+                    var sp = LandingSpecies(args[0] as string, out string err);
+                    if (sp == null) return TextCommandResult.Error(err);
+                    bool ok = landings.Arrive((IServerPlayer)args.Caller.Player, sp, true, out string msg);
                     return ok ? TextCommandResult.Success(msg) : TextCommandResult.Error(msg);
                 })
                 .EndSubCommand()
@@ -89,6 +106,16 @@ namespace Flocks
                 .EndSubCommand();
         }
 
+        /// <summary>A species that lands (has a landed entity), by code; default goose.</summary>
+        private Species LandingSpecies(string code, out string err)
+        {
+            code = (code ?? DefaultSpecies).ToLowerInvariant();
+            err = null;
+            if (species.TryGetValue(code, out var sp) && sp.Lands) return sp;
+            err = $"No landing species '{code}'. Landing species: {string.Join(", ", species.Values.Where(s => s.Lands).Select(s => s.Code))}.";
+            return null;
+        }
+
         private string TrySend(int count, string code, out bool ok)
         {
             int n = GameMath.Clamp(count, 1, 60);
@@ -96,7 +123,7 @@ namespace Flocks
             if (species == null || renderer == null) return "Flocks client part not running.";
             code = (code ?? DefaultSpecies).ToLowerInvariant();
             if (!species.TryGetValue(code, out var sp)) return $"Unknown species '{code}'. Try: {string.Join(", ", species.Keys)}.";
-            if (!sp.Meshes.Ok) return $"No {code} meshes loaded; see [Flocks] lines in client-main.log.";
+            if (sp.Meshes?.Ok != true) return $"No {code} meshes loaded; see [Flocks] lines in client-main.log.";
             renderer.Send(sp, n); ok = true;
             return $"Sent {n} {code} ({sp.Meshes.Loaded}) overhead from ~{renderer.VisibleRange(sp):0} blocks out ({renderer.Count} flock(s) in the sky).";
         }
@@ -107,16 +134,19 @@ namespace Flocks
         {
             capi = api;
             config = LoadConfig(api);
-            species = Species.Create(api);
             renderer = new FlockRenderer(api) { CallVolume = Math.Max(0, config.FlockCallVolume) };
             scheduler = new MigrationScheduler(api, renderer, species, config);
             api.Event.RegisterGameTickListener(scheduler.Tick, 1000);
             api.Event.LevelFinalize += () =>
             {
-                foreach (var sp in species.Values) { sp.Meshes.Load(); sp.FitScale(); }
-                // one size for sky and lake geese: the entity's client.size, so changing it there resizes both
-                float gooseSize = api.World.GetEntityType(ResidentGeese.Code)?.Client?.Size ?? 0;
-                if (gooseSize > 0 && species.TryGetValue("goose", out var goose)) goose.Scale = gooseSize;
+                foreach (var sp in species.Values)
+                {
+                    if (sp.Meshes == null) sp.CreateMeshes(api);
+                    sp.Meshes.Load(); sp.FitScale();
+                    // one size for drawn and landed birds: the entity's client.size, so changing it there resizes both
+                    float size = string.IsNullOrEmpty(sp.SizeFromEntity) ? 0 : api.World.GetEntityType(new AssetLocation(sp.SizeFromEntity))?.Client?.Size ?? 0;
+                    if (size > 0) sp.Scale = size;
+                }
                 if (!rendererRegistered) { api.Event.RegisterRenderer(renderer, EnumRenderStage.Opaque, "flocks"); rendererRegistered = true; }
             };
             api.Network.GetChannel("flocks").SetMessageHandler<SendFlockPacket>(pkt =>
@@ -126,7 +156,7 @@ namespace Flocks
             });
             var p = api.ChatCommands.Parsers;
             api.ChatCommands.Create("flocks").WithDescription("Flocks (client-only birds)")
-                .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [goose|crane|hawk]")
+                .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [species, e.g. goose, crane, hawk]")
                 .WithArgs(p.OptionalInt("count", 12), p.OptionalWord("species"))
                 .HandleWith(args =>
                 {
@@ -173,6 +203,6 @@ namespace Flocks
             return cfg;
         }
 
-        public override void Dispose() { if (species != null) foreach (var sp in species.Values) sp.Meshes.Dispose(); }
+        public override void Dispose() { foreach (var sp in species.Values) sp.Meshes?.Dispose(); } // no meshes on the server
     }
 }

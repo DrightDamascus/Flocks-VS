@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.14.0
+Birds are data (Phase 1, last part). No change in how the geese, cranes and hawks behave.
+- Each bird is a file in config/flocks-species/ (any mod's domain, so other mods can add birds): drawn-flock shapes and
+  size, speed and wingbeat rhythm, migration windows and hours, passing and landing flock sizes, calls, and for birds
+  that land the entity they land as. goose.json, crane.json and hawk.json carry exactly the values that were in code.
+- A landing bird's tuning stays in its entity file, as with vanilla animals: flocks.waterfowl attributes (now also
+  species, takeoffWingsChance, takeoffCallChance) and entity sounds for takeoff and landing (takeoffsplash,
+  takeoffwings, takeoffcall, landsplash).
+- Resident spawning, landing flocks, `/flocks land [count] [species]` and `/flocks arrive [species]` work for any
+  species that lands; each uses its own resident season and landing flock size.
+- flocks.json: DisabledSpecies, a list of species codes that never migrate on their own (goose, crane and hawk keep
+  their own switches).
+- README rewritten for the current mod.
+- Engine tests: 61 passed, 0 failed. New checks: the species files load, and the goose entity file loads whole (a bad
+  field makes the game drop most of an entity file with only one log line, which is how a first attempt at this
+  version broke: sound volume must be { avg: ... }, not a number). The test world now has a fixed seed, so the test
+  site is always built on the same, low enough terrain.
+
 ## 0.13.0
 Phase 1 AI: missed shots, lake wariness, vanilla-style player sensing.
 - A missed arrow flushes the group like a hit. Ten times a second each goose looks for fast non-creatures (arrows,

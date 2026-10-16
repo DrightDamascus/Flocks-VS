@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Vintagestory.API.Common;
@@ -34,50 +35,62 @@ namespace Flocks
     }
 
     /// <summary>
-    /// Resident geese spawn through vanilla's spawner (spawnconditions in entities/greylag.json: inside still water at
-    /// the surface, climate limits, per-player maxQuantity). Vanilla spawnconditions don't know seasons or lake size,
-    /// so this vetoes greylag spawns out of season, on small ponds, or where geese are already thick on the ground.
+    /// Resident birds of every species that lands (its landedEntity, e.g. flocks:greylag) spawn through vanilla's spawner
+    /// (spawnconditions in the entity file: inside still water at the surface, climate limits, maxQuantity). Vanilla
+    /// spawnconditions don't know seasons or lake size, so this vetoes spawns out of the species' resident season, on
+    /// small ponds, far from shore, near an abandoned lake, or where they are already thick on the ground.
     /// The autumn departure is in EntityBehaviorWaterfowl.
     /// </summary>
     public class ResidentGeese
     {
         private readonly ICoreServerAPI sapi;
         public readonly FlocksServerConfig Cfg;
-        public static readonly AssetLocation Code = new("flocks", "greylag");
+        private readonly Dictionary<string, Species> species;
         public int Allowed, VetoSeason, VetoLake, VetoShore, VetoCrowded, VetoOff, VetoAbandoned;
         /// <summary>Config ShoreDistance, for EntityBehaviorWaterfowl (server side).</summary>
         public static int ShoreDistanceCfg = 20;
 
-        public ResidentGeese(ICoreServerAPI sapi, FlocksServerConfig cfg)
+        public ResidentGeese(ICoreServerAPI sapi, FlocksServerConfig cfg, Dictionary<string, Species> species)
         {
-            this.sapi = sapi; Cfg = cfg;
+            this.sapi = sapi; Cfg = cfg; this.species = species;
             ShoreDistanceCfg = Math.Max(1, cfg.ShoreDistance);
             sapi.Event.OnTrySpawnEntity += TrySpawn;
         }
 
         private bool TrySpawn(IBlockAccessor ba, ref EntityProperties properties, Vec3d pos, long herdId)
         {
-            if (properties?.Code == null || !properties.Code.Equals(Code)) return true;
+            if (properties?.Code == null) return true;
+            var code = properties.Code;
+            var sp = ByEntity(species, code);
+            if (sp == null) return true;
             try
             {
                 if (!Cfg.ResidentGeese) { VetoOff++; return false; }
                 var bp = pos.AsBlockPos;
-                if (!InSeason(sapi.World, bp)) { VetoSeason++; return false; }
+                if (!InSeason(sapi.World, bp, sp)) { VetoSeason++; return false; }
                 if (LakeSize(ba, bp, Cfg.MinLakeSize) < Cfg.MinLakeSize) { VetoLake++; return false; }
                 if (ShoreDirection(ba, bp, ShoreDistanceCfg, out _) < 0) { VetoShore++; return false; }
                 if (FlockRegistry.Instance?.IsAbandoned(pos.X, pos.Z) == true) { VetoAbandoned++; return false; }
-                int near = sapi.World.GetEntitiesAround(pos, Cfg.NearbyRadius, 32, e => e.Alive && e.Code.Equals(Code)).Length;
+                int near = sapi.World.GetEntitiesAround(pos, Cfg.NearbyRadius, 32, e => e.Alive && e.Code.Equals(code)).Length;
                 if (near >= Cfg.MaxGeeseNearby) { VetoCrowded++; return false; }
                 Allowed++;
                 return true;
             }
-            catch (Exception ex) { sapi.Logger.Error("[Flocks] goose spawn check failed: {0}", ex); return false; }
+            catch (Exception ex) { sapi.Logger.Error("[Flocks] {0} spawn check failed: {1}", code, ex); return false; }
         }
 
-        public static bool InSeason(IWorldAccessor world, BlockPos bp)
+        /// <summary>The landing species whose landed entity this is, or null.</summary>
+        public static Species ByEntity(Dictionary<string, Species> species, AssetLocation entityCode)
+        {
+            foreach (var sp in species.Values) if (sp.Lands && sp.LandedEntityCode.Equals(entityCode)) return sp;
+            return null;
+        }
+
+        /// <summary>The species' resident season here: from its spring window to its autumn window (MigrationScheduler).</summary>
+        public static bool InSeason(IWorldAccessor world, BlockPos bp, Species sp)
         {
             var cal = world.Calendar;
-            return MigrationScheduler.ResidentSeason(Species.GooseSpringStart, Species.GooseAutumnStart, cal.GetSeasonRel(bp), cal.OnGetLatitude(bp.Z));
+            return MigrationScheduler.ResidentSeason(sp.SpringStart, sp.AutumnStart, cal.GetSeasonRel(bp), cal.OnGetLatitude(bp.Z));
         }
 
         /// <summary>Fresh-water surface blocks connected to bp's column at its water level, counted up to <paramref name="enough"/>.</summary>
@@ -133,16 +146,20 @@ namespace Flocks
 
         public string Report()
         {
-            var sb = new StringBuilder($"Resident geese {(Cfg.ResidentGeese ? "on" : "OFF")} (vanilla spawning + season/lake veto). " +
+            var sb = new StringBuilder($"Resident birds {(Cfg.ResidentGeese ? "on" : "OFF")} (vanilla spawning + season/lake veto). " +
                 $"Spawn checks since start: {Allowed} allowed, vetoed {VetoSeason} out of season, {VetoLake} small lake, {VetoShore} too far from shore (>{Cfg.ShoreDistance}), {VetoCrowded} crowded, {VetoAbandoned} abandoned lake, {VetoOff} disabled.");
-            var geese = sapi.World.LoadedEntities.Values.Where(e => e.Alive && e.Code.Equals(Code)).ToList();
-            sb.Append($"\nLoaded geese: {geese.Count}");
-            foreach (var p in sapi.World.AllOnlinePlayers)
+            foreach (var sp in species.Values.Where(s => s.Lands))
             {
-                if (p.Entity == null) continue;
-                var bp = p.Entity.Pos.AsBlockPos;
-                int near = geese.Count(e => e.Pos.HorDistanceTo(p.Entity.Pos.XYZ) <= Cfg.NearbyRadius);
-                sb.Append($"\n  {p.PlayerName}: {near} geese within {Cfg.NearbyRadius} blocks, resident season here: {(InSeason(sapi.World, bp) ? "yes" : "no")}");
+                var code = sp.LandedEntityCode;
+                var birds = sapi.World.LoadedEntities.Values.Where(e => e.Alive && e.Code.Equals(code)).ToList();
+                sb.Append($"\nLoaded {sp.Name ?? sp.Code}: {birds.Count}");
+                foreach (var p in sapi.World.AllOnlinePlayers)
+                {
+                    if (p.Entity == null) continue;
+                    var bp = p.Entity.Pos.AsBlockPos;
+                    int near = birds.Count(e => e.Pos.HorDistanceTo(p.Entity.Pos.XYZ) <= Cfg.NearbyRadius);
+                    sb.Append($"\n  {p.PlayerName}: {near} within {Cfg.NearbyRadius} blocks, resident season here: {(InSeason(sapi.World, bp, sp) ? "yes" : "no")}");
+                }
             }
             return sb.ToString();
         }

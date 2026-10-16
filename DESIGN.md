@@ -135,7 +135,13 @@ Decisions (Dright, 0.13.0), Phase 1 AI:
   `/flocks calm` resets it. Vanilla deer only have a short spooked state (fleeondamage, 40-60 s) and a herd alarm.
 - Players are sensed as vanilla animals sense them (AiTaskBaseTargetable.CanSensePlayer): animalSeekingRange stat,
   sneaking on the ground x0.6, creative and spectator players unnoticed.
-- Next in Phase 1: data-driven species (each bird a data file plus a behaviour type), then Phase 2, the roster.
+- Done in 0.14.0: data-driven species. Each bird is a file in config/flocks-species/ (any domain, so other mods can
+  add birds): drawn-flock shapes and size, flight rhythm, migration windows and hours, passing and landing flock sizes,
+  calls, and for birds that land the entity they land as. The landed bird's behaviour tuning and its takeoff and splash
+  sounds are in its entity file (flocks.waterfowl attributes, entity sounds), as vanilla does. Resident spawning,
+  landing flocks and /flocks land work for every species that lands. Each side keeps its own species dictionary (client
+  and server share a process in singleplayer; only the client has meshes).
+- Next: Phase 2, the roster (mallard, heron, eagle, gull, crow on top of goose, crane, hawk).
 
 Next steps:
 - Hand-off from the sky: when a planned goose flock passes a suitable lake (fresh water, 36+ surface blocks, 64+

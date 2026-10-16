@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Flocks
 {
     /// <summary>Client config, ModConfig/flocks.json. Written with defaults on first run.</summary>
@@ -26,9 +28,13 @@ namespace Flocks
         /// assets only (shapes/entity/amphithere.json) with no entity, spawning or AI.</summary>
         public bool FantasyCreatures = false;
 
+        /// <summary>Species codes (config/flocks-species/) that never migrate on their own, for birds without a switch
+        /// above, e.g. ["gull"]. /flocks send still works.</summary>
+        public List<string> DisabledSpecies = new();
+
         public bool SpeciesEnabled(string code) => code switch
         {
-            "goose" => Geese, "crane" => Cranes, "hawk" => Hawks, _ => true,
+            "goose" => Geese, "crane" => Cranes, "hawk" => Hawks, _ => DisabledSpecies == null || !DisabledSpecies.Contains(code),
         };
     }
 }

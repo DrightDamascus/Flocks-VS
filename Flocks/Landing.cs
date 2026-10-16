@@ -8,7 +8,7 @@ using Vintagestory.API.Server;
 
 namespace Flocks
 {
-    /// <summary>/flocks land: finds open fresh water near the player and spawns a group of greylag geese on it.</summary>
+    /// <summary>/flocks land: finds open fresh water near the player and spawns a group of a landing species on it.</summary>
     public static class Landing
     {
         public const int Radius = 64, MinPatch = 36, MaxFill = 2000;
@@ -16,13 +16,14 @@ namespace Flocks
         /// otherwise the group paddles off or takes off on the first tick.</summary>
         public const double Clear = 20;
 
-        public static TextCommandResult Land(ICoreServerAPI sapi, Entity caller, int count)
+        public static TextCommandResult Land(ICoreServerAPI sapi, Entity caller, int count, Species sp)
         {
             if (caller == null) return TextCommandResult.Error("Needs a player.");
-            var type = sapi.World.GetEntityType(new AssetLocation("flocks", "greylag"));
-            if (type == null) return TextCommandResult.Error("Entity type flocks:greylag is not loaded; see server-main.log.");
+            var type = sapi.World.GetEntityType(sp.LandedEntityCode);
+            if (type == null) return TextCommandResult.Error($"Entity type {sp.LandedEntity} is not loaded; see server-main.log.");
             var rand = sapi.World.Rand;
-            int n = count > 0 ? GameMath.Clamp(count, 1, 30) : 7 + rand.Next(6); // landing flocks are 7-12, like natural groups
+            // the species' landing flock size, like a landing flock or a natural group
+            int n = count > 0 ? GameMath.Clamp(count, 1, 30) : sp.LandingMin + rand.Next(Math.Max(1, sp.LandingMax - sp.LandingMin + 1));
             var patch = FindPatch(sapi.World.BlockAccessor, caller.Pos.AsBlockPos);
             if (patch == null) return TextCommandResult.Error($"No open water with {MinPatch}+ surface blocks at least {Clear:0} blocks from you (the geese would flee at once) within {Radius} blocks.");
 
@@ -34,7 +35,7 @@ namespace Flocks
             spots = spots.OrderBy(c => (c.X - anchor.X) * (c.X - anchor.X) + (c.Z - anchor.Z) * (c.Z - anchor.Z)).Take(Math.Max(MinPatch, n * 4)).ToList();
             int spawned = 0;
             // one flock record for the whole group, so they leave together and are tracked as one
-            var flock = FlockRegistry.Instance?.Create("goose", n, new Vec3d(anchor.X + 0.5, anchor.Y + 1, anchor.Z + 0.5));
+            var flock = FlockRegistry.Instance?.Create(sp.Code, n, new Vec3d(anchor.X + 0.5, anchor.Y + 1, anchor.Z + 0.5));
             for (int i = 0; i < n; i++)
             {
                 var c = spots[rand.Next(spots.Count)];
@@ -46,7 +47,7 @@ namespace Flocks
                 sapi.World.SpawnEntity(e);
                 spawned++;
             }
-            return TextCommandResult.Success($"Landed {spawned} greylag geese on water at {anchor.X}, {anchor.Y}, {anchor.Z} (~{Dist(anchor):0} blocks away, patch of {patch.Count}+ blocks).");
+            return TextCommandResult.Success($"Landed {spawned} {sp.Name ?? sp.Code} on water at {anchor.X}, {anchor.Y}, {anchor.Z} (~{Dist(anchor):0} blocks away, patch of {patch.Count}+ blocks).");
         }
 
         /// <summary>Nearest fresh-water surface patch (rain-map top is still water) with at least MinPatch columns

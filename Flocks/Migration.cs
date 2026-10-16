@@ -50,7 +50,7 @@ namespace Flocks
             {
                 if (p.Finished || hour < p.Hour) continue;
                 bool late = hour > p.Hour + cfg.MaxDelayHours;
-                if (!p.Species.Meshes.Ok) { Finish(p, "skipped: no meshes"); continue; }
+                if (p.Species.Meshes?.Ok != true) { Finish(p, "skipped: no meshes"); continue; }
                 string hold = renderer.Count > 0 ? "sky busy" : (Stormy(player.Pos.AsBlockPos) ? "storm" : null);
                 if (hold == null && !late)
                 {
