@@ -34,6 +34,9 @@ DESIGN.md. Version history: CHANGELOG.md.
 - Arrows and other projectiles kill birds; thrown spears fly past them and melee is dodged. Sneaking gets you closer, as with vanilla
   animals; creative players go unnoticed.
 
+## Other mods
+- **Biomes**: each bird (and the mouse) spawns only in its own realms, and landing and passing flocks keep to them too.
+
 ## Commands
 `/flocks send [count] [species]` sends a passing flock over you. `/flocks schedule` shows today's migration plan.
 Admin (controlserver): `/flocks arrive [species]` sends a landing flock to a lake near you now; `/flocks land [count]

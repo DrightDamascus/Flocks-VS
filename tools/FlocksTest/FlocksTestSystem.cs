@@ -904,6 +904,7 @@ namespace FlocksTest
             }, 70));
 
             QueueOwlSteps();
+            QueueBiomesSteps();
 
             steps.Enqueue(("memory", () => { }, () => true, () =>
             {
@@ -1013,24 +1014,39 @@ namespace FlocksTest
             // Two mice out on the grass, 7 blocks out from the owl's perch, away from the trunk. A mouse sees the owl at the
             // last moment and may get away (as it should); whenever the owl is back on a perch with no mouse within reach,
             // two more come out near it, up to 6 in all, as on a real night.
+            // Mice come out on open ground 5-9 blocks from wherever the owl is perched, below it and in plain view of it
+            // (nothing solid on the line). After a miss the owl may move to real trees in the natural terrain far below
+            // the test slab, so the spots aren't limited to the clearing.
             System.Action putMice = () =>
             {
-                double tx = (InOwlTree(owl.Pos.XYZ) == 2 ? OwlTree2X : OwlTree1X) + 0.5, tz = OwlTreeZ + 0.5;
-                double ax = owl.Pos.X - tx, az = owl.Pos.Z - tz, al = Math.Sqrt(ax * ax + az * az);
-                if (al < 0.5) { ax = 1; az = 0; al = 1; }
+                var ba = sapi.World.BlockAccessor;
+                var eye = owl.Pos.XYZ.AddCopy(0, 0.4, 0);
+                var spots = new List<Vec3d>();
+                for (int r = 7; r >= 5 && spots.Count < 2; r--)
+                    for (int a = 0; a < 24 && spots.Count < 2; a++)
+                    {
+                        double h = a * Math.PI / 12;
+                        int x = (int)Math.Floor(owl.Pos.X + Math.Sin(h) * r), z = (int)Math.Floor(owl.Pos.Z + Math.Cos(h) * r);
+                        if (!EntityBehaviorCorvid.OpenGround(ba, x, z, out int top) || owl.Pos.Y - (top + 1) < 2) continue;
+                        var at = new Vec3d(x + 0.5, top + 1, z + 0.5);
+                        if (spots.Any(p => p.HorizontalSquareDistanceTo(at.X, at.Z) < 4)) continue;
+                        bool clear = true;
+                        double len = eye.DistanceTo(at);
+                        for (double t = 0.8; t < len - 0.3 && clear; t += 0.4)
+                        {
+                            var b = ba.GetBlock(new BlockPos((int)Math.Floor(eye.X + (at.X - eye.X) * t / len), (int)Math.Floor(eye.Y + (at.Y - eye.Y) * t / len), (int)Math.Floor(eye.Z + (at.Z - eye.Z) * t / len)));
+                            clear = b?.CollisionBoxes == null || b.CollisionBoxes.Length == 0;
+                        }
+                        if (clear) spots.Add(at);
+                    }
                 var mt = sapi.World.GetEntityType(new AssetLocation("flocks", "mouse"));
-                var added = new List<Entity>();
-                for (int i = 0; i < 2; i++)
+                foreach (var at in spots)
                 {
                     var m = sapi.World.ClassRegistry.CreateEntity(mt);
-                    double side = i == 0 ? -1.5 : 1.5;
-                    // kept inside the soil clearing (the slab ends at 100 blocks out, with a long drop beyond)
-                    double mx = GameMath.Clamp(owl.Pos.X + ax / al * 7 - az / al * side, c.X + 31, c.X + 71);
-                    double mz = GameMath.Clamp(owl.Pos.Z + az / al * 7 + ax / al * side, c.Z + 79, c.Z + 97);
-                    m.Pos.SetPos(mx, y0 + 1, mz);
-                    sapi.World.SpawnEntity(m); mice.Add(m); added.Add(m); extraPhysics.Add(m);
+                    m.Pos.SetPos(at);
+                    sapi.World.SpawnEntity(m); mice.Add(m); extraPhysics.Add(m);
                 }
-                Log($"mice at {string.Join(" ", added.Select(m => Site(m.Pos.XYZ)))}, owl at {Site(owl.Pos.XYZ)}");
+                Log($"mice at {string.Join(" ", spots.Select(Site))}, owl at {Site(owl.Pos.XYZ)}");
             };
             steps.Enqueue(("owl catches a mouse", () =>
             {
@@ -1039,7 +1055,7 @@ namespace FlocksTest
             }, () =>
             {
                 if (OB(owl)?.StateName == "Perch" && OB(owl)?.Catches == 0 && mice.Count < 6
-                    && !mice.Any(m => m.Alive && m.Pos.HorDistanceTo(owl.Pos.XYZ) < 16)) putMice();
+                    && !mice.Any(m => m.Alive && m.Pos.DistanceTo(owl.Pos) < 16)) putMice();
                 return OB(owl)?.Catches > 0 && OB(owl)?.StateName != "Feed" || Elapsed > 170;
             }, () =>
             {
@@ -1071,6 +1087,35 @@ namespace FlocksTest
                 owl.Die(EnumDespawnReason.Expire);
                 foreach (var m in mice) if (m.Alive) m.Die(EnumDespawnReason.Expire);
             }, 60));
+        }
+
+        /// <summary>With the Biomes mod installed (run_engine_tests.ps1 -ExtraMods): Flocks finds its API, our patch reaches
+        /// the animals, realm answers really come from Biomes, and landing flocks follow them. Skipped without Biomes.</summary>
+        private void QueueBiomesSteps()
+        {
+            steps.Enqueue(("biomes realms", () => { }, () => true, () =>
+            {
+                if (!sapi.ModLoader.IsModEnabled("biomes")) { Log("biomes realms: Biomes not installed, skipped"); return; }
+                var spc = sapi.ModLoader.GetModSystem<FlocksModSystem>().SpeciesByCode;
+                Check(BiomesCompat.Active(sapi), "Flocks found the Biomes API");
+                var missing = new[] { "goose", "mallard", "heron", "gull", "crow", "eagle", "owl", "crane" }.Where(code => BiomesCompat.Realms(sapi, spc[code]) == null).ToList();
+                var mouse = sapi.World.GetEntityType(new AssetLocation("flocks", "mouse"))?.Attributes?["biorealm"];
+                Check(missing.Count == 0 && mouse?.Exists == true,
+                    $"our patch gave every bird (and the mouse) its realms ({(missing.Count == 0 ? "all" : "missing: " + string.Join(", ", missing))}; mallard {string.Join("/", BiomesCompat.Realms(sapi, spc["mallard"]) ?? new string[0])})");
+                var at = new BlockPos((int)c.X, y0 + 1, (int)c.Z);
+                var none = new Species { Code = "test-nowhere", Biorealm = new string[0] };
+                var all = new Species { Code = "test-everywhere", Biorealm = new[] { "pacific nearctic", "atlantic nearctic", "atlantic palearctic", "central palearctic", "eastern palearctic", "pacific palearctic", "pacific neotropic", "atlantic neotropic", "atlantic afrotropic", "eastern afrotropic", "australasian", "oceanic" } };
+                Check(!BiomesCompat.Allows(sapi, none, at) && BiomesCompat.Allows(sapi, all, at), "Biomes answers: a species with no realms is kept out, one with every realm let in");
+                Log("biomes realms at the site: " + string.Join(", ", spc.Values.Select(sp => $"{sp.Code} {(BiomesCompat.Allows(sapi, sp, at) ? "yes" : "no")}")));
+                // a landing flock: refused with the realm reason exactly when Biomes keeps geese out here
+                bool geeseHere = BiomesCompat.Allows(sapi, spc["goose"], at);
+                bool ok = sapi.ModLoader.GetModSystem<FlocksModSystem>().Landings.Arrive(new Vec3d(c.X, y0 + 1, c.Z - 60), spc["goose"], false, out string msg);
+                Check(geeseHere || (!ok && msg.Contains("realm")), $"landing flocks follow the realms (geese {(geeseHere ? "live" : "don't live")} here; arrive said: {msg})");
+                // and geese that live in no realm at all never land (all year, so the season check can't be what stops them)
+                var nowhere = new Species { Code = "test-nowhere-goose", Name = "test geese", LandedEntity = "flocks:greylag", YearRound = true, Biorealm = new string[0] };
+                bool landed = sapi.ModLoader.GetModSystem<FlocksModSystem>().Landings.Arrive(new Vec3d(c.X, y0 + 1, c.Z - 60), nowhere, false, out string msg2);
+                Check(!landed && msg2.Contains("realm"), $"a landing flock of birds from no realm here is refused ({msg2})");
+            }, 5));
         }
 
         private readonly List<long> memory = new();

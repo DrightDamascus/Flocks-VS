@@ -1,7 +1,7 @@
-// Golden eagle. Our own model (tools/make_eagle.py). Lives in the air over open high ground (habitat "air"): perches,
-// soars on thermals and stoops on prey (entities/eagle.json, Raptor.cs). Resident all year; no drawn passing flocks and
-// no landing flocks. Fields: see Flocks/Species.cs.
 {
+	// Golden eagle. Our own model (tools/make_eagle.py). Lives in the air over open high ground (habitat "air"): perches,
+	// soars on thermals and stoops on prey (entities/eagle.json, Raptor.cs). Resident all year; no drawn passing flocks and
+	// no landing flocks. Fields: see Flocks/Species.cs.
 	code: "eagle",
 	name: "golden eagles",
 	shapes: [

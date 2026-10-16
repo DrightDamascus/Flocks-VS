@@ -1,7 +1,8 @@
 # Handoff
 
 Where Flocks stands and what comes next, for whoever picks it up (a new session, or Dright after a break).
-Last updated 2026-10-16. Committed through 0.20.0 (0.19.1 and 0.20.0 in one commit, both tried in game by Dright):
+Last updated 2026-10-16. Committed through 0.20.1 (Biomes support, by Hydromancerx's patch). Before that, 0.19.1 and
+0.20.0 went in as one commit, both tried in game by Dright:
 0.19.1 removed the hawk, made the eagle rest 1200 s after a meal like vanilla predators and let thrown spears fly past
 birds; 0.20.0 added the tawny owl and the wood mouse and fixed crows, owls and mice spawning. DESIGN.md has the
 reasoning behind each piece; CHANGELOG.md has the per-version detail.
@@ -121,6 +122,15 @@ The roster planned so far is done. Open ideas, none agreed with Dright yet:
   morning groups flying out from it and evening groups back.
 - Gulls: standing on beaches and shores (a "standing ashore" state the waterfowl don't have yet); scavenging.
 - Goslings and eggs; domestication.
+
+## Compatibility
+
+- Biomes (modid biomes, server only; tested against 2.3.1, zip kept in %USERPROFILE%\agent-tools\vsmods):
+  patches/biomes.json gives each animal its realms (Biomes itself then vets natural spawning), and BiomesCompat.cs
+  makes landing flocks and drawn passing flocks follow them, through Biomes' public API (Biomes.Api.ExternalData,
+  EntityBiomeData) by reflection. Engine tests: `-ExtraMods <zip>` loads other mods; `FLOCKS_TEST_ONLY=biomes` runs
+  the Biomes step. Not yet seen in game: the sky flocks staying away outside a species' realm.
+- JSON patches can't reach a file whose first token is a comment: keep comments inside the braces.
 
 ## Loose ends
 

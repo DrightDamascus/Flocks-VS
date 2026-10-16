@@ -1,8 +1,8 @@
-// Herring gull. Our own model (tools/make_gull.py). A sea bird (habitat "sea"): floats on the sea along the coast as
-// flocks:gull (behaviour tuning and sounds in entities/gull.json), resident all year, bold, wheels about after taking
-// off and now and then goes up of its own accord. Loose groups pass along the coast, only where the player is near the
-// sea. No landing flocks: they spawn on their own. Fields: see Flocks/Species.cs.
 {
+	// Herring gull. Our own model (tools/make_gull.py). A sea bird (habitat "sea"): floats on the sea along the coast as
+	// flocks:gull (behaviour tuning and sounds in entities/gull.json), resident all year, bold, wheels about after taking
+	// off and now and then goes up of its own accord. Loose groups pass along the coast, only where the player is near the
+	// sea. No landing flocks: they spawn on their own. Fields: see Flocks/Species.cs.
 	code: "gull",
 	name: "herring gulls",
 	shapes: [

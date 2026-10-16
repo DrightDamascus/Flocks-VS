@@ -1,8 +1,8 @@
-// Grey heron. Our own model (tools/make_heron.py), with freakishly long legs. Wades: stands on the bottom of water one
-// block deep, stalks and strikes there, and flies to other such water when flushed (entities/heron.json). Mostly
-// resident; it doesn't arrive in landing flocks, and passes over rarely, alone or in twos and threes.
-// Fields: see Flocks/Species.cs.
 {
+	// Grey heron. Our own model (tools/make_heron.py), with freakishly long legs. Wades: stands on the bottom of water one
+	// block deep, stalks and strikes there, and flies to other such water when flushed (entities/heron.json). Mostly
+	// resident; it doesn't arrive in landing flocks, and passes over rarely, alone or in twos and threes.
+	// Fields: see Flocks/Species.cs.
 	code: "heron",
 	name: "grey herons",
 	shapes: [

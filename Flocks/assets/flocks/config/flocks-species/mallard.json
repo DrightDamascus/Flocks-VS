@@ -1,7 +1,7 @@
-// Mallard. Our own model (tools/make_mallard.py; drake and hen textures). Passes over in loose, fast groups, and
-// lands on lakes and ponds as flocks:mallard (behaviour tuning and sounds in entities/mallard.json).
-// Fields: see Flocks/Species.cs.
 {
+	// Mallard. Our own model (tools/make_mallard.py; drake and hen textures). Passes over in loose, fast groups, and
+	// lands on lakes and ponds as flocks:mallard (behaviour tuning and sounds in entities/mallard.json).
+	// Fields: see Flocks/Species.cs.
 	code: "mallard",
 	name: "mallards",
 	shapes: [

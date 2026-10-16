@@ -18,6 +18,14 @@ namespace Flocks
         [ProtoMember(3)] public string Command; // null or "send" = send a flock, "schedule" = show today's plan
     }
 
+    /// <summary>Server -> client: the species whose passing flocks aren't drawn where the player is, because the Biomes mod
+    /// puts that spot outside their realms (BiomesCompat; Biomes runs on the server only). Sent when it changes.</summary>
+    [ProtoContract]
+    public class SkyRealmsPacket
+    {
+        [ProtoMember(1)] public string[] Absent;
+    }
+
     /// <summary>Client-side migrating flocks: a renderer, the species, and a scheduler that sends them in season.</summary>
     public class FlocksModSystem : ModSystem
     {
@@ -36,7 +44,7 @@ namespace Flocks
 
         public override void Start(ICoreAPI api)
         {
-            api.Network.RegisterChannel("flocks").RegisterMessageType<SendFlockPacket>();
+            api.Network.RegisterChannel("flocks").RegisterMessageType<SendFlockPacket>().RegisterMessageType<SkyRealmsPacket>();
             api.RegisterEntityBehaviorClass(EntityBehaviorWaterfowl.Code, typeof(EntityBehaviorWaterfowl));
             api.RegisterEntityBehaviorClass(EntityBehaviorRaptor.Code, typeof(EntityBehaviorRaptor));
             api.RegisterEntityBehaviorClass(EntityBehaviorCorvid.Code, typeof(EntityBehaviorCorvid));
@@ -62,6 +70,23 @@ namespace Flocks
             var ch = sapi.Network.GetChannel("flocks");
             registry = new FlockRegistry(sapi, residents.Cfg);
             landings = new LandingFlocks(sapi, species);
+            // with the Biomes mod: tell each client which species don't fly over where its player is
+            var realmsSent = new Dictionary<string, string>();
+            sapi.Event.RegisterGameTickListener(_ =>
+            {
+                if (!BiomesCompat.Active(sapi)) return;
+                foreach (IServerPlayer plr in sapi.World.AllOnlinePlayers)
+                {
+                    if (plr.Entity == null || plr.ConnectionState != EnumClientState.Playing) continue;
+                    var pos = plr.Entity.Pos.AsBlockPos;
+                    var absent = species.Values.Where(sp => !BiomesCompat.Allows(sapi, sp, pos)).Select(sp => sp.Code).OrderBy(c => c).ToArray();
+                    string key = string.Join(",", absent);
+                    if (realmsSent.TryGetValue(plr.PlayerUID, out var last) && last == key) continue;
+                    realmsSent[plr.PlayerUID] = key;
+                    sapi.Network.GetChannel("flocks").SendPacket(new SkyRealmsPacket { Absent = absent }, plr);
+                }
+            }, 20000, 3000);
+            sapi.Event.PlayerDisconnect += plr => realmsSent.Remove(plr.PlayerUID);
             var p = sapi.ChatCommands.Parsers;
             sapi.ChatCommands.Create("flocks").WithDescription("Flocks (client-side birds)").RequiresPrivilege(Privilege.chat)
                 .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [species, e.g. goose, crane, gull]").RequiresPlayer()
@@ -165,6 +190,7 @@ namespace Flocks
                 }
                 if (!rendererRegistered) { api.Event.RegisterRenderer(renderer, EnumRenderStage.Opaque, "flocks"); rendererRegistered = true; }
             };
+            api.Network.GetChannel("flocks").SetMessageHandler<SkyRealmsPacket>(pkt => scheduler.SetAbsent(pkt.Absent));
             api.Network.GetChannel("flocks").SetMessageHandler<SendFlockPacket>(pkt =>
             {
                 string msg = pkt.Command == "schedule" ? Schedule() : TrySend(pkt.Count, pkt.Species, out _);

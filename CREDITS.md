@@ -38,3 +38,6 @@ Commons had no usable wild mouse recording, only slowed-down ultrasound.
 
 The NPS/Yellowstone sound library (public domain) was checked first. It has Canada geese and sandhill cranes, but no
 greylag, common crane or clean wingbeat takeoffs, so the clips above were used instead.
+
+## Code and data contributions
+- Biomes mod support (patches/biomes.json): Hydromancerx, of the Biomes team.

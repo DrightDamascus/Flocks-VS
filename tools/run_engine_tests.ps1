@@ -3,7 +3,9 @@ param(
     [string]$DataPath = (Join-Path $env:TEMP 'flocks-enginetest'),
     [int]$TimeoutMinutes = 20,
     # a fixed world, so every run builds the test site on the same terrain (low enough near spawn for the slab)
-    [string]$Seed = '424242'
+    [string]$Seed = '424242',
+    # other mods to load alongside (zips), for compatibility runs, e.g. %USERPROFILE%\agent-tools\vsmods\biomes_2.3.1.zip
+    [string[]]$ExtraMods = @()
 )
 # In-engine tests: a scratch dedicated server (new world, no players) with the built Flocks zip and the FlocksTest mod.
 # FlocksTest builds a test site, runs the goose AI through settle / flush / depart / landing / cycles, logs PASS/FAIL
@@ -19,6 +21,7 @@ $mods = Join-Path $DataPath 'Mods'
 New-Item -ItemType Directory -Force (Join-Path $mods 'flockstest') | Out-Null
 $version = (Get-Content -Raw (Join-Path $root 'Flocks/modinfo.json') | ConvertFrom-Json).version
 Copy-Item (Join-Path $root "dist/flocks_$version.zip") $mods
+foreach ($m in $ExtraMods) { Copy-Item $m $mods }
 Copy-Item (Join-Path $PSScriptRoot 'FlocksTest/bin/Release/FlocksTest.dll'), (Join-Path $PSScriptRoot 'FlocksTest/bin/Release/modinfo.json') (Join-Path $mods 'flockstest')
 
 $server = Start-Process -FilePath (Join-Path $GamePath 'VintagestoryServer.exe') -WorkingDirectory $GamePath -PassThru -WindowStyle Hidden `

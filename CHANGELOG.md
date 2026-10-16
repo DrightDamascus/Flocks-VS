@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.20.1
+- Biomes mod support (patches/biomes.json, applied only when Biomes is installed): each animal spawns only in its
+  realms. Contributed by Hydromancerx of the Biomes team; the mallard's entry fixed (it was keyed "mallard-*", but the
+  mallard has no variants, so it matched nothing) and entries added for the owl and the mouse (the three Palearctic
+  realms) and the crane (in its species file: the Palearctic and its African wintering grounds; it has no entity).
+  Biomes confirmed it works for natural spawning (a contributor's report, for the heron).
+- Flocks follow Biomes too (BiomesCompat.cs, through Biomes' public API, by reflection so Biomes stays optional):
+  a landing flock only comes down where its species' realm is (/flocks arrive skips this, as it skips the season), and
+  each client is told which species don't live where its player is, so their passing flocks aren't drawn there
+  (/flocks schedule says so). Species files can carry their own biorealm list. Without Biomes nothing changes.
+- Species files had their leading comment outside the braces, which made them impossible to patch (the game's
+  patcher read the comment as the file's root); the comments are inside now.
+- Tests: with Biomes installed (run_engine_tests.ps1 -ExtraMods <biomes zip>), a step checks Flocks finds the API,
+  every bird gets its realms, Biomes' answers come through, and landing flocks are refused outside the realm.
+- Tests: after a missed pounce the owl may move to real trees anywhere in its territory (in the test, the natural
+  forest below the test slab), so new mice now come out near wherever it perches.
+
 ## 0.20.0
 The tawny owl, a bird of the night, and the wood mouse it hunts:
 - New model (tools/make_owl.py): warm rufous-brown, streaked and barred, with white spots along the scapulars, a big

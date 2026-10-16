@@ -230,6 +230,13 @@ Decisions (Dright, 0.13.0), Phase 1 AI:
   - Owl flight is silent: no wingbeat sounds at takeoff, unlike every other bird here.
   - No drawn passing groups (owls don't fly over in groups) and no flock: each owl keeps its own territory (48 blocks
     from where it appeared); no wariness either, like the eagle.
+- Biomes support (after 0.20.0; a patch by Hydromancerx of the Biomes team, Dright asked for the flocks to follow it too). Biomes
+  vets vanilla's spawning, so resident birds needed only their realm lists. Flocks this mod places itself bypass that:
+  landing flocks ask Biomes (server) before coming down; drawn flocks are the client's, and Biomes runs only on the
+  server, so the server tells each client which species are out of realm where its player stands (every 20 s, sent
+  only on change) and the client leaves them out. Biomes is reached through its documented public API by reflection,
+  so Flocks has no hard dependency; anything unexpected logs once and allows everything. Seasons are left to Flocks
+  (its own migration windows), so the realm data passed to Biomes says every season.
 
 Next steps:
 - Hand-off from the sky: when a planned goose flock passes a suitable lake (fresh water, 36+ surface blocks, 64+

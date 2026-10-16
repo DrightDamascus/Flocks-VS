@@ -1,5 +1,5 @@
-// Common crane. Our own model (tools/make_crane.py). Passes over only (no landed entity yet). Fields: see Flocks/Species.cs.
 {
+	// Common crane. Our own model (tools/make_crane.py). Passes over only (no landed entity yet). Fields: see Flocks/Species.cs.
 	code: "crane",
 	name: "common cranes",
 	shapes: [

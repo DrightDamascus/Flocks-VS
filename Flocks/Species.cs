@@ -94,6 +94,11 @@ namespace Flocks
         /// <summary>Whether landing flocks of it arrive on spring migration days (herons don't; they spawn on their own).</summary>
         public bool ArriveInFlocks = true;
 
+        /// <summary>Realms it lives in, for the Biomes mod (BiomesCompat): its landing flocks only come down, and its passing
+        /// flocks are only drawn, where Biomes puts one of these realms. Null = its landed entity's biorealm attribute
+        /// (patches/biomes.json); for a bird that only passes over, set it here (the patch does, for cranes).</summary>
+        public string[] Biorealm;
+
         public bool Lands => !string.IsNullOrEmpty(LandedEntity);
         public AssetLocation LandedEntityCode => Lands ? new AssetLocation(LandedEntity) : null;
 

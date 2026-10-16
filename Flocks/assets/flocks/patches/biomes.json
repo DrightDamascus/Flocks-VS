@@ -1,0 +1,217 @@
+// Realms for the Biomes mod (modid biomes), applied only when Biomes is installed: each animal spawns only in the
+// realms listed, and landing and passing flocks keep to them too (BiomesCompat). The crane only passes over, so its
+// list goes in its species file. Contributed by Hydromancerx (Biomes team); mallard key fixed, owl, mouse and crane
+// added.
+[
+	{
+		"file": "flocks:entities/crow.json",
+		"op": "addmerge",
+		"path": "/attributesByType",
+		"side": "Server",
+		"value": {
+			"crow": {
+				"biorealm": [
+					"pacific nearctic",
+					"atlantic nearctic",
+					"atlantic palearctic",
+					"central palearctic",
+					"eastern palearctic",
+					"pacific palearctic",
+					"pacific neotropic",
+					"atlantic neotropic",
+					"atlantic afrotropic",
+					"eastern afrotropic",
+					"australasian",
+					"oceanic"
+				]
+			}
+		},
+		"dependsOn": [
+			{
+				"modid": "biomes"
+			}
+		]
+	},
+	{
+		"file": "flocks:entities/eagle.json",
+		"op": "addmerge",
+		"path": "/attributesByType",
+		"side": "Server",
+		"value": {
+			"eagle": {
+				"biorealm": [
+					"pacific nearctic",
+					"atlantic nearctic",
+					"atlantic palearctic",
+					"central palearctic",
+					"eastern palearctic",
+					"pacific palearctic"
+				]
+			}
+		},
+		"dependsOn": [
+			{
+				"modid": "biomes"
+			}
+		]
+	},
+	{
+		"file": "flocks:entities/greylag.json",
+		"op": "addmerge",
+		"path": "/attributesByType",
+		"side": "Server",
+		"value": {
+			"greylag": {
+				"biorealm": [
+					"atlantic palearctic",
+					"central palearctic",
+					"eastern palearctic"
+				]
+			}
+		},
+		"dependsOn": [
+			{
+				"modid": "biomes"
+			}
+		]
+	},
+	{
+		"file": "flocks:entities/gull.json",
+		"op": "addmerge",
+		"path": "/attributesByType",
+		"side": "Server",
+		"value": {
+			"gull": {
+				"biorealm": [
+					"pacific nearctic",
+					"atlantic nearctic",
+					"atlantic palearctic",
+					"central palearctic",
+					"eastern palearctic",
+					"pacific palearctic",
+					"pacific neotropic",
+					"atlantic neotropic",
+					"atlantic afrotropic",
+					"eastern afrotropic",
+					"australasian",
+					"oceanic"
+				]
+			}
+		},
+		"dependsOn": [
+			{
+				"modid": "biomes"
+			}
+		]
+	},
+	{
+		"file": "flocks:entities/heron.json",
+		"op": "addmerge",
+		"path": "/attributesByType",
+		"side": "Server",
+		"value": {
+			"heron": {
+				"biorealm": [
+					"pacific nearctic",
+					"atlantic nearctic",
+					"atlantic palearctic",
+					"central palearctic",
+					"eastern palearctic",
+					"pacific palearctic",
+					"pacific neotropic",
+					"atlantic neotropic",
+					"atlantic afrotropic",
+					"eastern afrotropic",
+					"australasian",
+					"oceanic"
+				]
+			}
+		},
+		"dependsOn": [
+			{
+				"modid": "biomes"
+			}
+		]
+	},
+	{
+		"file": "flocks:entities/mallard.json",
+		"op": "addmerge",
+		"path": "/attributesByType",
+		"side": "Server",
+		"value": {
+			"mallard": {
+				"biorealm": [
+					"pacific nearctic",
+					"atlantic nearctic",
+					"atlantic palearctic",
+					"central palearctic",
+					"eastern palearctic",
+					"pacific palearctic"
+				]
+			}
+		},
+		"dependsOn": [
+			{
+				"modid": "biomes"
+			}
+		]
+	},
+	{
+		"file": "flocks:entities/owl.json",
+		"op": "addmerge",
+		"path": "/attributesByType",
+		"side": "Server",
+		"value": {
+			"owl": {
+				"biorealm": [
+					"atlantic palearctic",
+					"central palearctic",
+					"eastern palearctic"
+				]
+			}
+		},
+		"dependsOn": [
+			{
+				"modid": "biomes"
+			}
+		]
+	},
+	{
+		"file": "flocks:entities/mouse.json",
+		"op": "addmerge",
+		"path": "/attributesByType",
+		"side": "Server",
+		"value": {
+			"mouse": {
+				"biorealm": [
+					"atlantic palearctic",
+					"central palearctic",
+					"eastern palearctic"
+				]
+			}
+		},
+		"dependsOn": [
+			{
+				"modid": "biomes"
+			}
+		]
+	},
+	{
+		"file": "flocks:config/flocks-species/crane.json",
+		"op": "add",
+		"path": "/biorealm",
+		"side": "Server",
+		"value": [
+			"atlantic palearctic",
+			"central palearctic",
+			"eastern palearctic",
+			"atlantic afrotropic",
+			"eastern afrotropic"
+		],
+		"dependsOn": [
+			{
+				"modid": "biomes"
+			}
+		]
+	}
+]

@@ -1,6 +1,6 @@
-// Greylag goose. Our own model (tools/make_greylag.py). Passes over in V's, and lands on lakes as flocks:greylag
-// (its behaviour tuning and sounds are in entities/greylag.json). Fields: see Flocks/Species.cs.
 {
+	// Greylag goose. Our own model (tools/make_greylag.py). Passes over in V's, and lands on lakes as flocks:greylag
+	// (its behaviour tuning and sounds are in entities/greylag.json). Fields: see Flocks/Species.cs.
 	code: "goose",
 	name: "greylag geese",
 	shapes: [

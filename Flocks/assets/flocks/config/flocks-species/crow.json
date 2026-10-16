@@ -1,8 +1,8 @@
-// Carrion crow. Our own model (tools/make_crow.py). A land bird (habitat "ground"): a small group feeds on open ground,
-// flies up into the trees when disturbed, roosts in the trees at night and raids crops (entities/crow.json,
-// Corvid.cs). Resident all year; no landing flocks: they spawn on their own. Loose groups pass over in the early
-// morning and the evening, on their way out from the roost and back to it. Fields: see Flocks/Species.cs.
 {
+	// Carrion crow. Our own model (tools/make_crow.py). A land bird (habitat "ground"): a small group feeds on open ground,
+	// flies up into the trees when disturbed, roosts in the trees at night and raids crops (entities/crow.json,
+	// Corvid.cs). Resident all year; no landing flocks: they spawn on their own. Loose groups pass over in the early
+	// morning and the evening, on their way out from the roost and back to it. Fields: see Flocks/Species.cs.
 	code: "crow",
 	name: "carrion crows",
 	shapes: [

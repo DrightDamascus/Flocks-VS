@@ -31,6 +31,10 @@ namespace Flocks
         private readonly FlocksConfig cfg;
         private int day = int.MinValue;
         private readonly List<PlannedFlock> plan = new();
+        /// <summary>Species the Biomes mod keeps out of the player's realm (the server says, SkyRealmsPacket): their flocks
+        /// aren't drawn here.</summary>
+        private HashSet<string> absent = new();
+        public void SetAbsent(string[] codes) => absent = new HashSet<string>(codes ?? Array.Empty<string>());
 
         public MigrationScheduler(ICoreClientAPI capi, FlockRenderer renderer, Dictionary<string, Species> species, FlocksConfig cfg)
         {
@@ -52,6 +56,7 @@ namespace Flocks
                 if (p.Finished || hour < p.Hour) continue;
                 bool late = hour > p.Hour + cfg.MaxDelayHours;
                 if (p.Species.Meshes?.Ok != true) { Finish(p, "skipped: no meshes"); continue; }
+                if (absent.Contains(p.Species.Code)) { Finish(p, "skipped: not in this realm (Biomes)"); continue; }
                 // sea birds pass along the coast: only where there is sea near the player
                 if (p.Species.Sea && !SeaNear(player.Pos.AsBlockPos)) { Finish(p, "skipped: no sea nearby"); continue; }
                 string hold = Stormy(player.Pos.AsBlockPos) ? "storm" : null;
@@ -213,6 +218,7 @@ namespace Flocks
             if (!cfg.AutoMigration) sb.Append(", automatic migration OFF in flocks.json");
             if (cfg.ForceMigration) sb.Append(", ForceMigration ON (every day is peak autumn)");
             if (Stormy(pos)) sb.Append(", storm: flocks held");
+            if (absent.Count > 0) sb.Append($", not in this realm (Biomes): {string.Join(", ", absent)}");
             foreach (var sp in species.Values)
             {
                 double s = Strength(sp, rel, lat, out bool spring);

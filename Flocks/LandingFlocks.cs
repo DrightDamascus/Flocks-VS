@@ -80,7 +80,8 @@ namespace Flocks
             return hours;
         }
 
-        /// <summary>Starts a landing flock for this player now. force (the /flocks arrive command) skips the season check.</summary>
+        /// <summary>Starts a landing flock for this player now. force (the /flocks arrive command) skips the season check,
+        /// and the realm check when the Biomes mod is installed.</summary>
         public bool Arrive(IServerPlayer plr, Species sp, bool force, out string msg) => Arrive(plr.Entity.Pos.XYZ, sp, force, out msg);
 
         /// <summary>The same for a position standing in for the player (the in-engine tests use it).</summary>
@@ -96,6 +97,7 @@ namespace Flocks
             var centre = spots[spots.Count / 2];
             if (centre.HorizontalSquareDistanceTo(p.X, p.Z) < MinFromPlayer * MinFromPlayer) { msg = $"The nearest landing water is under {MinFromPlayer:0} blocks from you."; return false; }
             if (!force && !ResidentGeese.InSeason(sapi.World, centre.AsBlockPos, sp)) { msg = $"Out of season for {name} there."; return false; }
+            if (!force && !BiomesCompat.Allows(sapi, sp, centre.AsBlockPos)) { msg = $"No {name} in this realm (Biomes)."; return false; }
             if (sapi.World.GetEntitiesAround(centre, 48, 24, e => e.Alive && e.Code.Equals(code)).Length > 0) { msg = $"There are {name} on that lake already."; return false; }
             var type = sapi.World.GetEntityType(code);
             if (type == null) { msg = $"Entity type {code} is not loaded."; return false; }

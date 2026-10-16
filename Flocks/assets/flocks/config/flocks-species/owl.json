@@ -1,7 +1,7 @@
-// Tawny owl. Our own model (tools/make_owl.py). A woodland bird of the night (habitat "wood"): roosts in a tree by day,
-// hunts mice from branches at night, hoots (entities/owl.json, Owl.cs). Resident all year, alone; no drawn passing
-// groups and no landing flocks. Fields: see Flocks/Species.cs.
 {
+	// Tawny owl. Our own model (tools/make_owl.py). A woodland bird of the night (habitat "wood"): roosts in a tree by day,
+	// hunts mice from branches at night, hoots (entities/owl.json, Owl.cs). Resident all year, alone; no drawn passing
+	// groups and no landing flocks. Fields: see Flocks/Species.cs.
 	code: "owl",
 	name: "tawny owls",
 	shapes: [
