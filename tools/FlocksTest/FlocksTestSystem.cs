@@ -60,6 +60,11 @@ namespace FlocksTest
                 if (e.Code?.Domain != "flocks") return;
                 e.AlwaysActive = true; e.State = EnumEntityState.Active;
             };
+            sapi.Event.OnEntityDeath += (e, ds) =>
+            {
+                if (e.Code?.Domain == "flocks" && e.Code.Path == "mouse")
+                    Log($"mouse {e.EntityId} died: {ds?.Source} {ds?.Type} by {ds?.SourceEntity?.Code} at {e.Pos.X - c.X:0.0},{e.Pos.Y - y0:0.0},{e.Pos.Z - c.Z:0.0}");
+            };
             sapi.Event.ServerRunPhase(EnumServerRunPhase.RunGame, () => sapi.Event.RegisterCallback(_ => LoadSite(), 2000));
         }
 
@@ -130,13 +135,17 @@ namespace FlocksTest
             for (int y = y0 + 1; y <= y0 + 6; y++) ba.SetBlock(log, new BlockPos(x0 + 15, y, z0 + 66));
             for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) for (int y = y0 + 5; y <= y0 + 7; y++)
                 if (dx != 0 || dz != 0 || y == y0 + 7) ba.SetBlock(leaves, new BlockPos(x0 + 15 + dx, y, z0 + 66 + dz));
+            // owl wood: two oaks with real branches (branchy leaves, which have a collision box, under the crown's leaves,
+            // which don't), 20 blocks apart in a soil clearing
+            for (int x = x0 + 30; x <= x0 + 72; x++) for (int z = z0 + 78; z <= z0 + 98; z++) ba.SetBlock(sapi.World.GetBlock(new AssetLocation("game", "soil-medium-normal")).BlockId, new BlockPos(x, y0, z));
+            BuildOwlTree(OwlTree1X, OwlTreeZ, log, leaves); BuildOwlTree(OwlTree2X, OwlTreeZ, log, leaves);
             Log($"site built: slab top y={y0} (terrain max {top}); rain map at pond A {ba.GetRainMapHeightAt(x0 - 40, z0)}, " +
                 $"slab {ba.GetRainMapHeightAt(x0, z0 + 60)}, wall {ba.GetRainMapHeightAt(x0 - 11, z0)}");
             // the goose entity file parsed whole (a bad field makes the game drop most of it, silently but for one log line)
             var gt = sapi.World.GetEntityType(new AssetLocation("flocks", "greylag"));
             Check(gt?.Sounds != null && gt.Sounds.ContainsKey("takeoffwings") && gt.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.waterfowl") == true,
                 "greylag entity file loaded whole (sounds and flocks.waterfowl behaviour present)");
-            var items = new[] { "greylag", "mallard", "heron", "eagle", "gull", "crow" };
+            var items = new[] { "greylag", "mallard", "heron", "eagle", "gull", "crow", "owl", "mouse" };
             Check(items.All(b => sapi.World.GetItem(new AssetLocation("flocks", "creature-" + b))?.GetType().Name == "ItemCreature"
                                  && sapi.World.GetEntityType(new AssetLocation("flocks", b)) != null),
                 "creature items (creative inventory) loaded, each placing an existing bird");
@@ -157,14 +166,51 @@ namespace FlocksTest
                 "crow entity file loaded whole (sounds and flocks.corvid)");
             Check(Lang.HasTranslation("flocks:item-handbooktext-flocks:creature-crow") && Lang.Get("game:item-handbooktext-strawdummy").Contains("crows"),
                 $"the crow's handbook text, and the straw dummy's mentions the crows ({Lang.Get("game:item-handbooktext-strawdummy")})");
+            var ot = sapi.World.GetEntityType(new AssetLocation("flocks", "owl"));
+            Check(ot?.Sounds != null && ot.Sounds.ContainsKey("hoot") && ot.Sounds.ContainsKey("kewick") && ot.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.owl") == true,
+                "owl entity file loaded whole (sounds and flocks.owl)");
+            var mo = sapi.World.GetEntityType(new AssetLocation("flocks", "mouse"));
+            Check(mo?.Sounds != null && mo.Sounds.ContainsKey("hurt") && mo.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "taskai") == true
+                  && mo.Server.SpawnConditions?.Runtime?.MaxQuantity == 4,
+                "mouse entity file loaded whole (sounds, vanilla AI, a low spawn cap)");
+            Check(Lang.HasTranslation("flocks:item-handbooktext-flocks:creature-owl") && Lang.HasTranslation("flocks:item-handbooktext-flocks:creature-mouse")
+                  && Lang.Get("flocks:gamemechanicinfo-birds-text").Contains("tawny owl"), "the owl's and the mouse's handbook texts, and the owl on the Birds page");
+            // every shape's animations as the client will build them: a keyframe at or past quantityframes, or an element
+            // that sets one axis of a group but not all three, crashes the game when the animation first plays (the server
+            // never builds animation frames, so nothing else here would notice)
+            var badAnims = new List<string>();
+            int shapes = 0, anims = 0;
+            foreach (var asset in sapi.Assets.GetMany("shapes/", "flocks"))
+            {
+                shapes++;
+                Shape sh;
+                try { sh = asset.ToObject<Shape>(); } catch (Exception ex) { badAnims.Add($"{asset.Location}: unreadable ({ex.Message})"); continue; }
+                foreach (var an in sh?.Animations ?? Array.Empty<Animation>())
+                {
+                    anims++;
+                    foreach (var kf in an.KeyFrames ?? Array.Empty<AnimationKeyFrame>())
+                    {
+                        if (kf.Frame >= an.QuantityFrames) badAnims.Add($"{asset.Location.Path} {an.Code}: key at {kf.Frame} of {an.QuantityFrames} frames");
+                        foreach (var (el, ke) in kf.Elements ?? new Dictionary<string, AnimationKeyFrameElement>())
+                            if (ke.AnySet && ((ke.RotationX != null) != (ke.RotationY != null) || (ke.RotationX != null) != (ke.RotationZ != null)
+                                || (ke.OffsetX != null) != (ke.OffsetY != null) || (ke.OffsetX != null) != (ke.OffsetZ != null)))
+                                badAnims.Add($"{asset.Location.Path} {an.Code} frame {kf.Frame} {el}: an axis group only partly set");
+                    }
+                }
+            }
+            Check(shapes >= 9 && anims > 40 && badAnims.Count == 0, $"every shape's animations will build on the client ({shapes} shapes, {anims} animations; {(badAnims.Count == 0 ? "ok" : string.Join("; ", badAnims.Take(6)))})");
+            var branchy = sapi.World.GetBlock(new AssetLocation("game", "leavesbranchy-placed-oak"));
+            Check(branchy?.CollisionBoxes?.Length > 0 && (sapi.World.GetBlock(new AssetLocation("game", "leaves-placed-oak"))?.CollisionBoxes?.Length ?? 0) == 0,
+                $"branchy leaves (tree branches) are solid, ordinary leaves aren't ({branchy?.Code}: {branchy?.CollisionBoxes?.Length ?? -1} boxes)");
             var mt = sapi.World.GetEntityType(new AssetLocation("flocks", "mallard"));
             Check(mt?.Sounds != null && mt.Sounds.ContainsKey("takeoffwings") && mt.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.waterfowl") == true,
                 "mallard entity file loaded whole (sounds and flocks.waterfowl behaviour present)");
             var spc = sapi.ModLoader.GetModSystem<FlocksModSystem>().SpeciesByCode;
-            Check(spc.ContainsKey("goose") && spc["goose"].Lands && spc["goose"].LandingMin == 7 && spc.ContainsKey("crane") && spc.ContainsKey("hawk")
+            Check(spc.ContainsKey("goose") && spc["goose"].Lands && spc["goose"].LandingMin == 7 && spc.ContainsKey("crane") && !spc.ContainsKey("hawk")
                   && spc.ContainsKey("mallard") && spc["mallard"].MinLakeSize == 25 && spc.ContainsKey("heron") && spc["heron"].Wades && !spc["heron"].ArriveInFlocks
                   && spc.ContainsKey("gull") && spc["gull"].Sea && spc["gull"].Liquid == "saltwater" && spc["gull"].YearRound && spc["gull"].WarinessFactor == 0.5
-                  && spc.ContainsKey("crow") && spc["crow"].Ground && spc["crow"].YearRound && !spc["crow"].ArriveInFlocks,
+                  && spc.ContainsKey("crow") && spc["crow"].Ground && spc["crow"].YearRound && !spc["crow"].ArriveInFlocks
+                  && spc.ContainsKey("owl") && spc["owl"].Woodland && spc["owl"].YearRound && !spc["owl"].ArriveInFlocks,
                 $"species data loaded: {string.Join(", ", spc.Keys)}");
             Check(top + 12 <= ba.MapSizeY - 60, $"test site above the terrain (terrain max {top}, slab {y0})");
             Check(ba.GetRainMapHeightAt(x0 - 40, z0) == y0 && ba.GetRainMapHeightAt(x0 - 11, z0) == y0 + 14 && ba.GetRainMapHeightAt(x0 + 50 - 17, z0 + 30) == y0 + 8,
@@ -197,6 +243,30 @@ namespace FlocksTest
                     ba.SetBlock(farmland, new BlockPos(x, y0, z));
                     ba.SetBlock(flax, new BlockPos(x, y0 + 1, z));
                 }
+        }
+
+        private int OwlTree1X => (int)c.X + 60;
+        private int OwlTree2X => (int)c.X + 40;
+        private int OwlTreeZ => (int)c.Z + 88;
+
+        /// <summary>An oak for owls: a trunk 8 high, four branches of branchy leaves 3 blocks out at 5 up, and a crown of
+        /// leaves over them from 6 to 10 up. The branch ends have leaves over them and air under them.</summary>
+        private void BuildOwlTree(int tx, int tz, int log, int leaves)
+        {
+            var ba = sapi.World.BlockAccessor;
+            int branch = sapi.World.GetBlock(new AssetLocation("game", "leavesbranchy-placed-oak"))?.BlockId ?? leaves;
+            for (int dx = -3; dx <= 3; dx++)
+                for (int dz = -3; dz <= 3; dz++)
+                    for (int y = y0 + 6; y <= y0 + 10; y++)
+                    {
+                        int r2 = dx * dx + dz * dz;
+                        if (r2 > (y == y0 + 10 ? 2 : 10)) continue;
+                        ba.SetBlock(leaves, new BlockPos(tx + dx, y, tz + dz));
+                    }
+            for (int y = y0 + 1; y <= y0 + 8; y++) ba.SetBlock(log, new BlockPos(tx, y, tz));
+            for (int d = 1; d <= 3; d++)
+                foreach (var (ox, oz) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+                    ba.SetBlock(branch, new BlockPos(tx + ox * d, y0 + 5, tz + oz * d));
         }
 
         /// <summary>Growth stages of a field's 25 crops.</summary>
@@ -301,6 +371,31 @@ namespace FlocksTest
                 ReportFlight("missed arrow", 2);
             }, 90));
 
+            Entity spear = null; Vec3d spearFrom = null; float gooseHp = 0; Entity speared = null;
+            steps.Enqueue(("a spear never connects", () =>
+            {
+                ResetStats(); FlockRegistry.Instance.Calm();
+                speared = LoadedGeese()[0];
+                gooseHp = speared.WatchedAttributes.GetTreeAttribute("health")?.GetFloat("currenthealth") ?? 0;
+                spear = sapi.World.ClassRegistry.CreateEntity(sapi.World.GetEntityType(new AssetLocation("game", "spear-generic-flint")));
+                spearFrom = new Vec3d(speared.Pos.X - 6, speared.Pos.Y + 0.4, speared.Pos.Z);
+                spear.Pos.SetPos(spearFrom);
+                spear.Pos.Motion.Set(0.5, 0, 0);                                     // 30 blocks/s, straight at it
+                spear.AlwaysActive = true;
+                sapi.World.SpawnEntity(spear);
+                spear.State = EnumEntityState.Active;
+                extraPhysics.Add(spear);
+            }, () => Elapsed > 4 && LoadedGeese().All(e => Phase(e) == "Water"), () =>
+            {
+                float hp = speared.WatchedAttributes.GetTreeAttribute("health")?.GetFloat("currenthealth") ?? 0;
+                bool hitIt = (bool)(spear.GetType().GetProperty("EntityHit")?.GetValue(spear) ?? true);
+                Check(!hitIt, $"the spear didn't strike the goose (EntityHit {hitIt}; it ended {spear.Pos.X - spearFrom.X:0.0} blocks on)");
+                Check(speared.Alive && hp >= gooseHp, $"the goose is unhurt ({hp} of {gooseHp})");
+                Check(spear.Pos.X - spearFrom.X > 7, $"it flew on past the goose ({spear.Pos.X - spearFrom.X:0.0} blocks; the goose was 6 off, its far side about 6.5)");
+                Check(stats.Values.Count(st => st.Samples > 0) > 0, "and the flock flushed at the near miss");
+                extraPhysics.Remove(spear);
+                spear.Die(EnumDespawnReason.Expire);
+            }, 60));
             steps.Enqueue(("second disturbance", () =>
             {
                 ResetStats();
@@ -534,6 +629,7 @@ namespace FlocksTest
             steps.Enqueue(("eagle feeds and leaves", () => { eagleStates.Clear(); }, () => eagleStates.Contains("Soar") || Elapsed > 60, () =>
             {
                 Check(eagleStates.Contains("Soar"), $"back up after feeding (states seen: {string.Join(", ", eagleStates)})");
+                Check(eagle.GetBehavior<EntityBehaviorRaptor>().Saturated, "fed, so it isn't hunting (saturated, as vanilla predators are)");
             }, 70));
             steps.Enqueue(("eagle back to the perch", () =>
             {
@@ -807,12 +903,174 @@ namespace FlocksTest
                 foreach (var e in crowList) e.Die(EnumDespawnReason.Expire);
             }, 70));
 
+            QueueOwlSteps();
+
             steps.Enqueue(("memory", () => { }, () => true, () =>
             {
                 Check(memory.Count >= 3 && memory.Last() - memory[1] < 64, $"managed memory over cycles (MB): {string.Join(", ", memory)}");
                 int left = sapi.World.LoadedEntities.Values.Count(e => e.Alive && e.WatchedAttributes.GetLong(FlockRegistry.FlockIdKey, -1) == flock.Id);
                 Check(left == 7, $"still 7 geese after the cycles ({left})");
             }, 5));
+        }
+
+        // ------------------------------------------------------------------------------------------------ owls
+
+        private Entity owl;
+        private int owlHits, owlSamples;
+        private string owlLastState;
+        private readonly HashSet<string> owlStates = new();
+        private static EntityBehaviorOwl OB(Entity e) => e?.GetBehavior<EntityBehaviorOwl>();
+
+        /// <summary>Which owl tree a spot is in (1 or 2), 0 if neither.</summary>
+        private int InOwlTree(Vec3d p) => Math.Abs(p.Z - OwlTreeZ - 0.5) <= 3.6 ? (Math.Abs(p.X - OwlTree1X - 0.5) <= 3.6 ? 1 : Math.Abs(p.X - OwlTree2X - 0.5) <= 3.6 ? 2 : 0) : 0;
+        private string Site(Vec3d p) => p == null ? "-" : $"{p.X - c.X:0.0},{p.Y - y0:0.0},{p.Z - c.Z:0.0}";
+
+        /// <summary>Standing on a branch (branchy leaves or wood) with leaves over it.</summary>
+        private bool OnBranch(Entity e, out string what)
+        {
+            var ba = sapi.World.BlockAccessor;
+            int x = (int)Math.Floor(e.Pos.X), z = (int)Math.Floor(e.Pos.Z);
+            bool ok = EntityBehaviorOwl.PerchBelowLeaves(ba, x, z, new BlockPos(0, 0, 0), out int y, out int top, out bool branch);
+            what = $"{ba.GetBlock(new BlockPos(x, y, z))?.Code?.Path} at {y - y0} under leaves to {top - y0}, owl feet {e.Pos.Y - y0:0.00}";
+            return ok && branch && top > y && Math.Abs(e.Pos.Y - (y + 1)) < 0.35;
+        }
+
+        /// <summary>Hunting in the open, where it can be seen: nothing at its head (no leaves), standing on the top of the
+        /// column (leaves, a branch, a post).</summary>
+        private bool InTheOpen(Entity e, out string what)
+        {
+            var ba = sapi.World.BlockAccessor;
+            int x = (int)Math.Floor(e.Pos.X), z = (int)Math.Floor(e.Pos.Z), top = ba.GetRainMapHeightAt(x, z);
+            var head = ba.GetBlock(new BlockPos(x, (int)Math.Floor(e.Pos.Y + 0.3), z));
+            what = $"on {ba.GetBlock(new BlockPos(x, top, z))?.Code?.Path} at {top - y0}, at its head {head?.Code?.Path}, owl feet {e.Pos.Y - y0:0.00}";
+            return (head == null || head.Id == 0) && Math.Abs(e.Pos.Y - (top + 1)) < 0.35;
+        }
+
+        private void SetHour(double hour)
+        {
+            double h = sapi.World.Calendar.HourOfDay;
+            sapi.World.Calendar.Add((float)((hour - h + 24) % 24));
+        }
+
+        private void QueueOwlSteps()
+        {
+            var mice = new List<Entity>();
+            Entity walker = null;
+            double flushedAt = -1;
+            steps.Enqueue(("owl roosts by day", () =>
+            {
+                SetHour(12);
+                owl = sapi.World.ClassRegistry.CreateEntity(sapi.World.GetEntityType(new AssetLocation("flocks", "owl")));
+                owl.Pos.SetPos(OwlTree1X + 8.5, y0 + 1, OwlTreeZ + 6.5);
+                sapi.World.SpawnEntity(owl);
+                owlHits = 0; owlSamples = 0; owlStates.Clear();
+            }, () => OB(owl)?.StateName == "Roost" || Elapsed > 40, () =>
+            {
+                bool branch = OnBranch(owl, out string what);
+                Check(OB(owl)?.StateName == "Roost" && branch && InOwlTree(owl.Pos.XYZ) > 0,
+                    $"by day it flew up to roost on a branch in a tree, under the leaves ({OB(owl)?.StateName}, tree {InOwlTree(owl.Pos.XYZ)}; {what})");
+                Check(owl.Pos.HorDistanceTo(new Vec3d(InOwlTree(owl.Pos.XYZ) == 2 ? OwlTree2X + 0.5 : OwlTree1X + 0.5, 0, OwlTreeZ + 0.5)) <= 2.3,
+                    $"close to the trunk ({Site(owl.Pos.XYZ)})");
+                Check(owlHits == 0, $"no collisions in flight ({owlHits} of {owlSamples} samples)");
+            }, 50));
+            steps.Enqueue(("owl stays on its roost", () => { }, () => Elapsed > 8, () =>
+            {
+                bool branch = OnBranch(owl, out string what);
+                Check(OB(owl)?.StateName == "Roost" && branch, $"still roosting 8 s later, standing on the branch ({OB(owl)?.StateName}; {what})");
+            }, 15));
+            steps.Enqueue(("owl sits tight", () =>
+            {
+                walker = sapi.World.ClassRegistry.CreateEntity(sapi.World.GetEntityType(new AssetLocation("game", "chicken-hen")));
+                walker.Pos.SetPos(owl.Pos.X + 20, y0 + 1, owl.Pos.Z);
+                sapi.World.SpawnEntity(walker);
+                EntityBehaviorBird.TestPlayers.Add(walker);
+                flushedAt = -1; owlHits = 0; owlSamples = 0;
+            }, () =>
+            {
+                double d = walker.Pos.HorDistanceTo(owl.Pos.XYZ);
+                if (flushedAt < 0 && OB(owl)?.StateName != "Roost") flushedAt = d;
+                if (flushedAt < 0 && walker.Pos.X > owl.Pos.X - 1) walker.Pos.SetPos(walker.Pos.X - 1, walker.Pos.Y, walker.Pos.Z);   // 2 blocks a second
+                return flushedAt >= 0 && OB(owl)?.StateName == "Roost" || Elapsed > 60;
+            }, () =>
+            {
+                Check(flushedAt >= 0 && flushedAt <= 5.5, $"it let the player come nearly under it before flying ({flushedAt:0.0} blocks)");
+                bool branch = OnBranch(owl, out string what);
+                Check(OB(owl)?.StateName == "Roost" && branch && owl.Pos.HorDistanceTo(walker.Pos.XYZ) >= 14,
+                    $"and roosted again on a branch away from them ({OB(owl)?.StateName}, {owl.Pos.HorDistanceTo(walker.Pos.XYZ):0} blocks off, tree {InOwlTree(owl.Pos.XYZ)}; {what})");
+                Check(owlHits == 0, $"no collisions in flight ({owlHits} of {owlSamples} samples)");
+                EntityBehaviorBird.TestPlayers.Remove(walker);
+                walker.Die(EnumDespawnReason.Expire);
+            }, 70));
+            steps.Enqueue(("owl goes hunting at dusk", () => { SetHour(20.5); owlHits = 0; owlSamples = 0; },
+                () => OB(owl)?.StateName == "Perch" || Elapsed > 40, () =>
+            {
+                bool open = InTheOpen(owl, out string what);
+                Check(OB(owl)?.StateName == "Perch" && open && InOwlTree(owl.Pos.XYZ) > 0,
+                    $"after dusk it hunts from the outside of a crown, in the open where it can be seen ({OB(owl)?.StateName}, tree {InOwlTree(owl.Pos.XYZ)}; {what})");
+                Check(!OnBranch(owl, out _), "not hidden inside the leaves");
+                Check(owlHits == 0, $"no collisions in flight ({owlHits} of {owlSamples} samples)");
+            }, 50));
+            // Two mice out on the grass, 7 blocks out from the owl's perch, away from the trunk. A mouse sees the owl at the
+            // last moment and may get away (as it should); whenever the owl is back on a perch with no mouse within reach,
+            // two more come out near it, up to 6 in all, as on a real night.
+            System.Action putMice = () =>
+            {
+                double tx = (InOwlTree(owl.Pos.XYZ) == 2 ? OwlTree2X : OwlTree1X) + 0.5, tz = OwlTreeZ + 0.5;
+                double ax = owl.Pos.X - tx, az = owl.Pos.Z - tz, al = Math.Sqrt(ax * ax + az * az);
+                if (al < 0.5) { ax = 1; az = 0; al = 1; }
+                var mt = sapi.World.GetEntityType(new AssetLocation("flocks", "mouse"));
+                var added = new List<Entity>();
+                for (int i = 0; i < 2; i++)
+                {
+                    var m = sapi.World.ClassRegistry.CreateEntity(mt);
+                    double side = i == 0 ? -1.5 : 1.5;
+                    // kept inside the soil clearing (the slab ends at 100 blocks out, with a long drop beyond)
+                    double mx = GameMath.Clamp(owl.Pos.X + ax / al * 7 - az / al * side, c.X + 31, c.X + 71);
+                    double mz = GameMath.Clamp(owl.Pos.Z + az / al * 7 + ax / al * side, c.Z + 79, c.Z + 97);
+                    m.Pos.SetPos(mx, y0 + 1, mz);
+                    sapi.World.SpawnEntity(m); mice.Add(m); added.Add(m); extraPhysics.Add(m);
+                }
+                Log($"mice at {string.Join(" ", added.Select(m => Site(m.Pos.XYZ)))}, owl at {Site(owl.Pos.XYZ)}");
+            };
+            steps.Enqueue(("owl catches a mouse", () =>
+            {
+                putMice();
+                owlStates.Clear();
+            }, () =>
+            {
+                if (OB(owl)?.StateName == "Perch" && OB(owl)?.Catches == 0 && mice.Count < 6
+                    && !mice.Any(m => m.Alive && m.Pos.HorDistanceTo(owl.Pos.XYZ) < 16)) putMice();
+                return OB(owl)?.Catches > 0 && OB(owl)?.StateName != "Feed" || Elapsed > 170;
+            }, () =>
+            {
+                Check(OB(owl)?.Catches > 0, $"it dropped onto a mouse and caught it ({OB(owl)?.Catches} catches of {OB(owl)?.Pounces} pounces, {mice.Count} mice out; states {string.Join(", ", owlStates)})");
+                Check(owlStates.Contains("Feed"), "and ate it on the ground");
+                int inWorld = mice.Count(m => sapi.World.GetEntityById(m.EntityId) != null);
+                Check(inWorld == mice.Count - (OB(owl)?.Catches ?? 0),
+                    $"swallowed whole: the caught mouse is gone ({mice.Count(m => m.Alive)} alive, {inWorld} still in the world)");
+                Check(OB(owl)?.Saturated == true, "fed, so it isn't hunting for a while (saturated, as vanilla predators are)");
+            }, 180));
+            steps.Enqueue(("owl back on a perch", () => { }, () => OB(owl)?.StateName == "Perch" || Elapsed > 40, () =>
+            {
+                bool open = InTheOpen(owl, out string what);
+                Check(OB(owl)?.StateName == "Perch" && open, $"back up on a perch in the open after eating ({OB(owl)?.StateName}; {what})");
+            }, 50));
+            steps.Enqueue(("owl calls at night", () => { }, () => OB(owl)?.CallsMade > 0 || Elapsed > 90, () =>
+            {
+                Check(OB(owl)?.CallsMade > 0, $"it hooted or called during the night ({OB(owl)?.CallsMade} calls)");
+            }, 100));
+            steps.Enqueue(("owl roosts at dawn", () => { SetHour(6.5); owlHits = 0; owlSamples = 0; }, () => OB(owl)?.StateName == "Roost" || Elapsed > 50, () =>
+            {
+                bool branch = OnBranch(owl, out string what);
+                Check(OB(owl)?.StateName == "Roost" && branch && InOwlTree(owl.Pos.XYZ) > 0,
+                    $"back to roost in a tree in the morning ({OB(owl)?.StateName}, tree {InOwlTree(owl.Pos.XYZ)}; {what})");
+                Check(owlHits == 0, $"no collisions in flight ({owlHits} of {owlSamples} samples)");
+                var ba = sapi.World.BlockAccessor;
+                Check(EntityBehaviorOwl.HasRoostNear(ba, new Vec3d(OwlTree1X + 10, y0 + 1, OwlTreeZ)) && !EntityBehaviorOwl.HasRoostNear(ba, c),
+                    "owls only spawn with a tree to roost in nearby");
+                owl.Die(EnumDespawnReason.Expire);
+                foreach (var m in mice) if (m.Alive) m.Die(EnumDespawnReason.Expire);
+            }, 60));
         }
 
         private readonly List<long> memory = new();
@@ -830,6 +1088,10 @@ namespace FlocksTest
         {
             if (steps.Count == 0) { Finish(); return; }
             var s = steps.Dequeue();
+            // FLOCKS_TEST_ONLY=owl runs only the steps whose names contain it (the site is built either way)
+            string only = Environment.GetEnvironmentVariable("FLOCKS_TEST_ONLY");
+            if (!string.IsNullOrEmpty(only) && !s.name.Contains(only) && s.name != "memory") { NextStep(); return; }
+            if (!string.IsNullOrEmpty(only) && s.name == "memory") { Finish(); return; }
             stepName = s.name; stepDone = s.done; stepCheck = s.check; stepTimeout = s.timeout;
             stepStart = sapi.World.ElapsedMilliseconds / 1000.0;
             Log("---- step: " + stepName);
@@ -864,6 +1126,8 @@ namespace FlocksTest
         private long testFlock = -2;
 
         private double physicsAcc;
+        /// <summary>Other entities the test needs moving with nobody around (a thrown spear).</summary>
+        private readonly List<Entity> extraPhysics = new();
         /// <summary>What PhysicsManager does for a tracked entity: OnPhysicsTick at 1/30 s steps, then AfterPhysicsTick.</summary>
         private void Physics(float dt)
         {
@@ -874,6 +1138,8 @@ namespace FlocksTest
             if (steps == 0) return;
             var tick = LoadedGeese();
             if (eagle != null && eagle.Alive) tick.Add(eagle);
+            if (owl != null && owl.Alive) tick.Add(owl);
+            tick.AddRange(extraPhysics.Where(e => e.Alive));
             foreach (var e in tick)
             {
                 if (e.IsTracked != 0) continue; // a player sees it: the server does it
@@ -907,6 +1173,21 @@ namespace FlocksTest
         private void Sample(float dt)
         {
             var ba = sapi.World.BlockAccessor;
+            if (owl != null && owl.Alive)
+            {
+                string st = OB(owl)?.StateName;
+                owlStates.Add(st);
+                if (st != owlLastState)
+                {
+                    owlLastState = st;
+                    Log($"owl -> {st} at {Site(owl.Pos.XYZ)}, target {Site(OB(owl)?.Target)}{(owl.OnGround ? ", on ground" : "")}");
+                }
+                if (st == "Fly" || st == "Takeoff")
+                {
+                    owlSamples++;
+                    if (owl.CollidedHorizontally) { owlHits++; if (owlHits == 1) Log($"owl hit: {st} at site {owl.Pos.X - c.X:0.0},{owl.Pos.Y - y0:0.0},{owl.Pos.Z - c.Z:0.0}, ahead {Ahead(ba, owl, 1)}"); }
+                }
+            }
             if (eagle != null && eagle.Alive)
             {
                 string st = RState(eagle);

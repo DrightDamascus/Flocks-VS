@@ -30,6 +30,12 @@ namespace Flocks
         // tuning (entity attributes)
         private float territory = 200, fleeRange = 26, takeoffRange = 16;
         private double soarSpeed = 10, soarAltMin = 35, soarAltMax = 65, stoopSpeed = 38;
+        /// <summary>Fed, it doesn't hunt for this long (real seconds), like vanilla's foxes, wolves and bears ("saturated",
+        /// 1200 s after eating). Starting to feed on a kill counts as a meal; a missed stoop doesn't.</summary>
+        private double saturatedSeconds = 1200;
+        private long fedUntilMs;
+        /// <summary>Fed recently: not hunting (diagnostics and the in-engine tests).</summary>
+        public bool Saturated => entity.World.ElapsedMilliseconds < fedUntilMs;
         private string[] preyCodes = { "game:hare-*", "flocks:mallard" };
         private const double HuntRange = 48, CircleMin = 16, CircleMax = 26;
 
@@ -53,7 +59,7 @@ namespace Flocks
 
         /// <summary>For diagnostics and the in-engine tests.</summary>
         public string StateName => state.ToString();
-        protected override string StateText => $"{state}, takes off from a perch within {takeoffRange:0} (times your sensing)";
+        protected override string StateText => $"{state}{(Saturated ? $", fed (not hunting for {(fedUntilMs - entity.World.ElapsedMilliseconds) / 1000} s)" : ", hunting")}, takes off from a perch within {takeoffRange:0} (times your sensing)";
         public Entity Prey => prey;
         public Entity Meal => meal;
         public float StateTime => stateTime;
@@ -87,6 +93,7 @@ namespace Flocks
             soarAltMin = attributes["soarAltitudeMin"].AsDouble(soarAltMin);
             soarAltMax = attributes["soarAltitudeMax"].AsDouble(soarAltMax);
             stoopSpeed = attributes["stoopSpeed"].AsDouble(stoopSpeed);
+            saturatedSeconds = attributes["saturatedSeconds"].AsDouble(saturatedSeconds);
             var codes = attributes["preyCodes"].AsArray<string>(null);
             if (codes != null) preyCodes = codes;
         }
@@ -96,6 +103,7 @@ namespace Flocks
             if (entity.World.Side != EnumAppSide.Server) return;
             if (!entity.Alive) { entity.Pos.Roll = 0; return; }
             if (!restored) { restored = true; Restore(); }
+            LetSpearsPass(dt);
             bool grounded = state == State.Perch || state == State.Feed;
             entity.SimulationRange = grounded ? GlobalConstants.DefaultSimulationRange : FlightRange;
             stateTime += dt;
@@ -212,7 +220,7 @@ namespace Flocks
                     if ((huntCheck -= dt) <= 0)
                     {
                         huntCheck = 5;
-                        prey = FindPrey();
+                        prey = Saturated ? null : FindPrey();
                         if (prey != null) { SetState(State.Stoop); entity.PlayEntitySound("call"); break; }
                     }
                     if (stateTime > stateLength)
@@ -476,6 +484,7 @@ namespace Flocks
 
         private void SetState(State s)
         {
+            if (s == State.Feed && state != State.Feed) fedUntilMs = entity.World.ElapsedMilliseconds + (long)(saturatedSeconds * 1000);
             state = s; stateTime = 0;
             if (s == State.Stoop) { diving = false; alarmRolled = false; }
             if (s != State.ToPerch && s != State.Feed) carrying = false;

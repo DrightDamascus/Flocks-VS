@@ -3,7 +3,8 @@
 ## Sounds (Flocks/assets/flocks/sounds)
 All clips were cut from the recordings below, mixed to mono, high-passed at 120 Hz, faded at the ends, loudness/peak
 normalized and encoded as Ogg Vorbis (the duck and heron clips high-passed at 150 Hz, the eagle's and the gull's at
-400 Hz, the gull colony at 600 Hz, the crow clips at 500 Hz). The hurt sounds are pitched up
+400 Hz, the gull colony at 600 Hz, the crow clips at 500 Hz, the owl's hoots at 300 Hz, its calls at 600 Hz and its alarm at
+400 Hz). The hurt sounds are pitched up
 15% and the death sounds down 15%. The CC BY-SA clips are adaptations and are themselves licensed CC BY-SA under the
 same version as their source.
 
@@ -26,6 +27,14 @@ same version as their source.
 | crow/alarm1-2 | [Corvus corone - Carrion Crow XC482407](https://commons.wikimedia.org/wiki/File:Corvus_corone_-_Carrion_Crow_XC482407.mp3) (xeno-canto [XC482407](https://xeno-canto.org/482407)) | Marie-Lan Taÿ Pamart | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 | crow/flock1-2 (a feeding flock) | [Corvus corone - Carrion Crow XC530166](https://commons.wikimedia.org/wiki/File:Corvus_corone_-_Carrion_Crow_XC530166.mp3) (xeno-canto [XC530166](https://xeno-canto.org/530166)) | Marie-Lan Taÿ Pamart | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 | gull/flock1-3 (a colony overhead) | [Larus argentatus - European Herring Gull XC488995](https://commons.wikimedia.org/wiki/File:Larus_argentatus_-_European_Herring_Gull_XC488995.mp3) (xeno-canto [XC488995](https://xeno-canto.org/488995)) | Marie-Lan Taÿ Pamart | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+| owl/hoot1-2 | [Strix aluco - Tawny Owl XC565861](https://commons.wikimedia.org/wiki/File:Strix_aluco_-_Tawny_Owl_XC565861.mp3) and [XC565862](https://commons.wikimedia.org/wiki/File:Strix_aluco_-_Tawny_Owl_XC565862.mp3) (xeno-canto [XC565861](https://xeno-canto.org/565861), [XC565862](https://xeno-canto.org/565862)) | Alvaro Ortiz Troncoso | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+| owl/hoot3 | [Strix aluco - Tawny Owl XC86915](https://commons.wikimedia.org/wiki/File:Strix_aluco_-_Tawny_Owl_XC86915.mp3) (xeno-canto [XC86915](https://xeno-canto.org/86915)) | Alexander Kurthy | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+| owl/kewick1-2, owl/death | [Strix aluco - Tawny Owl XC500920](https://commons.wikimedia.org/wiki/File:Strix_aluco_-_Tawny_Owl_XC500920.mp3) (xeno-canto [XC500920](https://xeno-canto.org/500920)) | Alvaro Ortiz Troncoso | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+| owl/kewick3, owl/hurt | [Strix aluco - Tawny Owl XC583835](https://commons.wikimedia.org/wiki/File:Strix_aluco_-_Tawny_Owl_XC583835.mp3) (xeno-canto [XC583835](https://xeno-canto.org/583835)) | Alvaro Ortiz Troncoso | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+| owl/alarm | [Strix aluco - Tawny Owl XC603209](https://commons.wikimedia.org/wiki/File:Strix_aluco_-_Tawny_Owl_XC603209.mp3) (xeno-canto [XC603209](https://xeno-canto.org/603209)) | Benoît Van Hecke | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+
+The mouse squeaks (mouse/squeak1-3, mouse/hurt, mouse/death) are synthesized for the mod (no recording): Wikimedia
+Commons had no usable wild mouse recording, only slowed-down ultrasound.
 
 The NPS/Yellowstone sound library (public domain) was checked first. It has Canada geese and sandhill cranes, but no
 greylag, common crane or clean wingbeat takeoffs, so the clips above were used instead.

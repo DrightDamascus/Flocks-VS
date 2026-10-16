@@ -25,7 +25,7 @@ namespace Flocks
             var rand = sapi.World.Rand;
             // the species' landing flock size, like a landing flock or a natural group
             int n = count > 0 ? GameMath.Clamp(count, 1, 30) : sp.LandingMin + rand.Next(Math.Max(1, sp.LandingMax - sp.LandingMin + 1));
-            if (sp.Ground) return LandOnGround(sapi, caller, n, sp);
+            if (sp.Ground || sp.Woodland) return LandOnGround(sapi, caller, n, sp);
             int minPatch = sp.MinLake(MinPatch);
             var patch = FindPatch(sapi.World.BlockAccessor, caller.Pos.AsBlockPos, minPatch, sp.Liquid);
             if (patch == null) return TextCommandResult.Error($"No open {(sp.Sea ? "sea" : "water")} with {minPatch}+ surface blocks at least {Clear:0} blocks from you (they would flee at once) within {Radius} blocks.");
@@ -53,13 +53,14 @@ namespace Flocks
             return TextCommandResult.Success($"Landed {spawned} {sp.Name ?? sp.Code} on water at {anchor.X}, {anchor.Y}, {anchor.Z} (~{Dist(anchor):0} blocks away, patch of {patch.Count}+ blocks).");
         }
 
-        /// <summary>Land birds (crows): a group on open ground at least Clear from the player.</summary>
+        /// <summary>Land birds (crows): a group on open ground at least Clear from the player. Owls too: each takes the place
+        /// it is put down as its territory and flies off to roost (or to hunt, at night); they keep no flock.</summary>
         private static TextCommandResult LandOnGround(ICoreServerAPI sapi, Entity caller, int n, Species sp)
         {
             var type = sapi.World.GetEntityType(sp.LandedEntityCode);
             var spots = EntityBehaviorCorvid.GroundSpots(sapi.World, caller.Pos.XYZ, caller.Pos.X, caller.Pos.Z, Clear, Clear, sapi.World.Rand);
             if (spots == null || spots.Count == 0) return TextCommandResult.Error($"No open ground (soil, sand or gravel, open to the sky) {Clear:0}-64 blocks from you.");
-            var flock = FlockRegistry.Instance?.Create(sp.Code, n, spots[0]);
+            var flock = sp.Woodland ? null : FlockRegistry.Instance?.Create(sp.Code, n, spots[0]);
             for (int i = 0; i < n; i++)
             {
                 var e = sapi.World.ClassRegistry.CreateEntity(type);

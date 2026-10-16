@@ -31,7 +31,7 @@
 ## Open questions
 1. Calls/sounds: answered in 0.8.0 - freely licensed recordings (CC0 / CC BY-SA, see CREDITS.md); flying flocks call
    now and then from one bird, landed geese use entity idle/hurt/death sounds plus takeoff wingbeats.
-2. Models: answered - own low-poly shapes per migrant (greylag goose done in 0.3.0, common crane in 0.5.0); the vanilla hawk stays as a hawk species.
+2. Models: answered - own low-poly shapes per migrant (greylag goose done in 0.3.0, common crane in 0.5.0); the vanilla hawk stayed as a hawk species until 0.19.1, when it was removed.
 3. Should flocks follow the global latitude or be world-wide synchronized per hemisphere for multiplayer consistency?
 4. Night migration (many songbirds migrate at night) - show silhouettes against the moon or skip?
 5. Integrate Continental Terrain climate in step 2 or later?
@@ -170,6 +170,15 @@ Decisions (Dright, 0.13.0), Phase 1 AI:
   an eagle hunting a pond drives the ducks off it for a few days), or pulls up if the prey got under cover. Flushes from a perch like
   the geese; a missed shot startles it. Spawns alone on open high ground, at most two within 192 blocks; resident
   all year; no landing flocks and no drawn sky flocks.
+- Removed in 0.19.1: the hawk (Dright). It was the only bird drawn with a vanilla asset (the game's unused hawk shape,
+  referenced, not shipped), and real hawks and buzzards pass over an ordinary spot rarely and mostly alone; groups form
+  only at migration bottlenecks. The golden eagle covers the raptor. flocks.json's Hawks switch is kept, unread.
+- 0.19.1: the eagle gets vanilla predators' rest after a meal (Dright: model it on foxes, wolves and bears, which hunt
+  whenever hungry within 15-30 blocks and are "saturated" for 1200 s after eating). It doesn't hunt for 1200 s after it
+  starts feeding on a kill.
+- 0.19.1: a thrown spear no longer visibly strikes a bird and then does nothing (Dright: it should look like it never
+  connects). Each bird adds itself to every nearby thrown spear's hit list (EntityProjectileBase.entitiesHit), which
+  vanilla's projectile checks before colliding, so the spear passes by.
 - Done in 0.18.0: the herring gull, the first sea bird (Dright: gulls stay by the sea). Species habitat "sea" is the
   ducks' floating on salt water: every place the waterfowl look for or check water (lake search, spawn checks, /flocks
   land, paddling back to water) takes the species' liquid, so lakes and the sea never mix. yearRound: resident all
@@ -199,6 +208,28 @@ Decisions (Dright, 0.13.0), Phase 1 AI:
   food points of interest farmland registers for hares and deer. Server config: CropRaiding, CropRaidHoursMin/Max,
   ScarecrowRadius, MaxCrowsNearby. Not done (ideas for Dright): mobbing the eagle, gathering at carcasses, following
   players who till or harvest.
+- Done in 0.20.0: the tawny owl, the fourth behaviour type (species habitat "wood", flocks.owl, Owl.cs on
+  EntityBehaviorBird), chosen by Dright over the barn owl and the eagle owl: a woodland bird, and the mod's first night
+  sounds. Roosts by day, hunts from branches at night, hoots. Decisions:
+  - Prey: vanilla has no rodents, so the mod adds the wood mouse (Dright: mice yes, but no clutter). Passed over: mice
+    that appear only at the hunt, and no mouse at all (a mouse in the owl's model). The mouse is rare: a low vanilla
+    spawn cap (maxQuantity 4) and despawn after 10 minutes away from players, so mice never build up. It runs on
+    vanilla's AI tasks, no code; it notices an owl only at 2.5 blocks, so most pounces land.
+  - Branches (Dright asked what to do about trees having no branches): they do have them. Vanilla's tree generator
+    grows branches through the crown out of branchy leaves, which keep the default collision box, while ordinary
+    leaves have none. So a perch is the first solid block under a column's leaves (EntityBehaviorOwl.PerchBelowLeaves):
+    a branch, or the trunk's top. Only leaves lie above it, so the owl can always drop onto it straight down; its
+    hitbox (0.45) fits inside the column. A roost is such a branch with 2+ leaves over it, near the trunk (more cover
+    scores higher). Branchy leaves are drawn as ordinary leaf blocks (Dright), so an owl on one is hidden. Dright chose:
+    hidden by day (you find it when it bursts out of a tree you walk under, as with real tawny owls), visible at night.
+    So a hunting perch is in the open over open ground: on top of a crown at its edge (a neighbouring column 2+ lower),
+    2-10 blocks up, holding its height on the leaves as crows do; a fence post; a wall or crag top. Roost fallback: a
+    tree top.
+  - It sits tight by day (4 blocks, measured across the ground, since it is up a tree) and is warier at night (9).
+  - Fed, it rests 1200 s like vanilla's predators (follow vanilla). It swallows the mouse whole, so the body goes.
+  - Owl flight is silent: no wingbeat sounds at takeoff, unlike every other bird here.
+  - No drawn passing groups (owls don't fly over in groups) and no flock: each owl keeps its own territory (48 blocks
+    from where it appeared); no wariness either, like the eagle.
 
 Next steps:
 - Hand-off from the sky: when a planned goose flock passes a suitable lake (fresh water, 36+ surface blocks, 64+

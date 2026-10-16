@@ -1,0 +1,23 @@
+// Tawny owl. Our own model (tools/make_owl.py). A woodland bird of the night (habitat "wood"): roosts in a tree by day,
+// hunts mice from branches at night, hoots (entities/owl.json, Owl.cs). Resident all year, alone; no drawn passing
+// groups and no landing flocks. Fields: see Flocks/Species.cs.
+{
+	code: "owl",
+	name: "tawny owls",
+	shapes: [
+		{ name: "owl", shape: "flocks:shapes/entity/bird/owl.json", flap: "fly-flap", soar: "fly-soar" }
+	],
+	sizeFromEntity: "flocks:owl",
+	speedMin: 7, speedMax: 9,
+	flapSeconds: 0.55, soarSeconds: 2, blendSeconds: 0.4,
+	flapBeatsMin: 3, flapBeatsMax: 6, soarLoopsMin: 1, soarLoopsMax: 1,
+	altitudeMin: 10, altitudeMax: 20,
+	loose: true,
+	yearRound: true,
+	maxFlocksPerDay: 0, countMin: 1, countMax: 1,
+	callSound: "owl/hoot", callVariants: 3, callGapMin: 20, callGapMax: 60,
+	landedEntity: "flocks:owl",
+	habitat: "wood",
+	arriveInFlocks: false,
+	landingMin: 1, landingMax: 1
+}

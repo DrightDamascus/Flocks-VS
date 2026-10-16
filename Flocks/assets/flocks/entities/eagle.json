@@ -42,7 +42,9 @@
 			{ code: "controlledphysics", stepHeight: 1.1 },
 			// perch, soar on thermals, stoop on prey (Raptor.cs). Before "health": it zeroes spear and melee damage.
 			{ code: "flocks.raptor", territory: 200, fleeRange: 26, takeoffRange: 16, soarSpeed: 10,
-			  soarAltitudeMin: 35, soarAltitudeMax: 65, stoopSpeed: 38, preyCodes: ["game:hare-*", "flocks:mallard"] },
+			  soarAltitudeMin: 35, soarAltitudeMax: 65, stoopSpeed: 38,
+			  // after a meal it doesn't hunt for 20 minutes, like vanilla's foxes, wolves and bears ("saturated")
+			  saturatedSeconds: 1200, preyCodes: ["game:hare-*", "flocks:mallard"] },
 			{ code: "health", currenthealth: 10, maxhealth: 10 },
 			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
 			{ code: "harvestable", drops: [

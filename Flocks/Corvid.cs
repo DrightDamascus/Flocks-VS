@@ -98,6 +98,7 @@ namespace Flocks
             if (entity.World.Side != EnumAppSide.Server) return;
             if (!entity.Alive) { entity.Pos.Roll = 0; return; }
             if (!restored) { restored = true; Restore(); FlockRegistry.Instance?.Adopt(entity, species); }
+            LetSpearsPass(dt);
             bool grounded = state == State.Forage || state == State.Perch;
             entity.SimulationRange = grounded ? GlobalConstants.DefaultSimulationRange : FlightRange;
             stateTime += dt;

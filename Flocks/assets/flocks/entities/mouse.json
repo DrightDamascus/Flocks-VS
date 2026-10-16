@@ -1,0 +1,108 @@
+{
+	code: "mouse",
+	class: "EntityAgent",
+	tags: ["animal", "adult", "habitat-land"],
+	hitboxSize: { x: 0.3, y: 0.22 },
+	deadHitboxSize: { x: 0.3, y: 0.15 },
+	eyeHeight: 0.15,
+	drops: [],
+	attributes: {
+		handbook: { exclude: true }
+	},
+	client: {
+		renderer: "Shape",
+		// tools/make_mouse.py: modelled at twice the size it is drawn
+		shape: { base: "flocks:entity/animal/mouse" },
+		textures: { "mouse": { base: "flocks:entity/animal/mouse" } },
+		// about twice a real wood mouse: any smaller and it would be lost in the grass
+		size: 0.4,
+		behaviors: [
+			{ code: "repulseagents" },
+			{ code: "controlledphysics", stepHeight: 1.1251 },
+			{ code: "floatupwhenstuck", onlyWhenDead: true },
+			{ code: "interpolateposition" },
+			{ code: "despawn", minPlayerDistance: 32, minSeconds: 600 }
+		],
+		animations: [
+			{ code: "idle", animation: "idle", blendMode: "Average", easeOutSpeed: 4, triggeredBy: { defaultAnim: true } },
+			{ code: "sniff", animation: "sniff", blendMode: "Average", easeInSpeed: 4, easeOutSpeed: 4 },
+			{ code: "walk", animation: "walk", blendMode: "Average", easeInSpeed: 5, easeOutSpeed: 5 },
+			{ code: "run", animation: "run", blendMode: "Average", easeInSpeed: 6, easeOutSpeed: 6 },
+			{ code: "eat", animation: "eat", blendMode: "Average", easeInSpeed: 4, easeOutSpeed: 4 },
+			{ code: "sleep", animation: "sleep", blendMode: "Average", easeInSpeed: 3, easeOutSpeed: 3 },
+			{ code: "die", animation: "death", animationSpeed: 1.25, weight: 10, blendMode: "Average", triggeredBy: { onControls: ["dead"] } }
+		]
+	},
+	server: {
+		behaviors: [
+			{ code: "repulseagents" },
+			{ code: "controlledphysics", stepHeight: 1.1251 },
+			// rare and short-lived in any one place: gone after 10 minutes with no player within 32 blocks, so mice never
+			// pile up; vanilla's runtime spawning (maxQuantity below) brings new ones near players
+			{ code: "despawn", minPlayerDistance: 32, minSeconds: 600 },
+			{ code: "health", currenthealth: 1, maxhealth: 1 },
+			{ code: "deaddecay", hoursToDecay: 6 },
+			{ code: "floatupwhenstuck", onlyWhenDead: true },
+			{ code: "breathe" },
+			{
+				code: "taskai",
+				aiCreatureType: "LandCreature",
+				aitasks: [
+					// an owl is only noticed at the last moment (the owl's glide is silent)
+					{ code: "fleeentity", entityCodes: ["owl"], priority: 2.1, movespeed: 0.04, seekingRange: 2.5,
+					  animation: "run", animationSpeed: 2 },
+					{ code: "fleeentity", entityCodes: ["player", "fox-*", "wolf-*", "hyena-*", "bear-*", "raccoon-*"], priority: 2,
+					  movespeed: 0.04, seekingRange: 8, instafleeOnDamageChance: 1, animation: "run", animationSpeed: 2 },
+					{ code: "getoutofwater", priority: 1.4, movespeed: 0.015, animation: "walk", animationSpeed: 2 },
+					// out at night; by day mostly curled up asleep in the grass
+					{ code: "idle", priority: 1.38, minduration: 200000, maxduration: 800000, mincooldown: 10000, maxcooldown: 30000,
+					  priorityForCancel: 1.38, animation: "sleep",
+					  duringDayTimeFrames: [ { fromHour: 6, toHour: 19 } ],
+					  stopOnNearbyEntityCodes: ["player", "fox-*", "wolf-*"], stopRange: 5, stopOnHurt: true },
+					{ code: "idle", priority: 1.2, priorityForCancel: 1.35, minduration: 1500, maxduration: 3000, mincooldown: 4000,
+					  maxcooldown: 15000, animation: "sniff" },
+					{ code: "idle", priority: 1.1, priorityForCancel: 1.35, minduration: 3000, maxduration: 6000, mincooldown: 8000,
+					  maxcooldown: 30000, animation: "eat" },
+					{ code: "idle", priority: 1.1, minduration: 1000, maxduration: 3000, mincooldown: 2000, maxcooldown: 20000, animation: "idle" },
+					{ code: "wander", priority: 1.0, priorityForCancel: 1.35, movespeed: 0.012, animation: "walk", animationSpeed: 1.6 },
+					{ code: "lookaround", priority: 0.5 }
+				]
+			}
+		],
+		// Grass in meadows, at forest edges and in open woods, one or two at a time, and never many about (maxQuantity):
+		// the tawny owl's prey (Owl.cs).
+		spawnconditions: {
+			worldgen: {
+				TriesPerChunk: { avg: 0.05, var: 0 },
+				tryOnlySurface: true,
+				groupSize: { dist: "verynarrowgaussian", avg: 1, var: 1 },
+				insideBlockCodes: ["game:tallgrass-*", "game:snowlayer-1"],
+				minTemp: -12,
+				maxTemp: 30,
+				minRain: 0.25,
+				minForest: 0.05,
+				maxForest: 0.85
+			},
+			runtime: {
+				group: "neutral",
+				MinDistanceToPlayer: 24,
+				chance: 0.003,
+				maxQuantity: 4,
+				tryOnlySurface: true,
+				groupSize: { dist: "verynarrowgaussian", avg: 1, var: 1 },
+				insideBlockCodes: ["game:tallgrass-*", "game:snowlayer-1"],
+				minTemp: -12,
+				maxTemp: 30,
+				minRain: 0.25,
+				minForest: 0.05,
+				maxForest: 0.85
+			}
+		}
+	},
+	sounds: {
+		hurt: "flocks:mouse/hurt",
+		death: "flocks:mouse/death",
+		idle: { path: "flocks:mouse/squeak*", pitch: { avg: 1, var: 0.1 }, range: 8, volume: { avg: 0.5 } }
+	},
+	idleSoundChance: 0.01
+}

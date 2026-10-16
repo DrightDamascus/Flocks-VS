@@ -23,7 +23,10 @@ namespace Flocks
         /// normal entity sounds and volume.</summary>
         public float FlockCallVolume = 1f;
         /// <summary>Species that migrate on their own (false = never scheduled; /flocks send still works).</summary>
-        public bool Geese = true, Cranes = true, Hawks = true;
+        public bool Geese = true, Cranes = true;
+        /// <summary>Deprecated, not read: the hawk was removed in 0.19.1 (it was drawn with the game's own unused hawk
+        /// shape, and real hawks rarely pass over in groups). Kept so older flocks.json files still load as they are.</summary>
+        public bool Hawks = false;
         /// <summary>Reserved: enables fantasy creatures (the amphithere). Not read anywhere yet; the amphithere ships as
         /// assets only (shapes/entity/amphithere.json) with no entity, spawning or AI.</summary>
         public bool FantasyCreatures = false;
@@ -34,7 +37,7 @@ namespace Flocks
 
         public bool SpeciesEnabled(string code) => code switch
         {
-            "goose" => Geese, "crane" => Cranes, "hawk" => Hawks, _ => DisabledSpecies == null || !DisabledSpecies.Contains(code),
+            "goose" => Geese, "crane" => Cranes, _ => DisabledSpecies == null || !DisabledSpecies.Contains(code),
         };
     }
 }

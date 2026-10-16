@@ -10,7 +10,7 @@ namespace Flocks
     /// Bakes a bird shape's flap / soar poses into static meshes so no animator or entity is needed: a full flap cycle,
     /// a full soar cycle, and blend poses from flap frame 0 to soar frame 0 so birds ease between flapping and gliding.
     /// Keyframes are joined with a cyclic Catmull-Rom spline instead of straight lines, so wings do not snap at the
-    /// top and bottom of a stroke (the hawk flap has only three keyframes).
+    /// top and bottom of a stroke (vanilla bird shapes may have as few as three keyframes).
     /// </summary>
     public class BirdMeshes : ITexPositionSource
     {

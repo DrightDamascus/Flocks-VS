@@ -73,13 +73,16 @@ namespace Flocks
         /// coast (gulls). "wade": stands on the bottom of water one block deep (herons): rests, stalks and strikes there,
         /// and lands and spawns only in such water. "air": a bird of prey that perches and soars over open high ground
         /// (eagles, flocks.raptor), resident all year, no water needed. "ground": walks and feeds on open ground and
-        /// flies up into the trees (crows, flocks.corvid).</summary>
+        /// flies up into the trees (crows, flocks.corvid). "wood": a woodland bird of the night that roosts in trees and
+        /// hunts from branches (owls, flocks.owl).</summary>
         public string Habitat = "water";
         public bool Wades => Habitat == "wade";
         public bool Soars => Habitat == "air";
         public bool Sea => Habitat == "sea";
         /// <summary>"ground": a land bird (crows, flocks.corvid) that forages on open ground and perches in trees.</summary>
         public bool Ground => Habitat == "ground";
+        /// <summary>"wood": a woodland bird (owls, flocks.owl) that roosts in trees by day and hunts from them at night.</summary>
+        public bool Woodland => Habitat == "wood";
         /// <summary>The liquid it floats on, lands on and spawns on (a block's LiquidCode).</summary>
         public string Liquid => Sea ? "saltwater" : "water";
         /// <summary>Resident all year: no resident season, no autumn departure, and its drawn flocks (if any) pass on any

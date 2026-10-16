@@ -33,6 +33,36 @@ namespace Flocks
 
         protected EntityBehaviorBird(Entity entity) : base(entity) { }
 
+        private float spearCheck;
+        private static readonly System.Collections.Generic.Dictionary<Type, System.Reflection.FieldInfo> hitListFields = new();
+
+        /// <summary>
+        /// Thrown spears never connect (Dright: it should look like they never do, not hit and do nothing). Twenty times a
+        /// second the bird puts itself on the hit list of every thrown spear within 24 blocks: vanilla's projectile never
+        /// strikes an entity on its list (EntityProjectileBase.entitiesHit, read by reflection since the class isn't in the
+        /// API), so the spear flies on past or through it. The near miss still flushes the bird (IncomingShot).
+        /// </summary>
+        protected void LetSpearsPass(float dt)
+        {
+            if ((spearCheck -= dt) > 0) return;
+            spearCheck = 0.05f;
+            long me = entity.EntityId;
+            foreach (var e in entity.World.GetEntitiesAround(entity.Pos.XYZ, 24, 16, e => e is not EntityAgent && e.Code?.Path?.StartsWith("spear") == true))
+                if (HitList(e) is System.Collections.Generic.List<long> hit && !hit.Contains(me)) hit.Add(me);
+        }
+
+        private static System.Collections.Generic.List<long> HitList(Entity projectile)
+        {
+            var t = projectile.GetType();
+            if (!hitListFields.TryGetValue(t, out var f))
+            {
+                for (var bt = t; bt != null && f == null; bt = bt.BaseType)
+                    f = bt.GetField("entitiesHit", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+                hitListFields[t] = f;
+            }
+            return f?.GetValue(projectile) as System.Collections.Generic.List<long>;
+        }
+
         /// <summary>Flying away for good, ready to be removed once far from every player (FlockRegistry.TryDepart).</summary>
         public virtual bool DepartingInFlight => false;
 

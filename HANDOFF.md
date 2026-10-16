@@ -1,8 +1,14 @@
 # Handoff
 
 Where Flocks stands and what comes next, for whoever picks it up (a new session, or Dright after a break).
-Last updated 2026-10-16, at 0.19.0 (the crow). DESIGN.md has the reasoning behind each piece; CHANGELOG.md has the
-per-version detail.
+Last updated 2026-10-16. Committed through 0.20.0 (0.19.1 and 0.20.0 in one commit, both tried in game by Dright):
+0.19.1 removed the hawk, made the eagle rest 1200 s after a meal like vanilla predators and let thrown spears fly past
+birds; 0.20.0 added the tawny owl and the wood mouse and fixed crows, owls and mice spawning. DESIGN.md has the
+reasoning behind each piece; CHANGELOG.md has the per-version detail.
+
+Agreed next (Dright): prepare a formal release on the ModDB once the owl and mouse are properly tested: localisation
+of everything, including corpses (dead entity names), then compatibility with popular mods such as Butchery. Dright is
+fine with it being published as AI-assisted.
 
 ## State
 
@@ -15,13 +21,17 @@ Vintage Story 1.22.7 mod, C# (.NET), server and client. Phase 1 (the AI) is done
 | Grey heron | wades water one block deep; stalks, strikes; alone | done (0.16.0) |
 | Golden eagle | perches, soars on thermals, stoops on hares and mallards | done (0.17.0) |
 | Herring gull | floats on the sea along the coast, all year; bold; wheels, loafing flights | done (0.18.0) |
-| Common crane, hawk | drawn sky flocks only | done |
+| Common crane | drawn sky flocks only | done |
+| Hawk | was a drawn sky flock with vanilla's unused hawk shape | removed (0.19.1) |
 | Carrion crow | feeds on open ground, perches and roosts in trees, raids crops; the straw dummy is its scarecrow | done (0.19.0) |
+| Tawny owl | roosts hidden in a crown by day; hunts mice at night from the open (crown edges, posts, walls); hoots | done (0.20.0) |
+| Wood mouse (not a bird) | the owl's prey; vanilla AI; rare, despawns away from players | done (0.20.0) |
 
 
 Every bird is about half again its real size, on purpose (Dright: true-size birds looked tiny next to the game's
 animals). New birds should follow suit; if gameplay needs a dimension (wading depth), make the bird bigger rather than
-stretch a body part. Current sizes: goose 0.98, mallard 0.75, heron 1.05, eagle 1.1, gull 0.8, crow 0.75 (entity `client.size`).
+stretch a body part. Current sizes: goose 0.98, mallard 0.75, heron 1.05, eagle 1.1, gull 0.8, crow 0.75, owl 0.75
+(entity `client.size`). The mouse is about twice life size (0.4) so it shows in the grass; not yet seen by Dright.
 
 Dright's general rules: birds should behave like the real thing, but not where realism turns into a chore for the
 player (the scarecrow never stops working); and they should follow vanilla's mechanics where vanilla has them (crows
@@ -31,7 +41,7 @@ kill crops like hares do).
 
 - **Species data** (`assets/flocks/config/flocks-species/*.json`, `Species.cs`): one file per bird. It holds sky
   drawing, migration windows, flock sizes and calls. It also has `landedEntity` for birds that exist as entities,
-  `habitat` (`"water"`, `"sea"`, `"wade"`, `"air"`, `"ground"`), `arriveInFlocks`, `yearRound` (no resident season; sky groups any
+  `habitat` (`"water"`, `"sea"`, `"wade"`, `"air"`, `"ground"`, `"wood"`), `arriveInFlocks`, `yearRound` (no resident season; sky groups any
   day, any direction) and `warinessFactor` (scales what a flush or kill adds to the flock's wariness).
 - **Entities** (`assets/flocks/entities/*.json`): the real birds. Their behaviour classes:
   - `flocks.waterfowl` (`Waterfowl.cs`): goose, mallard, heron and gull. It covers the water/wade states and a flight
@@ -43,7 +53,14 @@ kill crops like hares do).
     found through vanilla's POIRegistry (VSEssentials, referenced in the csproj); its WalkPois leaves out the last
     chunk column of its range, so the crow asks for a chunk more and filters. The scarecrow check is `Scarecrows.cs`
     (standing `game:strawdummy` entities, horizontal radius from the server config).
-  - All three sit on `EntityBehaviorBird` (`BirdBehavior.cs`), which has the shared flight pieces: terrain look-ahead,
+  - `flocks.owl` (`Owl.cs`): the owl's roost/perch/pounce/feed and its night calls. Trees: ordinary leaves have no
+    collision box, but the branches inside a crown are branchy leaves, which do; they are drawn as leaf blocks though,
+    so an owl on one is hidden. The roost is the first solid block under a column's leaves (PerchBelowLeaves), reached
+    by dropping straight down through the foliage, and left by climbing straight up. Hunting perches are in the open
+    (Dright: hidden by day, visible at night): on top of a crown's edge, holding its height on the leaves as crows do,
+    fence posts, walls.
+  - The mouse (`entities/mouse.json`) has no code: vanilla's taskai, a low runtime cap and the despawn behaviour.
+  - All four bird behaviours sit on `EntityBehaviorBird` (`BirdBehavior.cs`), which has the shared flight pieces: terrain look-ahead,
     steering, dodging shots, and sensing players the way vanilla animals do.
 - **Water**: every lake lookup takes the species' liquid (`Species.Liquid`: `"water"`, or `"saltwater"` for the sea),
   so lakes and the sea never mix (`LakeSearch.cs`, `Residents.cs`, `Landing.cs`).
@@ -60,7 +77,10 @@ kill crops like hares do).
   `assets/flocks/config/handbook/birds.json` with its text in `lang/en.json`. New birds get a paragraph and a link
   from the Birds page. Our lang file also overrides vanilla's straw dummy text (`game:item-handbooktext-strawdummy`);
   the engine test checks the override wins.
-- **Models**: generated by Python, `tools/make_<bird>.py`. The shared pieces live in `make_greylag.py`. Pass
+- **Models**: generated by Python, `tools/make_<bird>.py` (and `make_mouse.py`); `tools/preview_model.py` renders any
+  of them in chosen animation frames, so poses can be checked without the game.
+  A keyframe at or past an animation's quantityframes crashes the client (not the server); the generators refuse it
+  and an engine-test check reads every shape for it. The shared pieces live in `make_greylag.py`. Pass
   `--texture` to repaint (this overwrites hand edits). Every animation keyframe must set all three axes of a group,
   or the game crashes; the generators handle that.
 - **Creature items** (`assets/flocks/itemtypes/creature.json`): creative-tab items that place the birds. Add each new
@@ -76,9 +96,11 @@ kill crops like hares do).
   `dotnet build Flocks/Flocks.csproj -c Release '-p:VINTAGE_STORY=%USERPROFILE%\agent-tools\vsref1227' -warnaserror`
 - Engine tests: `tools/run_engine_tests.ps1`. This is a headless server with no players, seed 424242, and takes about
   9 minutes. The results are in `%TEMP%\flocks-enginetest\Logs\server-main.log`; grep it for `FAIL` and `SUMMARY`.
-  At 0.19.0: 145 checks. Two runs had eagle failures (see Loose ends), one passed all 145.
+  At 0.20.0: 179 checks, all passing (the last full run failed only the mouse catch, which then passed twice in owl-only runs once the test let the owl try again after a miss). To run only some steps, set FLOCKS_TEST_ONLY to part of their names first (e.g.
+  `$env:FLOCKS_TEST_ONLY = 'owl'`; about 2 minutes); the site is built either way.
   - The test mod (`tools/FlocksTest/`) builds a site at spawn: a slab, pond A with a one-block-deep rim, pond B inside
-    a ring of 8-high "trees", pond C of salt water (the sea), two soil fields with a 5x5 bed of flax each, a small oak, a 14-high wall and a
+    a ring of 8-high "trees", pond C of salt water (the sea), two soil fields with a 5x5 bed of flax each, a small oak, an owl
+    wood (two oaks with branchy-leaf branches in a soil clearing), a 14-high wall and a
     12-high perch pillar. It then runs
     scripted steps, sampling every bird's flight for collisions, terrain, stalls and turning.
   - With no players, the game runs no physics, so the harness steps physics itself for the test birds.
@@ -95,10 +117,22 @@ kill crops like hares do).
 The roster planned so far is done. Open ideas, none agreed with Dright yet:
 - Crows: mobbing the eagle (crows chase a soaring or perched eagle and it moves off); gathering at carcasses and the
   eagle's kills; following players who till or harvest. Rooks (bigger flocks, rookeries) as a variant.
+  Passing crow groups fly in random directions (Dright: fine for now); an option is a fixed roost per area, with
+  morning groups flying out from it and evening groups back.
 - Gulls: standing on beaches and shores (a "standing ashore" state the waterfowl don't have yet); scavenging.
 - Goslings and eggs; domestication.
 
 ## Loose ends
+
+- Crows never spawned on their own in 0.19.0: their spawn block codes lacked the `game:` domain. Fixed in 0.20.0; any
+  new entity's spawnconditions must name blocks as `game:...`. Watch the server log for "none of these blocks exists".
+- The owl in game (Dright, 0.20.0): hard to see; the night hooting is nice. Left as it is for now. If it is taken up
+  again, ideas were: out at dusk while there is still light, lower perches near eye level (fence posts, the lowest
+  edge of a crown), a little bigger and paler in front; or roosting visibly by day now and then.
+- Goose wings on the water sometimes sat at odd angles (Dright, 0.20.0); it stopped and couldn't be reproduced.
+  Likely the folded swim pose and a flight pose (land, takeoff) averaging into an in-between wing angle while
+  animations switch. The client takes each animation's blend settings from the entity file by code, so those do
+  apply. If it recurs: a screenshot and what the goose was doing just before.
 
 - Crows not fleeing a survival player was reported in 0.19.0 testing; in the engine test they flee a stand-in
   player (EntityBehaviorBird.TestPlayers) at 10 blocks. `/flocks near` shows in game what each bird senses; check it

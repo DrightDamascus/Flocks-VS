@@ -55,7 +55,7 @@ namespace Flocks
         private readonly ICoreServerAPI sapi;
         public readonly FlocksServerConfig Cfg;
         private readonly Dictionary<string, Species> species;
-        public int Allowed, VetoSeason, VetoLake, VetoShore, VetoCrowded, VetoOff, VetoAbandoned, VetoDepth, VetoScarecrow, VetoGround;
+        public int Allowed, VetoSeason, VetoLake, VetoShore, VetoCrowded, VetoOff, VetoAbandoned, VetoDepth, VetoScarecrow, VetoGround, VetoNoRoost;
         /// <summary>Config ShoreDistance, for EntityBehaviorWaterfowl (server side).</summary>
         public static int ShoreDistanceCfg = 20;
         /// <summary>The server config, for the bird behaviours (crop raiding, the scarecrow radius).</summary>
@@ -84,6 +84,14 @@ namespace Flocks
                     // birds of prey: resident all year, no water; a territory each, so at most two within 192 blocks
                     if (FlockRegistry.Instance?.IsAbandoned(pos.X, pos.Z) == true) { VetoAbandoned++; return false; }
                     if (sapi.World.GetEntitiesAround(pos, 192, 96, e => e.Alive && e.Code.Equals(code)).Length >= 2) { VetoCrowded++; return false; }
+                    Allowed++;
+                    return true;
+                }
+                if (sp.Woodland)
+                {
+                    // owls: all year, a territory each (at most two within 96 blocks), and a tree to roost in nearby
+                    if (sapi.World.GetEntitiesAround(pos, 96, 64, e => e.Alive && e.Code.Equals(code)).Length >= 2) { VetoCrowded++; return false; }
+                    if (!EntityBehaviorOwl.HasRoostNear(ba, pos)) { VetoNoRoost++; return false; }
                     Allowed++;
                     return true;
                 }
@@ -184,7 +192,7 @@ namespace Flocks
         public string Report()
         {
             var sb = new StringBuilder($"Resident birds {(Cfg.ResidentGeese ? "on" : "OFF")} (vanilla spawning + season/lake veto). " +
-                $"Spawn checks since start: {Allowed} allowed, vetoed {VetoSeason} out of season, {VetoLake} small lake, {VetoShore} too far from shore (>{Cfg.ShoreDistance}), {VetoCrowded} crowded, {VetoAbandoned} abandoned lake, {VetoDepth} too deep to wade, {VetoScarecrow} by a scarecrow, {VetoGround} not on open ground, {VetoOff} disabled.");
+                $"Spawn checks since start: {Allowed} allowed, vetoed {VetoSeason} out of season, {VetoLake} small lake, {VetoShore} too far from shore (>{Cfg.ShoreDistance}), {VetoCrowded} crowded, {VetoAbandoned} abandoned lake, {VetoDepth} too deep to wade, {VetoScarecrow} by a scarecrow, {VetoGround} not on open ground, {VetoNoRoost} no tree to roost in, {VetoOff} disabled.");
             foreach (var sp in species.Values.Where(s => s.Lands))
             {
                 var code = sp.LandedEntityCode;

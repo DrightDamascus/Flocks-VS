@@ -6,7 +6,7 @@
 	class: "ItemCreature",
 	maxstacksize: 64,
 	variantgroups: [
-		{ code: "type", states: ["greylag", "mallard", "heron", "eagle", "gull", "crow"] }
+		{ code: "type", states: ["greylag", "mallard", "heron", "eagle", "gull", "crow", "owl", "mouse"] }
 	],
 	shapeByType: {
 		"*-greylag": { base: "flocks:entity/bird/greylag" },
@@ -14,7 +14,9 @@
 		"*-heron": { base: "flocks:entity/bird/heron" },
 		"*-eagle": { base: "flocks:entity/bird/eagle" },
 		"*-gull": { base: "flocks:entity/bird/gull" },
-		"*-crow": { base: "flocks:entity/bird/crow" }
+		"*-crow": { base: "flocks:entity/bird/crow" },
+		"*-owl": { base: "flocks:entity/bird/owl" },
+		"*-mouse": { base: "flocks:entity/animal/mouse" }
 	},
 	texturesByType: {
 		"*-greylag": { "greylag": { base: "flocks:entity/bird/greylag" } },
@@ -22,16 +24,21 @@
 		"*-heron": { "heron": { base: "flocks:entity/bird/heron" } },
 		"*-eagle": { "eagle": { base: "flocks:entity/bird/eagle" } },
 		"*-gull": { "gull": { base: "flocks:entity/bird/gull" } },
-		"*-crow": { "crow": { base: "flocks:entity/bird/crow" } }
+		"*-crow": { "crow": { base: "flocks:entity/bird/crow" } },
+		"*-owl": { "owl": { base: "flocks:entity/bird/owl" } },
+		"*-mouse": { "mouse": { base: "flocks:entity/animal/mouse" } }
 	},
 	creativeinventory: { "general": ["*"], "items": ["*"], "creatures": ["*"] },
 	materialDensity: 600,
 	// a bird seen from above and in front, wings across the slot (the models are 2-3 blocks across at size 1)
 	guiTransformByType: {
+		// the mouse in its standing pose, side on
+		"*-mouse": { rotate: true, rotation: { x: -20, y: 150, z: 0 }, origin: { x: 0.6, y: 0.15, z: 0.5 }, scale: 1.6 },
 		"*-mallard": { rotate: true, rotation: { x: -30, y: 135, z: 0 }, origin: { x: 0.4, y: 0.3, z: 0.5 }, scale: 0.75 },
 		"*": { rotate: true, rotation: { x: -30, y: 135, z: 0 }, origin: { x: 0.4, y: 0.3, z: 0.5 }, scale: 0.55 }
 	},
 	groundTransformByType: {
+		"*-mouse": { origin: { x: 0.6, y: 0, z: 0.5 }, scale: 1.6 },
 		"*-mallard": { origin: { x: 0.4, y: 0, z: 0.5 }, scale: 1.4 },
 		"*": { origin: { x: 0.4, y: 0, z: 0.5 }, scale: 1.1 }
 	},

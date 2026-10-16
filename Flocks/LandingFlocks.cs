@@ -87,7 +87,7 @@ namespace Flocks
         public bool Arrive(Vec3d p, Species sp, bool force, out string msg)
         {
             if (!sp.Lands) { msg = $"{sp.Code} doesn't land."; return false; }
-            if (sp.Ground || sp.Soars) { msg = $"{sp.Name ?? sp.Code} don't come in landing flocks; try /flocks land."; return false; }
+            if (sp.Ground || sp.Soars || sp.Woodland) { msg = $"{sp.Name ?? sp.Code} don't come in landing flocks; try /flocks land."; return false; }
             var code = sp.LandedEntityCode;
             string name = sp.Name ?? sp.Code;
             var ba = sapi.World.BlockAccessor;

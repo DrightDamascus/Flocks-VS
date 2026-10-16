@@ -1,0 +1,96 @@
+{
+	code: "owl",
+	class: "EntityAgent",
+	tags: ["animal", "huntable", "adult"],
+	// narrow enough to drop straight down through the leaves of one column onto a branch (Owl.cs)
+	hitboxSize: { x: 0.45, y: 0.65 },
+	deadHitboxSize: { x: 0.6, y: 0.35 },
+	eyeHeight: 0.55,
+	fallDamageMultiplier: 0.3,
+	drops: [],
+	attributes: {
+		handbook: { exclude: true }
+	},
+	client: {
+		renderer: "Shape",
+		// tools/make_owl.py: its own bones and animations
+		shape: { base: "flocks:entity/bird/owl" },
+		textures: { "owl": { base: "flocks:entity/bird/owl" } },
+		// 1.4-block wingspan: half again a real tawny owl's 0.95 m, like the other birds
+		size: 0.75,
+		behaviors: [
+			{ code: "repulseagents" },
+			{ code: "controlledphysics", stepHeight: 1.1 },
+			{ code: "floatupwhenstuck", onlyWhenDead: true },
+			{ code: "interpolateposition" },
+			{ code: "harvestable" }
+		],
+		animations: [
+			{ code: "idle-stand", animation: "idle-stand", blendMode: "Average", easeInSpeed: 3, easeOutSpeed: 3, triggeredBy: { defaultAnim: true } },
+			{ code: "hoot", animation: "hoot", blendMode: "Average", easeInSpeed: 4, easeOutSpeed: 3 },
+			{ code: "walk", animation: "walk", blendMode: "Average", easeInSpeed: 4, easeOutSpeed: 4 },
+			{ code: "eat", animation: "eat", blendMode: "Average", easeInSpeed: 5, easeOutSpeed: 4 },
+			{ code: "fly-flap", animation: "fly-flap", animationSpeed: 1.1, blendMode: "Average", weight: 10, easeInSpeed: 5, easeOutSpeed: 5 },
+			{ code: "fly-soar", animation: "fly-soar", blendMode: "Average", weight: 10, easeInSpeed: 3, easeOutSpeed: 3 },
+			{ code: "takeoff", animation: "takeoff", animationSpeed: 1.8, blendMode: "Average", weight: 10, easeInSpeed: 10, easeOutSpeed: 5 },
+			{ code: "land", animation: "land", animationSpeed: 1.2, blendMode: "Average", weight: 10, easeInSpeed: 6, easeOutSpeed: 4 },
+			{ code: "die", animation: "death", animationSpeed: 1.25, weight: 10, blendMode: "Average", triggeredBy: { onControls: ["dead"] } }
+		]
+	},
+	server: {
+		behaviors: [
+			{ code: "repulseagents" },
+			{ code: "controlledphysics", stepHeight: 1.1 },
+			// roost in a tree by day, hunt mice from branches at night (Owl.cs). Before "health": it zeroes spear and
+			// melee damage. Tawny owls sit tight by day (4 blocks) and are warier at night (9).
+			{ code: "flocks.owl", roostTakeoffRange: 4, nightTakeoffRange: 9, territory: 48, flySpeed: 7, pounceSpeed: 9,
+			  huntRange: 18, perchSecondsMin: 60, perchSecondsMax: 180,
+			  // after a meal it doesn't hunt for 20 minutes, like vanilla's foxes, wolves and bears ("saturated")
+			  saturatedSeconds: 1200, preyCodes: ["flocks:mouse"] },
+			{ code: "health", currenthealth: 5, maxhealth: 5 },
+			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
+			{ code: "harvestable", drops: [
+				{ type: "item", code: "game:poultry-raw", quantity: { avg: 1, var: 0 } },
+				{ type: "item", code: "game:feather", quantity: { avg: 6, var: 2 } }
+			] },
+			{ code: "floatupwhenstuck", onlyWhenDead: true }
+		],
+		// Woods and wooded farmland, alone; at most two within 96 blocks, and only with a tree to roost in nearby
+		// (Residents.cs). Resident all year.
+		spawnconditions: {
+			worldgen: {
+				TriesPerChunk: { avg: 0.012, var: 0 },
+				tryOnlySurface: true,
+				groupSize: { dist: "uniform", avg: 1, var: 0 },
+				insideBlockCodes: ["game:air", "game:tallgrass-*", "game:snowlayer-1"],
+				minTemp: -10,
+				maxTemp: 28,
+				minRain: 0.3,
+				minForest: 0.3
+			},
+			runtime: {
+				group: "neutral",
+				MinDistanceToPlayer: 40,
+				chance: 0.002,
+				maxQuantity: 2,
+				tryOnlySurface: true,
+				groupSize: { dist: "uniform", avg: 1, var: 0 },
+				insideBlockCodes: ["game:air", "game:tallgrass-*", "game:snowlayer-1"],
+				minTemp: -10,
+				maxTemp: 28,
+				minRain: 0.3,
+				minForest: 0.3
+			}
+		}
+	},
+	sounds: {
+		hurt: "flocks:owl/hurt",
+		death: "flocks:owl/death",
+		// the male's song: a long hoot, a pause, then a quavering one; carries a long way through the woods at night
+		hoot: { path: "flocks:owl/hoot*", pitch: { avg: 1, var: 0.04 }, range: 96, volume: { avg: 1 } },
+		// the sharp "ke-wick" contact call
+		kewick: { path: "flocks:owl/kewick*", pitch: { avg: 1, var: 0.05 }, range: 64, volume: { avg: 0.9 } },
+		// "kek-kek" when flushed
+		alarm: { path: "flocks:owl/alarm", pitch: { avg: 1, var: 0.05 }, range: 48, volume: { avg: 0.8 } }
+	}
+}

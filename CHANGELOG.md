@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.20.0
+The tawny owl, a bird of the night, and the wood mouse it hunts:
+- New model (tools/make_owl.py): warm rufous-brown, streaked and barred, with white spots along the scapulars, a big
+  round head with a facial disc and dark eyes, a small pale hooked bill, a short barred tail, broad rounded wings and
+  feathered legs. Sits upright; turns its head far round. 1.4-block wingspan (size 0.75), half again a real one's.
+- New behaviour flocks.owl (Owl.cs; species habitat "wood"). By day it roosts on a branch deep in a tree's crown,
+  close to the trunk and under the leaves, and sits tight: it flies only when someone is within 4 blocks across the
+  ground, to another tree away from them. From dusk (19:30) it hunts from perches in the open, where it can be seen:
+  on top of a crown at the edge of the trees, a fence post or a wall, over open ground, moving to another every 1-3
+  minutes, hooting and calling. When a mouse within 18
+  blocks is in plain line it glides down onto it, talons first, kills it and swallows it on the ground (the mouse is
+  gone), then goes back up. Fed, it doesn't hunt for 1200 s, like vanilla's predators. At dawn (5:30) it goes back to
+  roost. At night it flies when someone comes within 9 blocks. Owl flight is silent: no wingbeat sounds.
+- Branches: leaves have no collision box in this game, but the branches inside a crown are branchy leaves, which do.
+  The owl roosts on the first solid block under a column's leaves (a branch, or the top of the trunk), coming over the
+  crown and dropping straight down through the foliage onto it. Branchy leaves are drawn as leaf blocks, so a roosting
+  owl is hidden (Dright: hidden by day, visible at night). Where there are no trees: a tree top, or the ground.
+- Spawning: woods and wooded farmland (forest 0.3+), alone, all year; at most two within 96 blocks, and only with a
+  tree to roost in within 24 blocks (Residents.cs).
+- Sounds from xeno-canto recordings on Wikimedia Commons (CC BY-SA 4.0): three songs (a long hoot, a pause, a
+  quavering hoot), three "ke-wick" calls, the "kek-kek" alarm when flushed, hurt and death.
+- The wood mouse (flocks:mouse, tools/make_mouse.py): a small animal on vanilla's AI (wander, sniff, nibble sitting up,
+  sleep curled up by day, run from players and predators; it notices an owl only 2.5 blocks off). Rare on purpose
+  (Dright: no clutter): in grass in meadows, at forest edges and in open woods, one or two at a time, at most 4 about
+  (vanilla runtime cap), and gone after 10 minutes with no player within 32 blocks. Drawn about twice life size (size
+  0.4) so it shows in the grass. No drops. Squeaks synthesized for the mod.
+- Creature items for both, handbook pages for both, and the owl on the Birds page.
+- Fix: crows never spawned on their own. Their spawn conditions named the blocks to spawn in ("air", "tallgrass-*")
+  without the game's domain, so in this mod's domain none of them existed (the server log warned "none of these blocks
+  exists"). Now "game:air" and so on, for the owl and the mouse too.
+- /flocks land 1 owl puts an owl down near you; it takes the spot as its territory and flies off to roost or hunt.
+- tools/preview_model.py renders any generated model in chosen animation frames without the game.
+- Tests: an owl roosts on a branch by day, stays there, lets a player come nearly under it, then roosts in the other
+  tree; at dusk goes out to hunt from the outside of a crown, in the open; catches and swallows a mouse and is fed; back on a branch;
+  calls at night; back to roost at dawn; spawning needs a tree. Branchy leaves are solid, ordinary leaves aren't.
+  A new check reads every shape the way the game client does: a keyframe at or past an animation's frame count, or an
+  axis group only partly set, crashes the client when the animation first plays, and the server never notices (the
+  first build's mouse crashed the game as soon as one was placed: its idle, sleep and death loops ended on their last
+  frame). make_greylag.complete_axes now refuses to write such a shape, for every generator.
+  FLOCKS_TEST_ONLY=<part of a step name> runs just those steps. The spear test now asks that the spear end past the
+  goose (7 blocks on, the goose 6 off) rather than 2 blocks past it: how far it skims depends on where the goose floats.
+
+## 0.19.1
+- The hawk is gone (Dright): its passing groups were drawn with the game's own unused hawk shape, the only bird here
+  that wasn't ours, and real hawks rarely pass over an ordinary spot, and then mostly alone. The golden eagle is the
+  raptor now. flocks.json's Hawks switch is kept so older files load, but nothing reads it; `/flocks send hawk` now says
+  there is no such species.
+- The golden eagle eats and then rests, like vanilla's foxes, wolves and bears: once it starts feeding on a kill it
+  doesn't hunt for 1200 seconds (20 minutes; "saturated" in vanilla, entity attribute saturatedSeconds). Before, it
+  went straight back to hunting after each meal and could take a hare or duck every minute or two. /flocks near
+  shows whether an eagle is hunting or fed.
+- Thrown spears never connect with a bird any more (Dright): before, a spear struck the bird, stopped and made its hit
+  sound, and only then did the bird turn out unhurt. Now every bird puts itself on the hit list of each thrown spear
+  coming near (vanilla's projectile skips entities on that list), so the spear flies straight past or through, and the
+  near miss flushes the bird. Melee is still dodged as before (no damage).
+- Tests: a spear thrown straight at a floating goose doesn't strike it, the goose is unhurt and the flock flushes; a
+  fed eagle isn't hunting.
+
 ## 0.19.0
 The carrion crow, the first land bird, and the straw dummy as a scarecrow:
 - New model (tools/make_crow.py): all black with a blue-purple sheen on the back and wing coverts, a big head, a stout

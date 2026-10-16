@@ -40,6 +40,7 @@ namespace Flocks
             api.RegisterEntityBehaviorClass(EntityBehaviorWaterfowl.Code, typeof(EntityBehaviorWaterfowl));
             api.RegisterEntityBehaviorClass(EntityBehaviorRaptor.Code, typeof(EntityBehaviorRaptor));
             api.RegisterEntityBehaviorClass(EntityBehaviorCorvid.Code, typeof(EntityBehaviorCorvid));
+            api.RegisterEntityBehaviorClass(EntityBehaviorOwl.Code, typeof(EntityBehaviorOwl));
         }
 
         public override void AssetsLoaded(ICoreAPI api)
@@ -63,7 +64,7 @@ namespace Flocks
             landings = new LandingFlocks(sapi, species);
             var p = sapi.ChatCommands.Parsers;
             sapi.ChatCommands.Create("flocks").WithDescription("Flocks (client-side birds)").RequiresPrivilege(Privilege.chat)
-                .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [species, e.g. goose, crane, hawk]").RequiresPlayer()
+                .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [species, e.g. goose, crane, gull]").RequiresPlayer()
                 .WithArgs(p.OptionalInt("count", 12), p.OptionalWord("species"))
                 .HandleWith(args =>
                 {
@@ -78,7 +79,7 @@ namespace Flocks
                     return TextCommandResult.Success();
                 })
                 .EndSubCommand()
-                .BeginSubCommand("land").WithDescription("Debug: put a group of birds on open water (crows: open ground) near you: /flocks land [count] [species, default goose]").RequiresPlayer()
+                .BeginSubCommand("land").WithDescription("Debug: put a group of birds on open water (crows and owls: open ground) near you: /flocks land [count] [species, default goose]").RequiresPlayer()
                 .RequiresPrivilege(Privilege.controlserver)
                 .WithArgs(p.OptionalInt("count", 0), p.OptionalWord("species"))
                 .HandleWith(args =>
@@ -171,7 +172,7 @@ namespace Flocks
             });
             var p = api.ChatCommands.Parsers;
             api.ChatCommands.Create("flocks").WithDescription("Flocks (client-only birds)")
-                .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [species, e.g. goose, crane, hawk]")
+                .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [species, e.g. goose, crane, gull]")
                 .WithArgs(p.OptionalInt("count", 12), p.OptionalWord("species"))
                 .HandleWith(args =>
                 {

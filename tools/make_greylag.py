@@ -365,8 +365,13 @@ AXES = {"offset": 0, "rotation": 0, "stretch": 1}
 
 def complete_axes(anims):
     """The game casts every keyframe component of a set group (offset, rotation, stretch) straight to float, so an
-    element that sets one axis must set all three or the client crashes the first time the animation plays."""
+    element that sets one axis must set all three or the client crashes the first time the animation plays.
+    It also refuses (crashes on) a keyframe at or past quantityframes, so that is checked here too."""
     for anim in anims:
+        bad = [kf["frame"] for kf in anim["keyframes"] if kf["frame"] >= anim["quantityframes"]]
+        if bad:
+            raise ValueError(f"animation {anim['code']}: keyframe(s) {bad} at or past quantityframes {anim['quantityframes']}"
+                             " (the game crashes); loops close by themselves, so leave the last key off")
         for kf in anim["keyframes"]:
             for el in kf["elements"].values():
                 for group, rest in AXES.items():
