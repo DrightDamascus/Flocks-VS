@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.12.0
+Landing and departing flocks are real geese the whole way (the drawn-flock swaps are gone):
+- A landing flock appears as a V of geese up to 320 blocks out along its arrival heading, all flying at 13 blocks/s,
+  and each goose peels off to its own spot and glides in. Needs loaded chunks out there and the lake 40-160 blocks
+  from you, as before.
+- A departing flock flies off as geese and is removed once 360 blocks from every player (3-4 px by then), and the
+  flock is Away, ready to return next spring.
+- While flying, a goose is simulated and sent to players out to 400 blocks instead of the vanilla 128 (per-entity
+  SimulationRange, which the server also uses for tracking); clients draw it out to their view distance. On the
+  water it goes back to 128, so resting geese cost no more than before.
+- Geese are bigger: size 0.65, a 1.7-block wingspan (was 0.55, 1.4; real greylags are 1.5-1.8 m), with the hitbox
+  scaled to match (0.7 x 0.6). The sky geese of passing flocks read the same size.
+- Removed: the hand-off and landing-flock packets and the client code that drew them.
+
 ## 0.11.1
 - Sky birds are drawn at one fixed, true size, so drawn and real geese match at a swap. The sky goose takes the landed
   goose's size from entities/greylag.json client.size (0.55, a 1.4-block wingspan; real greylags are 1.5-1.8 m):

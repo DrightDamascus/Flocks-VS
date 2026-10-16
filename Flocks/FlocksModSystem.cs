@@ -32,9 +32,7 @@ namespace Flocks
 
         public override void Start(ICoreAPI api)
         {
-            // message types register in the same order on both sides
-            api.Network.RegisterChannel("flocks").RegisterMessageType<SendFlockPacket>().RegisterMessageType<FlockHandoffPacket>()
-                .RegisterMessageType<LandingFlockPacket>();
+            api.Network.RegisterChannel("flocks").RegisterMessageType<SendFlockPacket>();
             api.RegisterEntityBehaviorClass(EntityBehaviorWaterfowl.Code, typeof(EntityBehaviorWaterfowl));
         }
 
@@ -47,8 +45,8 @@ namespace Flocks
         {
             residents = new ResidentGeese(sapi, LoadServerConfig(sapi));
             var ch = sapi.Network.GetChannel("flocks");
-            registry = new FlockRegistry(sapi, ch);
-            landings = new LandingFlocks(sapi, ch);
+            registry = new FlockRegistry(sapi);
+            landings = new LandingFlocks(sapi);
             var p = sapi.ChatCommands.Parsers;
             sapi.ChatCommands.Create("flocks").WithDescription("Flocks (client-side birds)").RequiresPrivilege(Privilege.chat)
                 .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [goose|crane|hawk]").RequiresPlayer()
@@ -119,16 +117,6 @@ namespace Flocks
             {
                 string msg = pkt.Command == "schedule" ? Schedule() : TrySend(pkt.Count, pkt.Species, out _);
                 api.ShowChatMessage("[Flocks] " + msg);
-            }).SetMessageHandler<FlockHandoffPacket>(pkt =>
-            {
-                // departing landed geese become a drawn flock where they are (FlockRegistry.TryHandoff)
-                if (renderer == null || pkt.X == null || !species.TryGetValue(pkt.Species ?? "", out var sp) || !sp.Meshes.Ok) return;
-                renderer.Adopt(sp, pkt.X, pkt.Y, pkt.Z, pkt.Heading, pkt.Speed);
-            }).SetMessageHandler<LandingFlockPacket>(pkt =>
-            {
-                // a flock coming in to land: drawn until the server swaps it for real geese (LandingFlocks)
-                if (renderer == null || !species.TryGetValue(pkt.Species ?? "", out var sp) || !sp.Meshes.Ok) return;
-                renderer.AddLanding(sp, pkt);
             });
             var p = api.ChatCommands.Parsers;
             api.ChatCommands.Create("flocks").WithDescription("Flocks (client-only birds)")

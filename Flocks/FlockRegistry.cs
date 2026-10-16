@@ -31,34 +31,18 @@ namespace Flocks
 
     public enum FlockState { Landed = 0, Away = 1, Lost = 2 }
 
-    /// <summary>Server -> clients: these departing birds are now a drawn flock; carry on from here.</summary>
-    [ProtoContract]
-    public class FlockHandoffPacket
-    {
-        [ProtoMember(1)] public string Species;
-        [ProtoMember(2)] public double[] X;
-        [ProtoMember(3)] public double[] Y;
-        [ProtoMember(4)] public double[] Z;
-        [ProtoMember(5)] public double Heading;
-        [ProtoMember(6)] public double Speed;
-        [ProtoMember(7)] public long FlockId;
-    }
-
     /// <summary>
     /// Server-side record of every landed flock: which geese belong together, how many are left, and whether the flock
     /// is on a lake, away on migration, or lost (all killed). Geese carry their flock id in WatchedAttributes.
-    /// A departing flock is handed to the clients' sky renderer once it is HandoffRange from every player: its entities
-    /// are removed and every client nearby continues it as a drawn flock, and its record goes Away so the migration
-    /// schedule can bring it back (landing flocks, next step).
+    /// A departing flock flies off as real geese; once DepartRange from every player its entities are removed and its
+    /// record goes Away, so the migration schedule can bring it back (LandingFlocks).
     /// </summary>
     public class FlockRegistry
     {
         public const string FlockIdKey = "flocksFlockId", SaveKey = "flocks:registry";
-        /// <summary>Departing geese become a drawn flock this far from the nearest player. Must stay well inside the
-        /// server's simulation range (128): entities further than that from every player stop ticking.</summary>
-        public const double HandoffRange = 80;
-        /// <summary>Players this close to the hand-off get the drawn flock (the sky renderer's farthest reach).</summary>
-        public const double BroadcastRange = 1600;
+        /// <summary>Departing geese are removed this far from the nearest player: 3-4 px across by then. Must stay
+        /// inside a flying goose's simulation range (EntityBehaviorWaterfowl.FlightRange), or it would stop ticking first.</summary>
+        public const double DepartRange = 360;
         /// <summary>A goose with no flock joins a landed flock with a member this close, else starts its own.</summary>
         public const double JoinRange = 24;
         private const int MaxRecords = 256;
@@ -66,14 +50,13 @@ namespace Flocks
         public static FlockRegistry Instance { get; private set; }
 
         private readonly ICoreServerAPI sapi;
-        private readonly IServerNetworkChannel channel;
         private Dictionary<long, FlockRecord> flocks = new();
         private long nextId = 1;
-        private readonly Dictionary<long, double> lastHandoffCheck = new();
+        private readonly Dictionary<long, double> lastDepartCheck = new();
 
-        public FlockRegistry(ICoreServerAPI sapi, IServerNetworkChannel channel)
+        public FlockRegistry(ICoreServerAPI sapi)
         {
-            this.sapi = sapi; this.channel = channel; Instance = this;
+            this.sapi = sapi; Instance = this;
             sapi.Event.SaveGameLoaded += Load;
             sapi.Event.GameWorldSave += Save;
         }
@@ -146,15 +129,15 @@ namespace Flocks
 
         /// <summary>
         /// Called by a departing goose in flight. Collects every departing airborne member of its flock; once their
-        /// centre is HandoffRange from the nearest player, sends them to the clients as one drawn flock and removes them.
-        /// Checked at most twice a second per flock.
+        /// centre is DepartRange from every player, the flock is Away and its geese are removed. Checked at most twice a
+        /// second per flock.
         /// </summary>
-        public void TryHandoff(Entity goose, string species)
+        public void TryDepart(Entity goose)
         {
             long id = goose.WatchedAttributes.GetLong(FlockIdKey, 0);
             double now = sapi.World.ElapsedMilliseconds / 1000.0;
-            if (lastHandoffCheck.TryGetValue(id, out double last) && now - last < 0.5) return;
-            lastHandoffCheck[id] = now;
+            if (lastDepartCheck.TryGetValue(id, out double last) && now - last < 0.5) return;
+            lastDepartCheck[id] = now;
 
             var members = new List<(Entity e, EntityBehaviorWaterfowl b)>();
             foreach (var e in sapi.World.LoadedEntities.Values)
@@ -168,22 +151,12 @@ namespace Flocks
             double cx = members.Average(m => m.e.Pos.X), cy = members.Average(m => m.e.Pos.Y), cz = members.Average(m => m.e.Pos.Z);
             var centre = new Vec3d(cx, cy, cz);
             var players = sapi.World.AllOnlinePlayers.Where(p => p.Entity != null).ToList();
-            if (players.Any(p => p.Entity.Pos.HorDistanceTo(centre) < HandoffRange)) return;
-
-            // average heading as a vector, so headings either side of north don't cancel out
-            double hx = members.Sum(m => Math.Sin(m.b.FlyHeading)), hz = members.Sum(m => Math.Cos(m.b.FlyHeading));
-            var pkt = new FlockHandoffPacket
-            {
-                Species = species, FlockId = id, Heading = Math.Atan2(hx, hz), Speed = members.Average(m => m.b.FlySpeed),
-                X = members.Select(m => m.e.Pos.X).ToArray(), Y = members.Select(m => m.e.Pos.Y).ToArray(), Z = members.Select(m => m.e.Pos.Z).ToArray(),
-            };
-            var send = players.Where(p => p.Entity.Pos.HorDistanceTo(centre) < BroadcastRange).Select(p => (IServerPlayer)p).ToArray();
-            if (send.Length > 0) channel.SendPacket(pkt, send);
+            if (players.Any(p => p.Entity.Pos.HorDistanceTo(centre) < DepartRange)) return;
 
             var f = Get(id);
             if (f != null) { f.State = FlockState.Away; f.X = cx; f.Y = cy; f.Z = cz; f.SinceHours = sapi.World.Calendar.TotalHours; }
             foreach (var (e, _) in members) e.Die(EnumDespawnReason.Expire);
-            lastHandoffCheck.Remove(id);
+            lastDepartCheck.Remove(id);
         }
 
         /// <summary>Keeps the registry bounded: drops the oldest Lost, then the oldest Away records past MaxRecords.</summary>

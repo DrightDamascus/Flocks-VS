@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
@@ -13,8 +14,10 @@ namespace Flocks
     /// at, the group takes off in a hurry (a short run across the water), flies to another part of the lake, or to
     /// another lake if there's no safe water left on this one, and glides in to land there.
     /// A group that departs for good (the resident season ends, a /flocks land test goose's time is up, or there is
-    /// nowhere to land nearby) climbs away and, once 80 blocks from every player, becomes a drawn flock in the clients'
-    /// sky (FlockRegistry.TryHandoff): it rejoins the migration rather than vanishing.
+    /// nowhere to land nearby) flies off as real geese and is removed once 360 blocks from every player
+    /// (FlockRegistry.TryDepart): it rejoins the migration rather than vanishing in view.
+    /// In flight a goose's simulation range is FlightRange instead of the usual 128 blocks, so it keeps flying, and
+    /// stays visible to players out to their view distance, far beyond where resting animals are simulated.
     /// Flight state is kept in WatchedAttributes, so a goose that flies out of the loaded area carries on later.
     /// Vanilla's land-creature AI tasks are not used: their pathfinder avoids water and getoutofwater would drag
     /// the birds ashore, so movement is set here directly and the vanilla physics does the rest.
@@ -46,8 +49,12 @@ namespace Flocks
         private const double Accel = 7, TurnRate = 1.4, ClimbMax = 4.5, SinkMax = 3, GroundClear = 6;
         /// <summary>Gliding in: blocks forward per block down, and the speed at touchdown.</summary>
         private const double GlideRatio = 3.5, LandSpeed = 6, SplashSeconds = 0.9;
-        /// <summary>Species code of the drawn flock this bird becomes when it departs (Species.cs).</summary>
+        /// <summary>Species code of this bird's flock (FlockRegistry, Species.cs).</summary>
         private string species = "goose";
+        /// <summary>Simulation range while flying: the server ticks an entity, and sends it to players, only within this
+        /// of some player (vanilla default 128). Landing flocks arrive from up to ~320 blocks out and departing ones are
+        /// removed at 360 (FlockRegistry.DepartRange), so it must cover both.</summary>
+        public const int FlightRange = 400;
         /// <summary>Terrain avoidance: feet clear ground and trees by Clearance; obstacles are seen LookSeconds ahead
         /// across the wingspan (HalfSpan either side). A wall too steep to climb at speed makes the goose pull up hard
         /// (SteepClimb) and shed speed, down to a near-vertical hover-climb at MinPullSpeed.</summary>
@@ -90,6 +97,7 @@ namespace Flocks
             var pos = entity.Pos;
             if (!entity.Alive) { pos.Roll = 0; if (entity.Swimming || entity.FeetInLiquid) pos.Motion.Y = SurfaceMotion(); return; }
             if (!restored) { restored = true; Restore(); FlockRegistry.Instance?.Adopt(entity, species); }
+            entity.SimulationRange = phase == Phase.Water ? GlobalConstants.DefaultSimulationRange : FlightRange;
             if (phase != Phase.Water) { TickFlight(dt); return; }
 
             var attrs = entity.WatchedAttributes;
@@ -239,8 +247,8 @@ namespace Flocks
                     }
                     else if (departing && phaseTime > 3)
                     {
-                        // far enough from every player: the group becomes a drawn flock (FlockRegistry.TryHandoff)
-                        FlockRegistry.Instance?.TryHandoff(entity, species);
+                        // far enough from every player: the flock has left (FlockRegistry.TryDepart)
+                        FlockRegistry.Instance?.TryDepart(entity);
                         if (!entity.Alive) return;
                     }
                     break;
@@ -418,7 +426,7 @@ namespace Flocks
         }
 
         /// <summary>
-        /// Before spawning a goose of a landing flock (LandingFlocks hand-off): it starts in flight at speed, already
+        /// Before spawning a goose of a landing flock (LandingFlocks): it starts in flight at speed, already
         /// headed for spot (a water-surface point from LakeSearch), and glides in on its first ticks. Written in the
         /// same saved form Restore() reads; the bird's own sink is applied there.
         /// </summary>
@@ -433,6 +441,14 @@ namespace Flocks
             t.SetBool("rawTarget", true);
             goose.WatchedAttributes[FlightKey] = t;
             goose.Pos.Yaw = (float)heading;
+            goose.SimulationRange = FlightRange; // active from the start, though it appears far from any player
+        }
+
+        /// <summary>A goose loaded from a save mid-flight needs its flight range before its first tick: beyond the
+        /// default 128 blocks from every player it would otherwise be inactive and never tick to set it.</summary>
+        public override void OnEntityLoaded()
+        {
+            if (entity.WatchedAttributes.HasAttribute(FlightKey)) entity.SimulationRange = FlightRange;
         }
 
         /// <summary>Climbing away for good, ready to be handed to the sky renderer.</summary>

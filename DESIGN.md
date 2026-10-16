@@ -100,6 +100,16 @@ agree where every bird is. At the hand-off the server spawns the real geese at t
 season would leave at once. The drawn formation closes to the real geese's spacing over the last 8 s, but the birds
 stay sky-sized until the swap (size jump left visible on purpose).
 
+Decision (Dright, 0.12.0): landing and departing flocks are real geese the whole way; the drawn-flock swaps of
+0.10.0-0.11.1 are gone (the transition never looked right). The engine allows it: the server ticks an entity, and
+sends it to a player whose client has the chunk, within max(128, entity.SimulationRange) blocks, and clients render
+entities out to their view distance (decompiled PhysicsManager / SystemRenderEntities). A flying goose's
+SimulationRange is 400 (EntityBehaviorWaterfowl.FlightRange); on the water it is back to the default 128. Landing
+flocks appear as a V of geese up to 320 blocks out along the arrival heading (loaded chunks, within 360 of the
+player), all at 13 blocks/s, each heading for its own spot. Departing flocks fly off and are removed 360 blocks from
+every player (3-4 px by then; out of sight below that view distance), and their record goes Away. Only flocks that
+merely pass over are still drawn by the client. Goose size 0.65 (1.7-block wingspan), hitbox scaled with it.
+
 Next steps:
 - Hand-off from the sky: when a planned goose flock passes a suitable lake (fresh water, 36+ surface blocks, 64+
   blocks from the player, near its heading), the client asks the server to land it. The server checks the lake

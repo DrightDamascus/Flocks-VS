@@ -51,7 +51,7 @@ namespace Flocks
             // Our own model (tools/make_greylag.py). Geese flap steadily with short glides.
             ["goose"] = new Species
             {
-                // the landed entity's size, read from entities/greylag.json client.size at load (0.55: 1.4 blocks
+                // the landed entity's size, read from entities/greylag.json client.size at load (0.65: 1.7 blocks
                 // across; a real greylag is 1.5-1.8 m), so drawn and real geese always match
                 Code = "goose", Scale = (float)FlockRenderer.EntityScale, SpeedMin = 16, SpeedMax = 21,
                 FlapSeconds = 0.5f, SoarSeconds = 2f, BlendSeconds = 0.35f,

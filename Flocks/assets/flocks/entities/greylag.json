@@ -2,9 +2,10 @@
 	code: "greylag",
 	class: "EntityAgent",
 	tags: ["animal", "huntable", "adult", "habitat-water"],
-	hitboxSize: { x: 0.6, y: 0.5 },
-	deadHitboxSize: { x: 0.6, y: 0.3 },
-	eyeHeight: 0.45,
+	// scaled with client.size 0.65 (was 0.55 with 0.6 x 0.5)
+	hitboxSize: { x: 0.7, y: 0.6 },
+	deadHitboxSize: { x: 0.7, y: 0.35 },
+	eyeHeight: 0.53,
 	fallDamageMultiplier: 0.5,
 	drops: [],
 	attributes: {
@@ -14,7 +15,8 @@
 		renderer: "Shape",
 		shape: { base: "flocks:entity/bird/greylag" },
 		textures: { "greylag": { base: "flocks:entity/bird/greylag" } },
-		size: 0.55,
+		// 1.7-block wingspan (a real greylag is 1.5-1.8 m); the sky geese read this too, so both always match
+		size: 0.65,
 		behaviors: [
 			{ code: "repulseagents" },
 			{ code: "controlledphysics", stepHeight: 0.6 },
