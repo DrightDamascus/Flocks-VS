@@ -10,8 +10,8 @@
 		  texOverride: "entity/animal/bird/passerine/treesparrow-adult-male" },
 		{ name: "chicken", shape: "game:shapes/entity/animal/bird/chicken/chicken-hen.json", flap: "fly", soar: "fly" }
 	],
-	// buzzard-sized: about 1.2 m wingspan (also applied to the fallback shapes)
-	wingspan: 1.2,
+	// half again a buzzard's 1.2 m wingspan, like the other birds (also applied to the fallback shapes)
+	wingspan: 1.8,
 	// raptors ride midday thermals; the big passage is autumn, spring is lighter. Loose groups of 3-10.
 	springStart: 0.08, springEnd: 0.22, springWeight: 0.5, autumnStart: 0.55, autumnEnd: 0.72,
 	hours: [10, 15],

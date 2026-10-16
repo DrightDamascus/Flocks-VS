@@ -1,0 +1,90 @@
+{
+	code: "eagle",
+	class: "EntityAgent",
+	tags: ["animal", "huntable", "adult"],
+	hitboxSize: { x: 1.1, y: 1.1 },
+	deadHitboxSize: { x: 1.1, y: 0.5 },
+	eyeHeight: 1.1,
+	fallDamageMultiplier: 0.3,
+	drops: [],
+	attributes: {
+		handbook: { exclude: true }
+	},
+	client: {
+		renderer: "Shape",
+		// tools/make_eagle.py: its own bones and animations
+		shape: { base: "flocks:entity/bird/eagle" },
+		textures: { "eagle": { base: "flocks:entity/bird/eagle" } },
+		// 3.1-block wingspan: bigger than a real golden eagle's 1.8-2.3 m, like the other birds
+		size: 1.1,
+		behaviors: [
+			{ code: "repulseagents" },
+			{ code: "controlledphysics", stepHeight: 1.1 },
+			{ code: "floatupwhenstuck", onlyWhenDead: true },
+			{ code: "interpolateposition" },
+			{ code: "harvestable" }
+		],
+		animations: [
+			{ code: "idle-stand", animation: "idle-stand", blendMode: "Average", easeInSpeed: 3, easeOutSpeed: 3, triggeredBy: { defaultAnim: true } },
+			{ code: "walk", animation: "walk", blendMode: "Average", easeInSpeed: 3, easeOutSpeed: 3 },
+			{ code: "eat", animation: "eat", blendMode: "Average", easeInSpeed: 4, easeOutSpeed: 4 },
+			{ code: "fly-soar", animation: "fly-soar", blendMode: "Average", weight: 10, easeInSpeed: 3, easeOutSpeed: 3 },
+			{ code: "fly-flap", animation: "fly-flap", animationSpeed: 1.1, blendMode: "Average", weight: 10, easeInSpeed: 5, easeOutSpeed: 5 },
+			{ code: "stoop", animation: "stoop", blendMode: "Average", weight: 10, easeInSpeed: 6, easeOutSpeed: 6 },
+			{ code: "takeoff", animation: "takeoff", animationSpeed: 1.6, blendMode: "Average", weight: 10, easeInSpeed: 10, easeOutSpeed: 5 },
+			{ code: "land", animation: "land", animationSpeed: 1.2, blendMode: "Average", weight: 10, easeInSpeed: 6, easeOutSpeed: 4 },
+			{ code: "die", animation: "death", animationSpeed: 1.25, weight: 10, blendMode: "Average", triggeredBy: { onControls: ["dead"] } }
+		]
+	},
+	server: {
+		behaviors: [
+			{ code: "repulseagents" },
+			{ code: "controlledphysics", stepHeight: 1.1 },
+			// perch, soar on thermals, stoop on prey (Raptor.cs). Before "health": it zeroes spear and melee damage.
+			{ code: "flocks.raptor", territory: 200, fleeRange: 26, takeoffRange: 16, soarSpeed: 10,
+			  soarAltitudeMin: 35, soarAltitudeMax: 65, stoopSpeed: 38, preyCodes: ["game:hare-*", "flocks:mallard"] },
+			{ code: "health", currenthealth: 10, maxhealth: 10 },
+			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
+			{ code: "harvestable", drops: [
+				{ type: "item", code: "game:poultry-raw", quantity: { avg: 2, var: 0.5 } },
+				{ type: "item", code: "game:feather", quantity: { avg: 20, var: 4 } }
+			] },
+			{ code: "floatupwhenstuck", onlyWhenDead: true }
+		],
+		// Open high ground (minY: 15% of the way from sea level to the sky limit), alone; at most two within 192 blocks
+		// (Residents.cs). Resident all year.
+		spawnconditions: {
+			worldgen: {
+				TriesPerChunk: { avg: 0.01, var: 0 },
+				tryOnlySurface: true,
+				groupSize: { dist: "uniform", avg: 1, var: 0 },
+				minY: 1.15,
+				minTemp: -25,
+				maxTemp: 28,
+				maxForest: 0.6
+			},
+			runtime: {
+				group: "passive",
+				MinDistanceToPlayer: 48,
+				chance: 0.004,
+				maxQuantity: 3,
+				tryOnlySurface: true,
+				groupSize: { dist: "uniform", avg: 1, var: 0 },
+				minY: 1.15,
+				minTemp: -25,
+				maxTemp: 28,
+				maxForest: 0.6
+			}
+		}
+	},
+	sounds: {
+		hurt: "flocks:eagle/hurt",
+		death: "flocks:eagle/death",
+		// golden eagles are mostly quiet: thin yelps now and then
+		idle: { path: "flocks:eagle/call*", pitch: { avg: 1, var: 0.06 }, range: 64 },
+		call: { path: "flocks:eagle/call*", pitch: { avg: 1, var: 0.06 }, range: 80, volume: { avg: 0.9 } },
+		// the goose wingbeats, pitched well down: big, heavy wings
+		takeoffwings: { path: "flocks:wings/flap*", pitch: { avg: 0.7, var: 0.05 }, range: 32, volume: { avg: 1 } }
+	},
+	idleSoundChance: 0.01
+}

@@ -75,9 +75,11 @@ Decisions (Dright, 0.10.0) for flocks landing and leaving:
 - Distant flight stays client-drawn (sky renderer: visible 300-1500 blocks, no server cost). Real entities only for
   the final approach and the climb-out: the server only simulates entities within 128 blocks of a player.
 - Sizes (Dright, 0.11.1): one fixed size per bird at every distance, no distance tricks, so it can be judged by eye.
-  The sky goose is drawn at the landed entity's size, read from entities/greylag.json client.size (0.55: 1.4 block
-  wingspan; a real greylag is 1.5-1.8 m, 1 block = 1 m); raise that one number to enlarge both. Cranes 2.2 and hawks
-  1.2 block wingspans (Species.Wingspan). Until 0.11.0 the sky birds were ~4.5x real size to read from far off; at
+  The sky goose is drawn at the landed entity's size, read from entities/greylag.json client.size; raise that one
+  number to enlarge both. Since 0.17.0 every bird is about half again its real size (Dright: true-size birds looked
+  tiny next to the game's boars and deer, and a block is a metre only loosely anyway): goose 0.98 (2.6-block
+  wingspan), mallard 0.75, heron 1.05, eagle 1.1, cranes 3.3 and hawks 1.8 block wingspans (Species.Wingspan).
+  Formation spacing and the flight look-ahead's half-span grew with them. Until 0.11.0 the sky birds were ~4.5x real size to read from far off; at
   true size a goose is ~2 px at ~540 blocks, which is now where flocks appear and fade.
 - Geese are the test species; per-species data (family unit, flock size) is to follow for the others.
 
@@ -147,13 +149,25 @@ Decisions (Dright, 0.13.0), Phase 1 AI:
   mallard.json and sounds/duck/. New per-species data it needed: takeoffRunSeconds/takeoffRunSpeed (a dabbling duck
   springs straight up instead of running) and minLakeSize (ducks take ponds of 25 surface blocks).
 - Done in 0.16.0: the grey heron, the first new behaviour type: wading. Vintage Story's still water is always a full
-  block deep, so a true-size heron would stand chest-deep; Dright: give it freakishly long legs (~1 block). It stands
+  block deep, so a true-size heron would stand chest-deep. At first it got stilt legs (~1 block on a 1.75-block bird);
+  in 0.17.0 (Dright: big herons with normal legs rather than small ones on stilts) it became a bigger bird (size 1.05)
+  whose only slightly long legs reach the bottom. It stands
   on the bottom of water one block deep (species habitat "wade"; a taller selection box while standing so the game's
   swimming check, water at 66% of the box, looks above the water), rests hunched, stalks and strikes, goes alert and
   backs off when approached, and flushes from further than geese. Landing spots are wadeable water a block away from
   any drop-off; a wader that ends up in deep water floats up and paddles back. It spawns on its own (only in water one
   block deep) and doesn't arrive in landing flocks (arriveInFlocks false). tools/make_heron.py: own bones (two-part
   neck for the S) and animations; ground poses lift the body by the leg length so the feet stand at the entity's feet.
+- Done in 0.17.0: the golden eagle, the second new behaviour type: a raptor (species habitat "air", Raptor.cs, on the
+  shared EntityBehaviorBird base with the waterfowl's flight helpers). Perches on the most prominent high point
+  within 64 blocks, soars in circles on thermals 35-65 blocks up within its territory, glides between thermals, and
+  hunts: every few seconds it looks for prey (preyCodes: hares and mallards) well below it in the open, closes in at
+  height until it is over it (a long shallow dive would hit what's in between), stoops at up to 38 blocks/s,
+  strikes and walks onto the kill to feed (flying to it if it fell off a ledge); waterfowl may spot it and flush,
+  a duck caught on the water is carried off, and each attack counts toward the flock's lake wariness (Dright's idea:
+  an eagle hunting a pond drives the ducks off it for a few days), or pulls up if the prey got under cover. Flushes from a perch like
+  the geese; a missed shot startles it. Spawns alone on open high ground, at most two within 192 blocks; resident
+  all year; no landing flocks and no drawn sky flocks.
 
 Next steps:
 - Hand-off from the sky: when a planned goose flock passes a suitable lake (fresh water, 36+ surface blocks, 64+

@@ -70,9 +70,11 @@ namespace Flocks
 
         public int MinLake(int serverDefault) => MinLakeSize > 0 ? MinLakeSize : serverDefault;
         /// <summary>"water": floats on open water (geese, ducks). "wade": stands on the bottom of water one block deep
-        /// (herons): rests, stalks and strikes there, and lands and spawns only in such water.</summary>
+        /// (herons): rests, stalks and strikes there, and lands and spawns only in such water. "air": a bird of prey that
+        /// perches and soars over open high ground (eagles, flocks.raptor), resident all year, no water needed.</summary>
         public string Habitat = "water";
         public bool Wades => Habitat == "wade";
+        public bool Soars => Habitat == "air";
         /// <summary>Whether landing flocks of it arrive on spring migration days (herons don't; they spawn on their own).</summary>
         public bool ArriveInFlocks = true;
 

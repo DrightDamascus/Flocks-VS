@@ -2,9 +2,9 @@
 	code: "mallard",
 	class: "EntityAgent",
 	tags: ["animal", "huntable", "adult", "habitat-water"],
-	hitboxSize: { x: 0.5, y: 0.45 },
-	deadHitboxSize: { x: 0.5, y: 0.28 },
-	eyeHeight: 0.4,
+	hitboxSize: { x: 0.8, y: 0.7 },
+	deadHitboxSize: { x: 0.8, y: 0.45 },
+	eyeHeight: 0.64,
 	fallDamageMultiplier: 0.5,
 	drops: [],
 	attributes: {
@@ -16,8 +16,9 @@
 		shape: { base: "flocks:entity/bird/mallard" },
 		// drakes and hens at random: one UV layout, two paint jobs
 		textures: { "mallard": { base: "flocks:entity/bird/mallard-drake", alternates: [ { base: "flocks:entity/bird/mallard-hen" } ] } },
-		// 0.9-block wingspan (a real mallard is 0.8-1 m); passing mallard flocks read this too
-		size: 0.47,
+		// 1.4-block wingspan: well over a real mallard's 0.8-1 m, so it doesn't vanish next to the game's animals.
+		// Passing mallard flocks read this too
+		size: 0.75,
 		behaviors: [
 			{ code: "repulseagents" },
 			{ code: "controlledphysics", stepHeight: 0.5 },
@@ -44,7 +45,7 @@
 			{ code: "controlledphysics", stepHeight: 0.5 },
 			// before "health": it zeroes spear and melee damage before health applies it. Mallards let you a little
 			// closer than geese, spring straight up instead of running, and fly faster.
-			{ code: "flocks.waterfowl", species: "mallard", fleeRange: 12, takeoffRange: 6, lifeHours: 6, sink: 0.1,
+			{ code: "flocks.waterfowl", species: "mallard", fleeRange: 12, takeoffRange: 6, lifeHours: 6, sink: 0.16,
 			  cruiseSpeedMin: 15, cruiseSpeedMax: 18, takeoffRunSeconds: 0.15, takeoffRunSpeed: 4,
 			  takeoffWingsChance: 0.7, takeoffCallChance: 0.5 },
 			{ code: "health", currenthealth: 3, maxhealth: 3 },

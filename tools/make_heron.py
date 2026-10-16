@@ -118,7 +118,7 @@ HAND_X = (3.0, 10.0)
 HAND_ROOT, HAND_LEN = ARM_ROOT + ARM_LEN, 9.0
 WING_Y = 5.6
 mz = g.mz
-LEG = 22.0                                    # 0.96 blocks at the entity's size 0.7
+LEG = 15.0                                    # 0.98 blocks at the entity's size 1.05
 HIP_L, HIP_R = (10.0, 3.45, 8.55), (10.0, 3.45, 7.45)
 BODY_ORIGIN = (6.5, 4.5)                      # the Body element's rotation origin (x, y): the centre of its box
 
@@ -150,7 +150,8 @@ def shape():
     bill = El("Bill", [-15.0, 4.7, 7.65], [-10.4, 5.4, 8.35], m_bill)
     crest = El("Crest", [-7.4, 5.85, 7.85], [-4.6, 6.15, 8.15], m_crest, origin=[-8.0, 6.0, 8], rot=(0, 0, 12))
     tail = El("Tail", [11.5, 5.4, 6.1], [14.4, 5.4, 9.9], m_tail, faces=("up",), origin=[11.5, 5.4, 8], rot=(0, 0, 4))
-    # freakishly long legs (Dright): long enough to stand on the bottom of a full block of water with the body clear of it
+    # A big heron rather than stilts (Dright): at the entity's size the legs, a little long, reach the bottom of a
+    # full block of water with the belly just clear of it
     leg_l = El("LegL", [10.0, 3.2, 8.3], [10.0 + LEG, 3.7, 8.8], m_legs, origin=list(HIP_L))
     leg_r = El("LegR", [10.0, 3.2, 7.2], [10.0 + LEG, 3.7, 7.7], m_legs, origin=list(HIP_R))
     foot_l = El("FootL", [10.0 + LEG, 3.1, 8.0], [13.0 + LEG, 3.6, 9.1], m_legs)

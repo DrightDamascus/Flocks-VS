@@ -24,7 +24,7 @@ namespace Flocks
     /// Damage: arrows and other ranged projectiles hurt it normally. Spears (thrown or held) and melee hits do
     /// nothing except scare it off - the goose dodges, like a fish slipping a spear.
     /// </summary>
-    public class EntityBehaviorWaterfowl : EntityBehavior
+    public class EntityBehaviorWaterfowl : EntityBehaviorBird
     {
         public const string Code = "flocks.waterfowl";
         private const string SpawnKey = "flocksSpawnHours", FlightKey = "flocksFlight";
@@ -34,10 +34,6 @@ namespace Flocks
 
         public bool Resident => !entity.WatchedAttributes.HasAttribute(TestKey);
         private float seasonCheck = 5;
-        /// <summary>Missed shots: ten times a second the goose looks for fast non-creatures (arrows, spears, stones, other
-        /// mods' shot) within ShotScan blocks whose path passes within NearMiss of it in the next 0.3 s. An arrow covers
-        /// several blocks between checks, so it is the path that is tested, not the distance.</summary>
-        private const double ShotScan = 24, NearMiss = 4, ShotMinSpeed = 9;   // blocks, blocks, blocks/s
         private float shotCheck;
         private double rangeMult = 1;                  // SkittishRangeFactor while the flock is skittish
         private double senseMul = 1;                   // the noticed player's sensing multiplier (sneaking, stats)
@@ -51,12 +47,11 @@ namespace Flocks
 
         // ---- flight, in blocks and seconds (Motion is per 1/60 s, hence the /60 where it is set)
         private enum Phase { Water, Run, Fly, Glide, Splash }
-        /// <summary>The run across the water before the feet leave it, and its top speed.</summary>
         /// <summary>takeoffRunSeconds / takeoffRunSpeed attributes: geese run 0.55 s across the water; dabbling ducks
         /// spring almost straight up.</summary>
         private double RunSeconds = 0.55, RunSpeed = 7;
         private double cruiseMin = 11, cruiseMax = 13.5;
-        private const double Accel = 7, TurnRate = 1.4, ClimbMax = 4.5, SinkMax = 3, GroundClear = 6;
+        private const double Accel = 7, ClimbMax = 4.5, SinkMax = 3, GroundClear = 6;
         /// <summary>Gliding in: blocks forward per block down, and the speed at touchdown.</summary>
         private const double GlideRatio = 3.5, LandSpeed = 6, SplashSeconds = 0.9;
         /// <summary>Species code of this bird's flock (FlockRegistry, Species.cs).</summary>
@@ -79,14 +74,6 @@ namespace Flocks
 
         /// <summary>Smallest lake this species lands on (its species data; else the server default).</summary>
         private int MinLake => SpeciesData?.MinLakeSize > 0 ? SpeciesData.MinLakeSize : Landing.MinPatch;
-        /// <summary>Simulation range while flying: the server ticks an entity, and sends it to players, only within this
-        /// of some player (vanilla default 128). Landing flocks arrive from up to ~320 blocks out and departing ones are
-        /// removed at 360 (FlockRegistry.DepartRange), so it must cover both.</summary>
-        public const int FlightRange = 400;
-        /// <summary>Terrain avoidance: feet clear ground and trees by Clearance; obstacles are seen LookSeconds ahead
-        /// across the wingspan (HalfSpan either side). A wall too steep to climb at speed makes the goose pull up hard
-        /// (SteepClimb) and shed speed, down to a near-vertical hover-climb at MinPullSpeed.</summary>
-        private const double Clearance = 1.5, LookSeconds = 3, HalfSpan = 0.8, SteepClimb = 7, MinPullSpeed = 1.2, PullDecel = 20;
         /// <summary>
         /// A spot is given up after ApproachGiveUp seconds of trying to get in, MaxGoArounds aborted glides, or when the
         /// way in would need a descent steeper than MaxApproachSlope (blocks down per block forward; 1 = 45 deg, about
@@ -115,15 +102,15 @@ namespace Flocks
         private int goArounds, spotChanges;
         private readonly List<Vec3d> badSpots = new();
         private bool departing;
-        private double flyHeading, speed, cruise, travel, threatX, threatZ;
+        private double cruise, travel, threatX, threatZ;
 
         private Entity scarer;
         private float nextCheck;
         private double heading;
-        private string anim;
-        private readonly Random rand = new();
 
         public EntityBehaviorWaterfowl(Entity entity) : base(entity) { }
+
+        protected override float AnimSpeed(string code) => code switch { "takeoff" => 2.6f, "fly-flap" => 1.6f, "land" => 1.3f, _ => 1f };
         public override string PropertyName() => Code;
 
         public override void Initialize(EntityProperties properties, JsonObject attributes)
@@ -241,6 +228,14 @@ namespace Flocks
             foreach (var e in entity.World.GetEntitiesAround(pos.XYZ, 16, 8, e => e.Code == entity.Code && e.Alive && e != entity))
                 e.GetBehavior<EntityBehaviorWaterfowl>()?.Takeoff(away + (rand.NextDouble() - 0.5) * 0.6, Pick(spots), depart, tx, tz,
                     (float)(0.08 + rand.NextDouble() * 0.5));
+        }
+
+        /// <summary>A bird of prey stooping at this bird or its group (Raptor.cs): they flush away from it, a disturbance
+        /// like any other (lake wariness: hunted often enough, they abandon the lake).</summary>
+        public void Alarm(Entity raptor)
+        {
+            if (phase != Phase.Water || !entity.Alive) return;
+            TakeoffGroup(Math.Atan2(entity.Pos.X - raptor.Pos.X, entity.Pos.Z - raptor.Pos.Z), raptor, false);
         }
 
         private Vec3d Pick(List<Vec3d> spots)
@@ -390,6 +385,7 @@ namespace Flocks
                     // skid to a stop on the water, wings still up, then fold them and float; a wader settles onto the bottom
                     SetAnim(phaseTime < 0.5 ? "land" : (Wade ? "idle-stand" : "swim"));
                     speed *= Math.Exp((Wade ? -8 : -4) * dt);
+                    if (Wade && !WadeAt(flyHeading, 0.7)) speed = 0;   // don't skid off the shallows into deep water
                     onWater = !Wade;
                     if (Wade) vy = -3;
                     if (phaseTime >= SplashSeconds)
@@ -433,80 +429,6 @@ namespace Flocks
             }
             if (target == null && ground > 0) baseY = ground;
             return Math.Max(baseY + alt, ground + GroundClear);
-        }
-
-        /// <summary>
-        /// Steepest climb (blocks up per block forward) needed to keep the feet Clearance above every ground or tree
-        /// top within dist along towards, sampled every 1.5 blocks down the middle and at each wingtip; -infinity if
-        /// nothing is in the way. Open water never counts.
-        /// </summary>
-        private double NeededSlope(double towards, double dist) => NeededSlope(towards, dist, out _, out _);
-
-        /// <summary>NeededSlope, also giving the nearest obstacle in the way: how far ahead, and how far the feet must
-        /// rise to clear it (0 / infinity when nothing is in the way).</summary>
-        private double NeededSlope(double towards, double dist, out double nearest, out double rise)
-        {
-            var pos = entity.Pos; var ba = entity.World.BlockAccessor;
-            double sx = Math.Sin(towards), sz = Math.Cos(towards), worst = double.NegativeInfinity;
-            nearest = double.PositiveInfinity; rise = 0;
-            var tmp = new BlockPos(0, 0, 0);
-            for (double d = 1; d <= dist; d += 1.5)
-                for (int side = -1; side <= 1; side++)
-                {
-                    int x = (int)Math.Floor(pos.X + sx * d + sz * side * HalfSpan), z = (int)Math.Floor(pos.Z + sz * d - sx * side * HalfSpan);
-                    int h = ba.GetRainMapHeightAt(x, z);
-                    if (h <= 0 || h + 1 + Clearance <= pos.Y) continue;                       // unloaded, or well below
-                    tmp.Set(x, h, z);
-                    if (ba.GetBlock(tmp, BlockLayersAccess.Fluid)?.IsLiquid() == true) continue;
-                    // the face may be up to one sample spacing nearer than the sample that sees it
-                    worst = Math.Max(worst, (h + 1 + Clearance - pos.Y) / Math.Max(d - 2.1, 0.4));
-                    if (d < nearest) { nearest = d; rise = h + 1 + Clearance - pos.Y; }
-                    else if (d == nearest) rise = Math.Max(rise, h + 1 + Clearance - pos.Y);
-                }
-            return worst;
-        }
-
-        /// <summary>
-        /// Raises vy to clear whatever is ahead, starting early (LookSeconds out) so most climbs are gentle. When the
-        /// climb is steeper than SteepClimb allows at the current speed, caps the speed so the climb angle is enough:
-        /// the goose pulls up hard and sheds speed, down to a hover-climb. If something is overhead (it flew in under
-        /// a crown), climbing can't help: it turns hard toward the most open direction instead.
-        /// </summary>
-        private void AvoidTerrain(ref double vy, ref double cap, float dt)
-        {
-            var pos = entity.Pos; var ba = entity.World.BlockAccessor;
-            int x = (int)Math.Floor(pos.X), z = (int)Math.Floor(pos.Z), above = ba.GetRainMapHeightAt(x, z);
-            if (above + 1 > pos.Y + 1.2 && ba.GetBlock(new BlockPos(x, above, z), BlockLayersAccess.Fluid)?.IsLiquid() != true)
-            {
-                Steer(MostOpenHeading(), TurnRate * 2.5, dt);
-                vy = Math.Min(vy, 0.5); cap = Math.Min(cap, 4);
-                return;
-            }
-            double slope = NeededSlope(flyHeading, Math.Max(8, speed * LookSeconds), out double near, out double rise);
-            if (double.IsNegativeInfinity(slope)) return;
-            // Too close to climb over in time (a go-round low inside a ring of trees, say): rising takes rise/SteepClimb,
-            // reaching it (near - 0.6)/speed. Turn hard for the most open side, slow, and climb while turning.
-            if (near < 6 && rise / SteepClimb > (near - 0.6) / Math.Max(speed, 0.5))
-            {
-                Steer(MostOpenHeading(), TurnRate * 2.5, dt);
-                vy = SteepClimb; cap = Math.Min(cap, 3);
-                return;
-            }
-            vy = Math.Max(vy, Math.Min(slope * Math.Max(speed, MinPullSpeed) * 1.35 + 0.6, SteepClimb));
-            cap = Math.Min(cap, Math.Max(MinPullSpeed, SteepClimb / (slope * 1.35)));
-        }
-
-        /// <summary>Of straight on, 45 and 90 degrees either way, and back, the direction whose next 6 blocks need the
-        /// gentlest climb.</summary>
-        private double MostOpenHeading()
-        {
-            double best = flyHeading, bestSlope = double.MaxValue;
-            foreach (double off in new[] { 0, 0.8, -0.8, 1.6, -1.6, Math.PI })
-            {
-                double sl = NeededSlope(flyHeading + off, 6);
-                if (sl < bestSlope) { bestSlope = sl; best = flyHeading + off; }
-            }
-            return best;
         }
 
         /// <summary>
@@ -592,11 +514,6 @@ namespace Flocks
         }
 
         private double ClimbRate(double wantY) => GameMath.Clamp((wantY - entity.Pos.Y) * 0.8, -SinkMax, phaseTime < 2 ? ClimbMax * 0.8 : ClimbMax);
-
-        private void Steer(double want, double rate, float dt)
-            => flyHeading += GameMath.Clamp(GameMath.AngleRadDistance((float)flyHeading, (float)want), -rate * dt, rate * dt);
-
-        private double HorDist(Vec3d p) => Math.Sqrt((p.X - entity.Pos.X) * (p.X - entity.Pos.X) + (p.Z - entity.Pos.Z) * (p.Z - entity.Pos.Z));
 
         private void SetPhase(Phase p) { phase = p; phaseTime = 0; Persist(); }
 
@@ -755,12 +672,14 @@ namespace Flocks
             pos.Yaw = (float)heading;
         }
 
-        /// <summary>Wadeable water dist blocks along heading, at the bird's own level.</summary>
+        /// <summary>Wadeable water dist blocks along heading, at the bird's own level (or up to two above, for one in over
+        /// its head and looking for the shallows).</summary>
         private bool WadeAt(double towards, double dist)
         {
             var pos = entity.Pos;
             int x = (int)Math.Floor(pos.X + Math.Sin(towards) * dist), z = (int)Math.Floor(pos.Z + Math.Cos(towards) * dist);
-            return LakeSearch.IsWadeable(entity.World.BlockAccessor, x, z, out int y) && Math.Abs(y - (int)Math.Floor(pos.Y + 0.1)) <= 1;
+            int dy = LakeSearch.IsWadeable(entity.World.BlockAccessor, x, z, out int y) ? y - (int)Math.Floor(pos.Y + 0.1) : int.MinValue;
+            return dy >= -1 && dy <= (entity.Swimming ? 2 : 1);
         }
 
         /// <summary>The heading itself if wadeable water is just ahead, else toward the nearest within 6 blocks, else a turn.</summary>
@@ -774,58 +693,6 @@ namespace Flocks
                     if (WadeAt(h, dist)) return h;
                 }
             return current + Math.PI * (0.5 + rand.NextDouble());
-        }
-
-        /// <summary>
-        /// A shot coming close: a fast-moving non-creature whose straight path over the next 0.3 s passes within NearMiss.
-        /// away: the shot's direction of travel (the flock flies on away from the shooter); shooter: who fired it, when
-        /// the projectile says (vanilla's EntityProjectile.FiredBy, read by name, since that class isn't in the API);
-        /// from: otherwise a point 20 blocks back along its path.
-        /// </summary>
-        private bool IncomingShot(out double away, out Entity shooter, out Vec3d from)
-        {
-            away = 0; shooter = null; from = null;
-            var me = entity.Pos.XYZ;
-            double minSq = ShotMinSpeed / 60 * (ShotMinSpeed / 60);
-            foreach (var e in entity.World.GetEntitiesAround(me, (float)ShotScan, (float)ShotScan / 2,
-                         e => e.Alive && e is not EntityAgent && e.Pos.Motion.LengthSq() > minSq))
-            {
-                var m = e.Pos.Motion;
-                double vx = m.X * 60, vy = m.Y * 60, vz = m.Z * 60, v2 = vx * vx + vy * vy + vz * vz;
-                double rx = me.X - e.Pos.X, ry = me.Y + 0.3 - e.Pos.Y, rz = me.Z - e.Pos.Z;
-                double t = GameMath.Clamp((rx * vx + ry * vy + rz * vz) / v2, 0, 0.3);
-                double cx = rx - vx * t, cy = ry - vy * t, cz = rz - vz * t;
-                if (cx * cx + cy * cy + cz * cz > NearMiss * NearMiss) continue;
-                away = Math.Atan2(vx, vz);
-                shooter = e.GetType().GetField("FiredBy")?.GetValue(e) as Entity;
-                double v = Math.Sqrt(v2);
-                from = new Vec3d(e.Pos.X - vx / v * 20, e.Pos.Y, e.Pos.Z - vz / v * 20);
-                return true;
-            }
-            return false;
-        }
-
-        /// <summary>
-        /// The nearest player this goose notices within range, sensed the way vanilla animals sense players
-        /// (AiTaskBaseTargetable.CanSensePlayer): the player's animalSeekingRange stat scales the range, sneaking on
-        /// the ground cuts it to 60%, and creative and spectator players go unnoticed. senseMul: that player's
-        /// multiplier, which the flee and takeoff distances use too, so a sneaking hunter gets closer before the flush.
-        /// </summary>
-        private Entity NearestPlayer(float range, out double senseMul)
-        {
-            EntityPlayer best = null; double bestD = double.MaxValue; senseMul = 1;
-            foreach (var p in entity.World.AllOnlinePlayers)
-            {
-                var ep = p.Entity;
-                if (ep == null || !ep.Alive || ep.Pos.Dimension != entity.Pos.Dimension) continue;
-                var mode = p.WorldData?.CurrentGameMode;
-                if (mode == EnumGameMode.Creative || mode == EnumGameMode.Spectator) continue;
-                double mul = ep.Stats.GetBlended("animalSeekingRange");
-                if (ep.Controls.Sneak && ep.OnGround) mul *= 0.6;
-                double d = ep.Pos.DistanceTo(entity.Pos);
-                if (d < range * mul && d < bestD) { best = ep; bestD = d; senseMul = mul; }
-            }
-            return best;
         }
 
         /// <summary>Water at the goose's level (or one below, for a goose standing ashore) dist blocks along heading.</summary>
@@ -858,15 +725,6 @@ namespace Flocks
                 if (!double.IsNaN(best)) return best;
             }
             return current + Math.PI * (0.5 + rand.NextDouble());
-        }
-
-        private void SetAnim(string code)
-        {
-            if (anim == code) return;
-            if (anim != null) entity.AnimManager?.StopAnimation(anim);
-            anim = code;
-            float speedMul = code switch { "takeoff" => 2.6f, "fly-flap" => 1.6f, "land" => 1.3f, _ => 1f };
-            entity.AnimManager?.StartAnimation(new AnimationMetaData { Code = code, Animation = code, AnimationSpeed = speedMul }.Init());
         }
 
         // ------------------------------------------------------------------------------------------------ damage
@@ -902,19 +760,5 @@ namespace Flocks
             }
         }
 
-        /// <summary>
-        /// Spears and melee are dodged; ranged projectiles (arrows, thrown stones, other mods' shot) are not.
-        /// A projectile hit has SourceEntity = the projectile (not an agent); a melee hit has the attacker itself as
-        /// the source. A thrown spear is a projectile whose code starts with "spear".
-        /// </summary>
-        private static bool Dodges(DamageSource source)
-        {
-            var src = source.SourceEntity;
-            var cause = source.GetCauseEntity();
-            if (src == null && cause == null) return false;                          // fire, falls, drowning, commands
-            if (src != null && !(src is EntityAgent))
-                return src.Code?.Path?.StartsWith("spear") == true;                  // a projectile: only spears miss
-            return true;                                                             // melee by an agent (any weapon)
-        }
     }
 }

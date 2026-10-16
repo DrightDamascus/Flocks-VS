@@ -2,7 +2,7 @@
 
 ## Sounds (Flocks/assets/flocks/sounds)
 All clips were cut from the recordings below, mixed to mono, high-passed at 120 Hz, faded at the ends, loudness/peak
-normalized and encoded as Ogg Vorbis (the duck and heron clips high-passed at 150 Hz). The hurt sounds are pitched up
+normalized and encoded as Ogg Vorbis (the duck and heron clips high-passed at 150 Hz, the eagle's at 400 Hz). The hurt sounds are pitched up
 15% and the death sounds down 15%. The CC BY-SA clips are adaptations and are themselves licensed CC BY-SA under the
 same version as their source.
 
@@ -17,6 +17,8 @@ same version as their source.
 | duck/idle/quack5-6, duck/call2 | [Anas platyrhynchos - Mallard - XC112828](https://commons.wikimedia.org/wiki/File:Anas_platyrhynchos_-_Mallard_-_XC112828.ogg) (xeno-canto [XC112828](https://xeno-canto.org/112828)) | Jonathon Jongsma | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) |
 | duck/idle/mutter1-2 (female mallard feeding) | [Anas platyrhynchos - Mallard XC518422](https://commons.wikimedia.org/wiki/File:Anas_platyrhynchos_-_Mallard_XC518422.mp3) (xeno-canto [XC518422](https://xeno-canto.org/518422)) | Marie-Lan Taÿ Pamart | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 | heron/croak1-3, heron/hurt, heron/death | [Grey heron call recorded in January 2023 at Sangli](https://commons.wikimedia.org/wiki/File:Grey_heron_call_recorded_in_January_2023_at_Sangli.wav) | Sharad Apte (Sharadapte) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+| eagle/call1-3, eagle/hurt, eagle/death (captive) | [Golden eagle](https://commons.wikimedia.org/wiki/File:Golden_eagle.ogg) | Bubulcus | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| eagle/call4 | [Golden Eagle (Aquila chrysaetos) (W1CDR0001387 BD6)](https://commons.wikimedia.org/wiki/File:Golden_Eagle_(Aquila_chrysaetos)_(W1CDR0001387_BD6).ogg) (British Library) | Lawrence Shove | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 
 The NPS/Yellowstone sound library (public domain) was checked first. It has Canada geese and sandhill cranes, but no
 greylag, common crane or clean wingbeat takeoffs, so the clips above were used instead.

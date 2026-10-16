@@ -51,7 +51,7 @@ namespace Flocks
 
         /// <summary>The landed goose entity's default size (entities/greylag.json client.size); the sky goose uses the
         /// loaded value, so the two always match.</summary>
-        public const double EntityScale = 0.65;
+        public const double EntityScale = 0.98;
 
         public FlockRenderer(ICoreClientAPI capi) { this.capi = capi; }
 

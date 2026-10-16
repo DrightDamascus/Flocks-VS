@@ -110,6 +110,9 @@ namespace FlocksTest
                     }
                     if (x >= x0 - 12 && x <= x0 - 10 && Math.Abs(z - z0) <= 30)
                         for (int y = y0 + 1; y <= y0 + 14; y++) { pos.Set(x, y, z); bulk.SetBlock(stone, pos); }
+                    // a 12-high stone pillar: the eagle's perch, the most prominent point on the site
+                    if (x >= x0 + 20 && x <= x0 + 22 && z >= z0 - 42 && z <= z0 - 40)
+                        for (int y = y0 + 1; y <= y0 + 12; y++) { pos.Set(x, y, z); bulk.SetBlock(stone, pos); }
                     // a ring of 8-high "trees" two blocks outside pond B: every way in has to drop over them
                     int bx = Math.Abs(x - (x0 + 50)), bz = Math.Abs(z - (z0 + 30));
                     if (Math.Max(bx, bz) == 17)
@@ -122,6 +125,13 @@ namespace FlocksTest
             var gt = sapi.World.GetEntityType(new AssetLocation("flocks", "greylag"));
             Check(gt?.Sounds != null && gt.Sounds.ContainsKey("takeoffwings") && gt.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.waterfowl") == true,
                 "greylag entity file loaded whole (sounds and flocks.waterfowl behaviour present)");
+            var items = new[] { "greylag", "mallard", "heron", "eagle" };
+            Check(items.All(b => sapi.World.GetItem(new AssetLocation("flocks", "creature-" + b))?.GetType().Name == "ItemCreature"
+                                 && sapi.World.GetEntityType(new AssetLocation("flocks", b)) != null),
+                "creature items (creative inventory) loaded, each placing an existing bird");
+            var et = sapi.World.GetEntityType(new AssetLocation("flocks", "eagle"));
+            Check(et?.Sounds != null && et.Sounds.ContainsKey("call") && et.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.raptor") == true,
+                "eagle entity file loaded whole");
             var ht = sapi.World.GetEntityType(new AssetLocation("flocks", "heron"));
             Check(ht?.Sounds != null && ht.Sounds.ContainsKey("takeoffcall") && ht.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.waterfowl") == true,
                 "heron entity file loaded whole");
@@ -388,6 +398,139 @@ namespace FlocksTest
                 foreach (var e in g) e.Die(EnumDespawnReason.Expire);
             }, 90));
 
+            // ---- the golden eagle: perch, soar on a thermal, stoop on a hare, feed, back to the perch
+            steps.Enqueue(("eagle perch", () =>
+            {
+                var type = sapi.World.GetEntityType(new AssetLocation("flocks", "eagle"));
+                eagle = sapi.World.ClassRegistry.CreateEntity(type);
+                eagle.Pos.SetPos(c.X + 21.5, y0 + 13.05, c.Z - 40.5);   // on top of the pillar
+                sapi.World.SpawnEntity(eagle);
+            }, () => Elapsed > 5, () =>
+            {
+                Check(RState(eagle) == "Perch" && eagle.OnGround && Math.Abs(eagle.Pos.Y - (y0 + 13)) < 0.3,
+                    $"perched on the pillar ({RState(eagle)}, y {eagle.Pos.Y - y0:0.00}, on ground {eagle.OnGround})");
+            }, 20));
+            steps.Enqueue(("eagle soar", () =>
+            {
+                eagleHits = eagleLow = eagleSamples = 0; eagleTurned = 0; soarSince = 0; eagleLastYaw = double.NaN; eagleMaxAlt = 0; eagleMinAlt = double.MaxValue; eagleStates.Clear();
+                eagle.ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 1);  // dodged: a startle
+            }, () => Elapsed > 45, () =>
+            {
+                Check(eagleStates.Contains("Takeoff") && eagleStates.Contains("Soar"), $"took off and soared (states seen: {string.Join(", ", eagleStates)})");
+                Check(eagleTurned > 2 * Math.PI, $"circled on the thermal (turned {eagleTurned / (2 * Math.PI):0.0} full circles)");
+                Check(eagleMinAlt > 5 && eagleMaxAlt < 90, $"soared at a sensible height above the ground ({eagleMinAlt:0}-{eagleMaxAlt:0} blocks)");
+                Check(eagleHits == 0 && eagleLow == 0, $"no collisions or terrain in flight ({eagleHits} hits, {eagleLow} low, of {eagleSamples} samples)");
+            }, 60));
+            var hares = new List<Entity>();
+            Vec3d perchAim = null;
+            steps.Enqueue(("eagle hunt", () =>
+            {
+                eagleStates.Clear(); eagleMaxStoop = 0; eagleMealDist = double.NaN; eagleFeedSince = -1;
+                var b = eagle.GetBehavior<EntityBehaviorRaptor>();
+                var hareType = sapi.World.GetEntityType(new AssetLocation("game", "hare-european-adult-male"));
+                // ~25 blocks from where the eagle is circling, toward the middle of the slab: it has to close in first
+                double ex = c.X - eagle.Pos.X, ez = c.Z - eagle.Pos.Z, el = Math.Max(1, Math.Sqrt(ex * ex + ez * ez));
+                if (el < 2) { ex = 1; ez = 0; el = 1; }
+                double hx = GameMath.Clamp(eagle.Pos.X + ex / el * 25, c.X - 30, c.X + 30), hz = GameMath.Clamp(eagle.Pos.Z + ez / el * 25, c.Z - 30, c.Z + 30);
+                for (int i = 0; i < 3; i++)
+                {
+                    var h = sapi.World.ClassRegistry.CreateEntity(hareType);
+                    h.Pos.SetPos(hx + 5 * i - 5, y0 + 1, hz);
+                    sapi.World.SpawnEntity(h); hares.Add(h);
+                }
+            }, () => (eagleFeedSince >= 0 && sapi.World.ElapsedMilliseconds / 1000.0 - eagleFeedSince > 6) || Elapsed > 100, () =>
+            {
+                var rb = eagle.GetBehavior<EntityBehaviorRaptor>();
+                Log($"hunt: eagle at site {eagle.Pos.X - c.X:0},{eagle.Pos.Y - y0:0},{eagle.Pos.Z - c.Z:0}; last look: {rb?.LastHunt}; hares: " +
+                    string.Join("; ", hares.Select(h => $"{h.Code?.ToShortString()} alive={h.Alive} at {h.Pos.X - c.X:0},{h.Pos.Y - y0:0.0},{h.Pos.Z - c.Z:0} d={h.Pos.HorDistanceTo(eagle.Pos.XYZ):0}")));
+                Check(eagleStates.Contains("Stoop"), $"stooped on a hare (states seen: {string.Join(", ", eagleStates)})");
+                Check(hares.Any(h => !h.Alive), $"caught one ({hares.Count(h => !h.Alive)} of 3 hares killed)");
+                Check(eagleStates.Contains("Feed"), "mantled over the kill");
+                Check(eagleMaxStoop >= 25, $"a fast stoop (top speed {eagleMaxStoop:0.0} blocks/s)");
+                Check(eagleMealDist <= 0.9, $"feeding on its kill, not beside it (distance to it {eagleMealDist:0.00})");
+            }, 110));
+            // the kill falls off a ledge: put the feeding eagle on top of a 5-high block right beside its kill
+            BlockPos ledgeAt = null;
+            steps.Enqueue(("eagle follows its kill down a ledge", () =>
+            {
+                var meal = eagle.GetBehavior<EntityBehaviorRaptor>()?.Meal;
+                if (meal == null) { Check(false, "had a kill to follow"); return; }
+                int mx = (int)Math.Floor(meal.Pos.X), mz = (int)Math.Floor(meal.Pos.Z);
+                ledgeAt = new BlockPos(mx + 2, y0 + 1, mz - 1);
+                int granite = sapi.World.GetBlock(new AssetLocation("game", "rock-granite")).BlockId;
+                var ba = sapi.World.BlockAccessor;
+                for (int dx = 0; dx < 3; dx++) for (int dz = 0; dz < 3; dz++) for (int dy = 0; dy < 5; dy++)
+                    ba.SetBlock(granite, ledgeAt.AddCopy(dx, dy, dz));
+                eagle.TeleportToDouble(mx + 2.5, y0 + 6, mz + 0.5);
+                eagleStates.Clear();
+            }, () => Elapsed > 15, () =>
+            {
+                var meal = eagle.GetBehavior<EntityBehaviorRaptor>()?.Meal;
+                Check(RState(eagle) == "Feed" && meal != null && Math.Abs(eagle.Pos.Y - meal.Pos.Y) < 0.5 && eagle.Pos.HorDistanceTo(meal.Pos) <= 1.0,
+                    $"flew down and fed on it ({RState(eagle)}, {(meal == null ? "no kill" : $"{eagle.Pos.Y - meal.Pos.Y:0.0} above it, {eagle.Pos.HorDistanceTo(meal.Pos):0.00} from it")}; states {string.Join(", ", eagleStates)})");
+                var ba = sapi.World.BlockAccessor;
+                if (ledgeAt != null)
+                    for (int dx = 0; dx < 3; dx++) for (int dz = 0; dz < 3; dz++) for (int dy = 0; dy < 5; dy++)
+                        ba.SetBlock(0, ledgeAt.AddCopy(dx, dy, dz));
+            }, 25));
+            steps.Enqueue(("eagle feeds and leaves", () => { eagleStates.Clear(); }, () => eagleStates.Contains("Soar") || Elapsed > 60, () =>
+            {
+                Check(eagleStates.Contains("Soar"), $"back up after feeding (states seen: {string.Join(", ", eagleStates)})");
+            }, 70));
+            steps.Enqueue(("eagle back to the perch", () =>
+            {
+                eagleStates.Clear(); eagleHits = eagleLow = 0;
+                bool ok = eagle.GetBehavior<EntityBehaviorRaptor>().GoPerch();
+                var spot = eagle.GetBehavior<EntityBehaviorRaptor>().PerchSpot;
+                perchAim = spot;
+                Check(ok && spot != null, $"found a perch within 64 blocks ({(spot == null ? "none" : $"{spot.X - c.X:0},{spot.Y - y0:0},{spot.Z - c.Z:0}")})");
+            }, () => RState(eagle) == "Perch" || Elapsed > 60, () =>
+            {
+                // on the perch it chose (it may have picked again, if the first was out of reach)
+                var aim = eagle.GetBehavior<EntityBehaviorRaptor>().PerchSpot ?? perchAim;
+                Check(RState(eagle) == "Perch" && aim != null && Math.Abs(eagle.Pos.Y - aim.Y) < 0.4 && eagle.Pos.HorDistanceTo(aim) < 1.5,
+                    $"landed on it ({RState(eagle)} at {eagle.Pos.X - c.X:0.0},{eagle.Pos.Y - y0:0.0},{eagle.Pos.Z - c.Z:0.0}; " +
+                    $"perch {aim?.X - c.X:0.0},{aim?.Y - y0:0.0},{aim?.Z - c.Z:0.0}{(aim == perchAim ? "" : ", chosen again")})");
+                Check(eagleHits == 0, $"no collisions on the way ({eagleHits})");
+            }, 70));
+
+            // ---- the eagle hunts mallards on pond A: they may see it coming; either way the flock is disturbed
+            FlockRecord hunted = null;
+            var huntedDucks = new List<Entity>();
+            steps.Enqueue(("eagle hunts mallards", () =>
+            {
+                FlockRegistry.Instance.Calm(); huntedDucks.Clear(); eagleStates.Clear();
+                var type = sapi.World.GetEntityType(new AssetLocation("flocks", "mallard"));
+                hunted = FlockRegistry.Instance.Create("mallard", 6, c);
+                testFlock = hunted.Id;
+                for (int i = 0; i < 6; i++)
+                {
+                    var e = sapi.World.ClassRegistry.CreateEntity(type);
+                    e.WatchedAttributes.SetLong(FlockRegistry.FlockIdKey, hunted.Id);
+                    e.Pos.SetPos(c.X - 40 + (i % 3) * 2, y0 + 0.8, c.Z + (i / 3) * 2);   // the middle of pond A
+                    sapi.World.SpawnEntity(e); huntedDucks.Add(e);
+                }
+                eagle.TeleportToDouble(c.X - 15, y0 + 36, c.Z);   // soaring 25 blocks off, 35 up
+            }, () =>
+            {
+                if (Elapsed < 3) return false;
+                if (Elapsed < 3.2) Check(eagle.GetBehavior<EntityBehaviorRaptor>().Hunt(huntedDucks[0]), "eagle stoops on a mallard");
+                return (eagleStates.Contains("Stoop") && RState(eagle) != "Stoop") || Elapsed > 40;
+            }, () =>
+            {
+                int dead = huntedDucks.Count(e => !e.Alive), flew = huntedDucks.Count(e => e.Alive && Phase(e) != "Water");
+                double w = FlockRegistry.Instance.Wariness(hunted.Id);
+                var rb = eagle.GetBehavior<EntityBehaviorRaptor>();
+                Log($"mallard hunt: {dead} caught, {flew} flying, eagle now {RState(eagle)} for {rb.StateTime:0.0} s, diving {rb.Diving}, at site " +
+                    $"{eagle.Pos.X - c.X:0.0},{eagle.Pos.Y - y0:0.0},{eagle.Pos.Z - c.Z:0.0}, motion {eagle.Pos.Motion.Length() * 60:0.0} b/s, tracked {eagle.IsTracked}, " +
+                    $"prey {(rb.Prey == null ? "none" : $"{rb.Prey.Pos.X - c.X:0.0},{rb.Prey.Pos.Y - y0:0.0},{rb.Prey.Pos.Z - c.Z:0.0}")} " +
+                    $"(states {string.Join(", ", eagleStates)}), flock wariness {w:0.0}");
+                Check(eagleStates.Contains("Stoop") && RState(eagle) != "Stoop", $"the stoop ended ({RState(eagle)})");
+                Check(w >= 1, $"the attack disturbed the flock (wariness {w:0.0}; they leave the lake at {new FlocksServerConfig().LeaveAt})");
+                Check(dead == 0 || RState(eagle) == "ToPerch" || RState(eagle) == "Feed" || RState(eagle) == "Takeoff",
+                    "a duck caught on the water is carried off, not left floating");
+            }, 50));
+
             steps.Enqueue(("memory", () => { }, () => true, () =>
             {
                 Check(memory.Count >= 3 && memory.Last() - memory[1] < 64, $"managed memory over cycles (MB): {string.Join(", ", memory)}");
@@ -453,7 +596,9 @@ namespace FlocksTest
             int steps = 0;
             for (; physicsAcc >= step; physicsAcc -= step) steps++;
             if (steps == 0) return;
-            foreach (var e in LoadedGeese())
+            var tick = LoadedGeese();
+            if (eagle != null && eagle.Alive) tick.Add(eagle);
+            foreach (var e in tick)
             {
                 if (e.IsTracked != 0) continue; // a player sees it: the server does it
                 foreach (var b in e.SidedProperties.Behaviors)
@@ -475,9 +620,47 @@ namespace FlocksTest
             return b?.Code?.Path ?? "?";
         }
 
+        private Entity eagle;
+        private int eagleHits, eagleLow, eagleSamples;
+        private double eagleTurned, eagleLastYaw = double.NaN, eagleMaxAlt, eagleMinAlt = double.MaxValue;
+        private double eagleMaxStoop, eagleMealDist = double.NaN, eagleFeedSince = -1;
+        private readonly HashSet<string> eagleStates = new();
+        private int soarSince;
+        private static string RState(Entity e) => e?.GetBehavior<EntityBehaviorRaptor>()?.StateName ?? "?";
+
         private void Sample(float dt)
         {
             var ba = sapi.World.BlockAccessor;
+            if (eagle != null && eagle.Alive)
+            {
+                string st = RState(eagle);
+                eagleStates.Add(st);
+                if (st == "Stoop") eagleMaxStoop = Math.Max(eagleMaxStoop, eagle.Pos.Motion.Length() * 60);
+                var meal = eagle.GetBehavior<EntityBehaviorRaptor>()?.Meal;
+                if (st == "Feed")
+                {
+                    if (eagleFeedSince < 0) eagleFeedSince = sapi.World.ElapsedMilliseconds / 1000.0;
+                    if (meal != null) eagleMealDist = eagle.Pos.HorDistanceTo(meal.Pos);
+                }
+                if (st != "Perch" && st != "Feed")
+                {
+                    eagleSamples++;
+                    if (eagle.CollidedHorizontally) eagleHits++;
+                    int gx = (int)Math.Floor(eagle.Pos.X), gz = (int)Math.Floor(eagle.Pos.Z), top = ba.GetRainMapHeightAt(gx, gz);
+                    if (top > 0 && eagle.Pos.Y < top + 1 - 0.3 && st != "Stoop" && st != "ToPerch")
+                    {
+                        eagleLow++;
+                        if (eagleLow == 1) Log($"eagle low: {st} at site {eagle.Pos.X - c.X:0.0},{eagle.Pos.Y - y0:0.0},{eagle.Pos.Z - c.Z:0.0}; top {top + 1 - y0}");
+                    }
+                    if (st == "Soar" && soarSince++ > 100)
+                    {
+                        if (!double.IsNaN(eagleLastYaw)) eagleTurned += Math.Abs(GameMath.AngleRadDistance((float)eagleLastYaw, eagle.Pos.Yaw));
+                        eagleLastYaw = eagle.Pos.Yaw;
+                        double alt = eagle.Pos.Y - Math.Max(top + 1, 0);
+                        eagleMaxAlt = Math.Max(eagleMaxAlt, alt); eagleMinAlt = Math.Min(eagleMinAlt, alt);
+                    }
+                }
+            }
             foreach (var e in LoadedGeese())
             {
                 double now = sapi.World.ElapsedMilliseconds / 1000.0;

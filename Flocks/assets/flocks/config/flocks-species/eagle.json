@@ -1,0 +1,21 @@
+// Golden eagle. Our own model (tools/make_eagle.py). Lives in the air over open high ground (habitat "air"): perches,
+// soars on thermals and stoops on prey (entities/eagle.json, Raptor.cs). Resident all year; no drawn passing flocks and
+// no landing flocks. Fields: see Flocks/Species.cs.
+{
+	code: "eagle",
+	name: "golden eagles",
+	shapes: [
+		{ name: "eagle", shape: "flocks:shapes/entity/bird/eagle.json", flap: "fly-flap", soar: "fly-soar" }
+	],
+	sizeFromEntity: "flocks:eagle",
+	speedMin: 12, speedMax: 16,
+	flapSeconds: 1.0, soarSeconds: 3, blendSeconds: 0.5,
+	flapBeatsMin: 2, flapBeatsMax: 4, soarLoopsMin: 2, soarLoopsMax: 4,
+	altitudeMin: 40, altitudeMax: 90,
+	loose: true,
+	maxFlocksPerDay: 0, countMin: 1, countMax: 2,
+	callSound: "eagle/call", callVariants: 4, callGapMin: 15, callGapMax: 40,
+	landedEntity: "flocks:eagle",
+	habitat: "air",
+	arriveInFlocks: false
+}

@@ -1,4 +1,10 @@
 {
 	"item-creature-greylag": "Greylag goose",
-	"item-creature-flocks:greylag": "Greylag goose"
+	"item-creature-flocks:greylag": "Greylag goose",
+	"item-creature-mallard": "Mallard",
+	"item-creature-flocks:mallard": "Mallard",
+	"item-creature-heron": "Grey heron",
+	"item-creature-flocks:heron": "Grey heron",
+	"item-creature-eagle": "Golden eagle",
+	"item-creature-flocks:eagle": "Golden eagle"
 }

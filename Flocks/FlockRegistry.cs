@@ -176,12 +176,12 @@ namespace Flocks
         }
 
         /// <summary>Within AbandonRadius of a lake a flock left in the last AbandonDays: no landings, no spawns.</summary>
-        public bool IsAbandoned(double x, double z)
+        public bool IsAbandoned(double x, double z, double margin = 0)
         {
             if (!cfg.LakeWariness) return false;
-            double since = Hours - cfg.AbandonDays * 24;
+            double since = Hours - cfg.AbandonDays * 24, r = AbandonRadius + margin;
             foreach (var a in abandoned)
-                if (a.Hours >= since && (a.X - x) * (a.X - x) + (a.Z - z) * (a.Z - z) < AbandonRadius * AbandonRadius) return true;
+                if (a.Hours >= since && (a.X - x) * (a.X - x) + (a.Z - z) * (a.Z - z) < r * r) return true;
             return false;
         }
 

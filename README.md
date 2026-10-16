@@ -11,8 +11,11 @@ DESIGN.md. Version history: CHANGELOG.md.
 - **Landing flocks** (real entities): on spring migration days a flock of greylag geese or mallards flies in from up
   to 320 blocks out and glides down onto a lake near you. Both also spawn naturally on lakes (mallards on ponds too)
   in their resident season.
-- **Grey herons** stand on freakishly long legs in water a block deep, stalk and strike, and flap off croaking when
-  you get too close.
+- **Grey herons**, big ones, stand in water a block deep, stalk and strike, and flap off croaking when you get too
+  close.
+- **Golden eagles** perch on the highest point around, soar in circles on thermals over open high ground, and stoop on
+  hares and ducks from high up, then feed on the kill.
+- The birds are deliberately bigger than life (about half again), so they read as birds next to the game's animals.
 - **Geese on the water** drift, paddle away from you, and take off in a hurry when you get close, shoot at them, or
   miss them. They fly to another part of the lake or another lake, coming in along a clear lane, and climb over hills
   and trees on the way. A flock that keeps being disturbed abandons the lake for a while (lake wariness).

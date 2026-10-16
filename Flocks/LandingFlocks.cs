@@ -22,7 +22,7 @@ namespace Flocks
         /// <summary>They appear this far out from the lake (the furthest that is loaded and within reach), at least MinEntry.</summary>
         public const int MaxEntry = 320, MinEntry = 140;
         /// <summary>V formation at the start (blocks): back per rank, out per rank (for size 0.65 geese, 1.7 across).</summary>
-        public const double FormBack = 1.2, FormOut = 1.5;
+        public const double FormBack = 1.8, FormOut = 2.2;
 
         private readonly ICoreServerAPI sapi;
         private readonly Dictionary<string, Species> species;

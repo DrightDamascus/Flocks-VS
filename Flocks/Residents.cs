@@ -67,6 +67,14 @@ namespace Flocks
             {
                 if (!Cfg.ResidentGeese) { VetoOff++; return false; }
                 var bp = pos.AsBlockPos;
+                if (sp.Soars)
+                {
+                    // birds of prey: resident all year, no water; a territory each, so at most two within 192 blocks
+                    if (FlockRegistry.Instance?.IsAbandoned(pos.X, pos.Z) == true) { VetoAbandoned++; return false; }
+                    if (sapi.World.GetEntitiesAround(pos, 192, 96, e => e.Alive && e.Code.Equals(code)).Length >= 2) { VetoCrowded++; return false; }
+                    Allowed++;
+                    return true;
+                }
                 if (!InSeason(sapi.World, bp, sp)) { VetoSeason++; return false; }
                 // a wading bird only where it can stand: water one block deep, the spawn on its bottom
                 if (sp.Wades && !(LakeSearch.IsWadeable(ba, bp.X, bp.Z, out int wy) && wy == bp.Y)) { VetoDepth++; return false; }

@@ -5,8 +5,8 @@
 	shapes: [
 		{ name: "crane", shape: "flocks:shapes/entity/bird/crane.json", flap: "fly-flap", soar: "fly-soar" }
 	],
-	// common crane: 2.0-2.4 m wingspan
-	wingspan: 2.2,
+	// half again a common crane's 2.0-2.4 m wingspan, like the other birds
+	wingspan: 3.3,
 	// cranes beat slower and deeper than geese, glide more, and fly higher
 	speedMin: 15, speedMax: 19,
 	flapSeconds: 0.8, soarSeconds: 2.4, blendSeconds: 0.45,

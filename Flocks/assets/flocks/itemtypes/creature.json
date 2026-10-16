@@ -1,0 +1,36 @@
+// Creature items, like the game's own (survival itemtypes/creature): they put the birds in the creative inventory's
+// creatures tab, and right-clicking one on a block places that bird (ItemCreature: flocks:creature-X spawns flocks:X).
+// The models are in their base pose, wings spread, which makes a good icon. Transforms are tunable in game (.tfedit).
+{
+	code: "creature",
+	class: "ItemCreature",
+	maxstacksize: 64,
+	variantgroups: [
+		{ code: "type", states: ["greylag", "mallard", "heron", "eagle"] }
+	],
+	shapeByType: {
+		"*-greylag": { base: "flocks:entity/bird/greylag" },
+		"*-mallard": { base: "flocks:entity/bird/mallard" },
+		"*-heron": { base: "flocks:entity/bird/heron" },
+		"*-eagle": { base: "flocks:entity/bird/eagle" }
+	},
+	texturesByType: {
+		"*-greylag": { "greylag": { base: "flocks:entity/bird/greylag" } },
+		"*-mallard": { "mallard": { base: "flocks:entity/bird/mallard-drake" } },
+		"*-heron": { "heron": { base: "flocks:entity/bird/heron" } },
+		"*-eagle": { "eagle": { base: "flocks:entity/bird/eagle" } }
+	},
+	creativeinventory: { "general": ["*"], "items": ["*"], "creatures": ["*"] },
+	materialDensity: 600,
+	// a bird seen from above and in front, wings across the slot (the models are 2-3 blocks across at size 1)
+	guiTransformByType: {
+		"*-mallard": { rotate: true, rotation: { x: -30, y: 135, z: 0 }, origin: { x: 0.4, y: 0.3, z: 0.5 }, scale: 0.75 },
+		"*": { rotate: true, rotation: { x: -30, y: 135, z: 0 }, origin: { x: 0.4, y: 0.3, z: 0.5 }, scale: 0.55 }
+	},
+	groundTransformByType: {
+		"*-mallard": { origin: { x: 0.4, y: 0, z: 0.5 }, scale: 1.4 },
+		"*": { origin: { x: 0.4, y: 0, z: 0.5 }, scale: 1.1 }
+	},
+	fpHandTransform: { translation: { x: 0, y: 0, z: 0.5 }, rotation: { x: 0, y: 90, z: 0 }, origin: { x: 0.4, y: 0.3, z: 0.5 }, scale: 0.7 },
+	tpHandTransform: { translation: { x: -0.6, y: -0.1, z: -0.5 }, rotation: { x: 0, y: 90, z: -90 }, origin: { x: 0.4, y: 0.3, z: 0.5 }, scale: 0.4 }
+}

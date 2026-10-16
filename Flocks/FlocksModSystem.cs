@@ -38,6 +38,7 @@ namespace Flocks
         {
             api.Network.RegisterChannel("flocks").RegisterMessageType<SendFlockPacket>();
             api.RegisterEntityBehaviorClass(EntityBehaviorWaterfowl.Code, typeof(EntityBehaviorWaterfowl));
+            api.RegisterEntityBehaviorClass(EntityBehaviorRaptor.Code, typeof(EntityBehaviorRaptor));
         }
 
         public override void AssetsLoaded(ICoreAPI api)

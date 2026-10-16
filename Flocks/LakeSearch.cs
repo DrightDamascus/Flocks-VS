@@ -72,7 +72,7 @@ namespace Flocks
                 int x = (int)(k >> 32), z = (int)k;
                 double cx = x + 0.5, cz = z + 0.5;
                 if (Dist(cx, cz, tx, tz) < minThreat) continue;
-                if (FlockRegistry.Instance?.IsAbandoned(cx, cz) == true) continue; // a lake geese left: not yet
+                if (FlockRegistry.Instance?.IsAbandoned(cx, cz, Spread + 1) == true) continue; // a lake geese left: not yet (nor the spread round it)
                 double d = Dist(cx, cz, from.X, from.Z);
                 if (d < minHere || !Open(lake, x, z)) continue;
                 open.Add((d, x, z));
@@ -136,7 +136,7 @@ namespace Flocks
         /// <summary>
         /// Water a wading bird can stand in: the column's surface is fresh water exactly one block deep, with solid
         /// ground under it. y = the water block, which is where the bird's feet are (on the bottom). Vintage Story's still
-        /// water is always a full block, so the heron's legs are long enough to stand in that (Dright: tall legs).
+        /// water is always a full block, so the heron is big enough for its legs to reach the bottom of that.
         /// </summary>
         public static bool IsWadeable(IBlockAccessor ba, int x, int z, out int y)
         {

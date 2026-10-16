@@ -2,10 +2,10 @@
 	code: "greylag",
 	class: "EntityAgent",
 	tags: ["animal", "huntable", "adult", "habitat-water"],
-	// scaled with client.size 0.65 (was 0.55 with 0.6 x 0.5)
-	hitboxSize: { x: 0.7, y: 0.6 },
-	deadHitboxSize: { x: 0.7, y: 0.35 },
-	eyeHeight: 0.53,
+	// scaled with client.size 0.98
+	hitboxSize: { x: 1.0, y: 0.9 },
+	deadHitboxSize: { x: 1.0, y: 0.5 },
+	eyeHeight: 0.8,
 	fallDamageMultiplier: 0.5,
 	drops: [],
 	attributes: {
@@ -15,8 +15,9 @@
 		renderer: "Shape",
 		shape: { base: "flocks:entity/bird/greylag" },
 		textures: { "greylag": { base: "flocks:entity/bird/greylag" } },
-		// 1.7-block wingspan (a real greylag is 1.5-1.8 m); the sky geese read this too, so both always match
-		size: 0.65,
+		// 2.6-block wingspan: half again a real greylag's 1.5-1.8 m, so it reads as a goose next to the game's animals.
+		// The sky geese read this too, so both always match
+		size: 0.98,
 		behaviors: [
 			{ code: "repulseagents" },
 			{ code: "controlledphysics", stepHeight: 0.6 },
@@ -41,7 +42,7 @@
 			{ code: "repulseagents" },
 			{ code: "controlledphysics", stepHeight: 0.6 },
 			// before "health": it zeroes spear and melee damage before health applies it
-			{ code: "flocks.waterfowl", species: "goose", fleeRange: 14, takeoffRange: 7, lifeHours: 6, sink: 0.15, cruiseSpeedMin: 11, cruiseSpeedMax: 13.5,
+			{ code: "flocks.waterfowl", species: "goose", fleeRange: 14, takeoffRange: 7, lifeHours: 6, sink: 0.22, cruiseSpeedMin: 11, cruiseSpeedMax: 13.5,
 			  takeoffWingsChance: 0.6, takeoffCallChance: 0.4 },
 			{ code: "health", currenthealth: 4, maxhealth: 4 },
 			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },

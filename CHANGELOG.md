@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.17.0
+The golden eagle, and bigger birds all round:
+- Every bird is about half again its real size (Dright: true-size birds looked tiny next to the game's boars and deer,
+  and a block is a metre only loosely anyway). Greylag size 0.98 (was 0.65; 2.6-block wingspan), mallard 0.75 (was
+  0.47), heron 1.05 (was 0.7), cranes 3.3 and hawks 1.8 block wingspans (were 2.2 and 1.2). Hitboxes, eye heights and
+  how deep they float grew with them, and so did the landing flocks' V spacing and the flight look-ahead's half-span.
+- The heron is a big heron on normal legs instead of a small one on stilts (Dright): legs 15 model units instead of 22,
+  which at its new size still reach the bottom of a full block of water with the belly clear. Texture repainted for
+  the new layout; standing box 1.7 tall; step height 1.1 so one that ends up in deep water can climb back onto the
+  shallows. It no longer skids off the shallows when it touches down, and one in deep water now finds the shallows
+  above it.
+- New model (tools/make_eagle.py): dark brown with a golden crown and nape, a big head on a short neck, a hooked bill
+  with a yellow cere, a long square banded tail, legs feathered to the toes, and long broad wings with seven spread
+  fingers. Perches upright; its own soaring, flapping, stoop (wings
+  folded), takeoff, landing, feeding (mantling) and death animations.
+- flocks:eagle (entities/eagle.json, behaviour flocks.raptor, Raptor.cs): perches on the most prominent high point
+  within 64 blocks, soars in circles on thermals 35-65 blocks up within a 200-block territory, glides between
+  thermals, and hunts: it looks for prey (preyCodes: hares and mallards) well below it in the open, closes in at
+  height until the prey is below it, then stoops, accelerating to 38 blocks/s with the talons forward only at the
+  end, strikes, and walks onto the kill to feed on it (flying down or up to it if it fell off a ledge), or pulls up
+  if the prey gets under cover. Ducks often see it coming (60% once it is within 14 blocks) and flush, and it may
+  still catch one in the air; a duck caught on the water is carried off to a perch and eaten there. Every attack on
+  a flock is a disturbance like any other flush, so an eagle hunting a pond can drive the ducks off it for a couple
+  of days (lake wariness). Perches are on the highest block it can stand on (not on a plant on top of a tree). Flushes from its perch when
+  approached; dodges and startles at missed shots. 10 health; drops poultry and feathers.
+- Spawns alone on open high ground (minY 1.15, maxForest 0.6), at most two within 192 blocks, all year (species
+  habitat "air"; no landing flocks, no drawn sky flocks).
+- Sounds (sounds/eagle/): calls, hurt and death from recordings by Bubulcus (CC BY 3.0) and Lawrence Shove (British
+  Library, CC BY-SA 4.0).
+- The waterfowl's flight helpers (terrain look-ahead, steering, shot and player sensing) moved into a shared base,
+  EntityBehaviorBird (BirdBehavior.cs).
+- Creature items for the geese, mallards, herons and eagles (itemtypes/creature.json, like the game's own): they
+  are in the creative inventory's creatures tab and place the bird where you right-click. Mallards, herons and eagles
+  have proper names now.
+- Fix: a lake a flock abandoned could still be offered as a landing spot from just outside the abandon radius.
+- Tests: the eagle perches, soars and circles, closes in on hares 25 blocks off, stoops fast, kills one and feeds
+  on it, follows its kill down a ledge, returns to a perch, and stoops on mallards on a pond, disturbing the flock; the creature items load and each places an existing bird.
+
 ## 0.16.0
 The grey heron, and wading (the first new behaviour type of the roster):
 - New model (tools/make_heron.py): slim grey body with black shoulder patches and pale back plumes, white neck with a
