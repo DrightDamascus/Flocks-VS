@@ -40,6 +40,8 @@ namespace Flocks
         private ResidentGeese residents;
         private FlockRegistry registry;
         private LandingFlocks landings;
+        /// <summary>The server's landing planner (null on the client).</summary>
+        public LandingFlocks Landings => landings;
 
         public override void StartServerSide(ICoreServerAPI sapi)
         {

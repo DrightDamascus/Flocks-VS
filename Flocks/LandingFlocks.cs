@@ -75,11 +75,13 @@ namespace Flocks
         }
 
         /// <summary>Starts a landing flock for this player now. force (the /flocks arrive command) skips the season check.</summary>
-        public bool Arrive(IServerPlayer plr, bool force, out string msg)
+        public bool Arrive(IServerPlayer plr, bool force, out string msg) => Arrive(plr.Entity.Pos.XYZ, force, out msg);
+
+        /// <summary>The same for a position standing in for the player (the in-engine tests use it).</summary>
+        public bool Arrive(Vec3d p, bool force, out string msg)
         {
             var ba = sapi.World.BlockAccessor;
-            var p = plr.Entity.Pos;
-            var spots = LakeSearch.FindSpots(ba, p.XYZ, p.X, p.Z, Landing.MinPatch, rand);
+            var spots = LakeSearch.FindSpots(ba, p, p.X, p.Z, Landing.MinPatch, rand);
             if (spots == null || spots.Count == 0) { msg = "No lake to land on within 160 blocks."; return false; }
             var centre = spots[spots.Count / 2];
             if (centre.HorizontalSquareDistanceTo(p.X, p.Z) < MinFromPlayer * MinFromPlayer) { msg = $"The nearest landing water is under {MinFromPlayer:0} blocks from you."; return false; }

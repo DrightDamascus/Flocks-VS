@@ -1,0 +1,11 @@
+{
+  "type": "code",
+  "modid": "flockstest",
+  "name": "Flocks engine tests",
+  "version": "1.0.0",
+  "authors": ["Dright"],
+  "description": "Test harness for Flocks. Builds a test site and runs the goose AI on a dedicated server with no players. Not for play.",
+  "side": "Server",
+  "requiredOnClient": false,
+  "dependencies": { "game": "1.22.7", "flocks": "*" }
+}

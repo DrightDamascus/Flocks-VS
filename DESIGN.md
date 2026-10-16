@@ -110,6 +110,21 @@ player), all at 13 blocks/s, each heading for its own spot. Departing flocks fly
 every player (3-4 px by then; out of sight below that view distance), and their record goes Away. Only flocks that
 merely pass over are still drawn by the client. Goose size 0.65 (1.7-block wingspan), hitbox scaled with it.
 
+In-engine tests (0.12.1): `tools/run_engine_tests.ps1` starts a scratch dedicated server (new world, no players) with
+the built mod and the test mod in tools/FlocksTest. It builds a test site in the sky at spawn (a stone slab, pond A
+open with a 14-high wall beside it, pond B ringed by 8-high "trees") and runs: settle, flush toward the wall, a flush
+in the tree-ringed pond, departure, a landing flock from 320 blocks over natural terrain, and repeated cycles with
+memory and entity counts. Every flying goose is sampled 10x a second for wall hits, being inside ground or trees,
+hanging in the air, aborted glides (with the reason) and where it lands. Two engine facts it relies on: entities with
+no player near don't tick unless AlwaysActive, and the server runs physics only for entities a player tracks
+(PhysicsManager skips IsTracked == 0), so the test runs the geese's physics itself at 30 ticks a second.
+
+Landing approach (0.12.1): a goose picks a lane into its spot, the clearest of 16 directions (the gentlest descent
+that keeps 1.5 blocks over banks and trees within 40 blocks, preferring its own side), flies out to it, follows it in,
+and glides down once its line is at least that steep (up to 45 deg, slowing to hold it). A glide is aborted only for
+something still between the goose and its spot. A spot is given up after 40 s, 3 aborted glides, or no lane under
+45 deg; after 3 given-up spots the flock rejoins the migration.
+
 Next steps:
 - Hand-off from the sky: when a planned goose flock passes a suitable lake (fresh water, 36+ surface blocks, 64+
   blocks from the player, near its heading), the client asks the server to land it. The server checks the lake

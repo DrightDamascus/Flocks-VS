@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.12.1
+Fixed geese circling forever after being flushed (found and verified with new in-engine tests):
+- The "give up on a spot after 40 s" rule never worked: its timer reset every time a goose switched between gliding
+  and flying, and if it did fire, the next spot was thrown away on the very next tick, so the goose searched for a
+  lake every tick and never landed.
+- Geese came in from wherever they happened to be and cruised at a height based only on distance, so at lakes with
+  trees on the shore the line down was blocked and they never began to glide. They now pick a clear lane into their
+  spot (the gentlest of 16 directions), fly out to it, follow it in and glide down at the angle it needs, up to 45 deg,
+  slowing down to hold a steep one.
+- Glides were aborted for trees the goose had already passed (the check measured the whole lane, not what was still
+  ahead). In the test's tree-ringed pond, 3 of 6 geese aborted 3-6 glides each and two gave up and flew to another
+  lake; now all 6 land in the pond within 19 s with no aborted glides.
+- A spot is given up after 40 s, 3 aborted glides, or when there is no way in under 45 deg; after 3 given-up spots
+  the flock rejoins the migration instead of circling.
+- New tools/run_engine_tests.ps1 and tools/FlocksTest: runs the goose AI on a scratch dedicated server against a
+  built test site (see DESIGN.md). Current result: 39 passed, 0 failed; longest flight 27 s (a landing flock from
+  320 blocks), no wall hits, never inside terrain, managed memory flat over repeated cycles.
+
 ## 0.12.0
 Landing and departing flocks are real geese the whole way (the drawn-flock swaps are gone):
 - A landing flock appears as a V of geese up to 320 blocks out along its arrival heading, all flying at 13 blocks/s,

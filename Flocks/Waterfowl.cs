@@ -59,13 +59,33 @@ namespace Flocks
         /// across the wingspan (HalfSpan either side). A wall too steep to climb at speed makes the goose pull up hard
         /// (SteepClimb) and shed speed, down to a near-vertical hover-climb at MinPullSpeed.</summary>
         private const double Clearance = 1.5, LookSeconds = 3, HalfSpan = 0.8, SteepClimb = 7, MinPullSpeed = 1.2, PullDecel = 20;
-        /// <summary>A landing approach that can't get in for this long gives up on that spot and picks another.</summary>
+        /// <summary>
+        /// A spot is given up after ApproachGiveUp seconds of trying to get in, MaxGoArounds aborted glides, or when the
+        /// way in would need a descent steeper than MaxApproachSlope (blocks down per block forward; 1 = 45 deg, about
+        /// what a goose dropping into a small pond among trees manages). After MaxSpotChanges given-up spots in one
+        /// flight the flock rejoins the migration instead.
+        /// </summary>
         private const float ApproachGiveUp = 40;
+        private const int MaxGoArounds = 3, MaxSpotChanges = 3;
+        private const double MaxApproachSlope = 1.0;
+        /// <summary>The approach lane: geese come in along the clearest of 16 directions from the spot, joining it out at
+        /// LaneLength and pursuing a point LaneLook further in (top-down simulation: from 2880 starting positions and
+        /// headings, every goose was on the lane and lined up within 23 s).</summary>
+        private const double LaneLength = 32, LaneLook = 14;
+        /// <summary>Fastest sink in a glide (blocks/s); with the speed eased down so the line can be held.</summary>
+        private const double GlideSinkMax = 6.5;
 
         private Phase phase = Phase.Water;
         private bool restored, runStarted, hardFlap;
         private float phaseTime, searchTimer;
         private Vec3d target;              // landing point at the water surface; null while searching or departing
+        // the current spot's approach: how steeply the way in must descend (from where the goose is now), time spent
+        // trying, aborted glides, and spots already given up this flight
+        private double approachSlope, laneX, laneZ;   // the chosen lane: its slope and outward direction
+        private bool laneChosen;
+        private float approachTime, glideCheck;
+        private int goArounds, spotChanges;
+        private readonly List<Vec3d> badSpots = new();
         private bool departing;
         private double flyHeading, speed, cruise, travel, threatX, threatZ;
 
@@ -170,7 +190,28 @@ namespace Flocks
                     (float)(0.08 + rand.NextDouble() * 0.5));
         }
 
-        private Vec3d Pick(List<Vec3d> spots) => spots == null || spots.Count == 0 ? null : spots[rand.Next(spots.Count)].Clone();
+        private Vec3d Pick(List<Vec3d> spots)
+        {
+            if (spots == null) return null;
+            var ok = spots.FindAll(sp => !badSpots.Exists(b => b.HorizontalSquareDistanceTo(sp.X, sp.Z) < 25));
+            return ok.Count == 0 ? null : ok[rand.Next(ok.Count)].Clone();
+        }
+
+        /// <summary>A new spot to come down on: the approach bookkeeping starts over.</summary>
+        private void NewTarget(Vec3d spot)
+        {
+            target = spot; approachTime = 0; goArounds = 0; laneChosen = false; approachSlope = 0;
+        }
+
+        /// <summary>This spot can't be reached: remember it, and look for another (or, after a few, rejoin the migration).</summary>
+        private void GiveUpSpot()
+        {
+            if (target != null) badSpots.Add(target.Clone());
+            NewTarget(null);
+            searchTimer = 0;
+            if (++spotChanges > MaxSpotChanges) departing = true;
+            if (phase == Phase.Glide) SetPhase(Phase.Fly); else Persist();
+        }
 
         public void Takeoff(double towards, Vec3d spot, bool depart, double tx, double tz, float delay)
         {
@@ -178,7 +219,8 @@ namespace Flocks
             phase = Phase.Run; phaseTime = -delay; runStarted = false;
             flyHeading = towards; speed = 0; travel = 0; searchTimer = 3;
             cruise = cruiseMin + rand.NextDouble() * (cruiseMax - cruiseMin);
-            target = spot; if (target != null) target.Y -= sink;
+            badSpots.Clear(); spotChanges = 0;
+            NewTarget(spot); if (target != null) target.Y -= sink;
             departing = depart; threatX = tx; threatZ = tz;
             Persist();
         }
@@ -212,13 +254,13 @@ namespace Flocks
 
                 case Phase.Fly:
                 {
-                    if (target != null && phaseTime > ApproachGiveUp) { target = null; searchTimer = 0; } // can't get in: try elsewhere
+                    if (target != null && TrackApproach(dt)) { GiveUpSpot(); break; }
                     if (target == null && !departing && (searchTimer -= dt) <= 0)
                     {
                         searchTimer = 4;
-                        target = Pick(LakeSearch.FindSpots(entity.World.BlockAccessor, pos.XYZ, threatX, threatZ, Landing.MinPatch, rand));
+                        NewTarget(Pick(LakeSearch.FindSpots(entity.World.BlockAccessor, pos.XYZ, threatX, threatZ, Landing.MinPatch, rand)));
                         if (target != null) { target.Y -= sink; Persist(); }
-                        else { departing = true; Persist(); } // nowhere to land: rejoin the migration
+                        else { departing = true; Persist(); } // nowhere (left) to land: rejoin the migration
                     }
                     // Climb out straight for a moment, then turn toward the landing spot. A spot close by and well off
                     // the nose can sit inside the turning circle, where steering at it only orbits it: fly on until it
@@ -226,8 +268,12 @@ namespace Flocks
                     // bearing, was reached in under 23 s with at most one go-round).
                     if (target != null && phaseTime > 0.8)
                     {
-                        double want = Math.Atan2(target.X - pos.X, target.Z - pos.Z);
-                        bool tooClose = HorDist(target) < 2.2 * speed / TurnRate && Math.Abs(GameMath.AngleRadDistance((float)flyHeading, (float)want)) > 1.2;
+                        LaneAim(out double ax, out double az, out bool laneEnd);
+                        double want = Math.Atan2(ax - pos.X, az - pos.Z);
+                        // the fly-on-before-turning rule only for the lane's fixed outer end: the point pursued along the
+                        // lane moves with the goose, and flying on from it would only lead off the lane
+                        bool tooClose = laneEnd && Math.Sqrt((ax - pos.X) * (ax - pos.X) + (az - pos.Z) * (az - pos.Z)) < 2.2 * speed / TurnRate
+                            && Math.Abs(GameMath.AngleRadDistance((float)flyHeading, (float)want)) > 1.2;
                         if (!tooClose) Steer(want, TurnRate, dt);
                     }
                     vy = ClimbRate(CruiseY());
@@ -241,9 +287,12 @@ namespace Flocks
                     {
                         double d = HorDist(target), drop = pos.Y - target.Y;
                         double err = Math.Abs(GameMath.AngleRadDistance((float)flyHeading, (float)Math.Atan2(target.X - pos.X, target.Z - pos.Z)));
-                        // glide in only along a clear line: nothing within Clearance of the straight path down
-                        bool clear = NeededSlope(flyHeading, Math.Max(0, d - 2.5)) <= -drop / Math.Max(d, 1) + 0.05;
-                        if (d <= drop * GlideRatio + 3 && err < 0.5 && phaseTime > 1.5 && clear) SetPhase(Phase.Glide);
+                        // glide in from the lane, once the straight line down to the spot is at least as steep as the
+                        // lane needs (clearing banks and trees near the spot) and no shallower than a glide
+                        double line = drop / Math.Max(d, 1);
+                        double bearing = Math.Atan2(pos.X - target.X, pos.Z - target.Z), laneDir = Math.Atan2(laneX, laneZ);
+                        bool onLane = Math.Abs(GameMath.AngleRadDistance((float)laneDir, (float)bearing)) < 25 * GameMath.DEG2RAD;
+                        if (onLane && d <= drop * GlideRatio + 3 && line >= approachSlope + 0.03 && err < 0.5 && phaseTime > 1.5) SetPhase(Phase.Glide);
                     }
                     else if (departing && phaseTime > 3)
                     {
@@ -256,20 +305,30 @@ namespace Flocks
 
                 case Phase.Glide:
                 {
-                    double d = HorDist(target);
+                    if (TrackApproach(dt)) { GiveUpSpot(); break; }
+                    double d = HorDist(target), line = Math.Max(0, pos.Y - target.Y) / Math.Max(d, 0.3);
                     SetAnim(d < 8 ? "land" : "fly-soar");
-                    speed = Math.Max(LandSpeed, speed - 3 * dt);
+                    // slow down enough to hold a steep line (a drop into a pond among trees), else ease to landing speed
+                    double want = Math.Max(LandSpeed, Math.Min(cruise, GlideSinkMax / Math.Max(line, 0.05)));
+                    speed = speed > want ? Math.Max(want, speed - 8 * dt) : Math.Max(LandSpeed, speed - 3 * dt);
                     Steer(Math.Atan2(target.X - pos.X, target.Z - pos.Z), TurnRate * 1.3, dt);
                     // a straight line down to the spot at the current speed
-                    vy = GameMath.Clamp(-(pos.Y - target.Y) / Math.Max(0.3, d / speed), -4, 0.5);
-                    // something rose into the glide path (a turn brought a tree into line): go round and climb over it
-                    if (NeededSlope(flyHeading, Math.Max(0, d - 2.5)) > vy / Math.Max(speed, 0.5) + 0.05) { SetPhase(Phase.Fly); break; }
+                    vy = GameMath.Clamp(-(pos.Y - target.Y) / Math.Max(0.3, d / speed), -GlideSinkMax, 0.5);
+                    // Something still between the goose and its spot rises above this line (the goose sank, or turned off
+                    // the lane): go round. Only what is still ahead counts; banks and trees it has already passed don't.
+                    if ((glideCheck -= dt) <= 0 && d > 3)
+                    {
+                        glideCheck = 0.25f;
+                        double ux = (pos.X - target.X) / Math.Max(d, 0.01), uz = (pos.Z - target.Z) / Math.Max(d, 0.01);
+                        double ahead = ApproachSlope(ux, uz, d - 1);
+                        if (ahead > line + 0.1) { GoAround($"obstacle ahead (line {line:0.00}, needs {ahead:0.00}, {d:0.0} out)"); break; }
+                    }
                     if (entity.Swimming || entity.FeetInLiquid || pos.Y <= target.Y + 0.15)
                     {
                         entity.World.PlaySoundAt(new AssetLocation("game", "environment/mediumsplash"), entity, null, true, 24, 0.45f);
                         SetPhase(Phase.Splash);
                     }
-                    else if ((d < 1.5 && pos.Y - target.Y > 1.5) || phaseTime > 15) SetPhase(Phase.Fly); // overshot: go round
+                    else if ((d < 1.5 && pos.Y - target.Y > 1.5) || phaseTime > 15) GoAround(phaseTime > 15 ? "glide too long" : $"overshot {pos.Y - target.Y:0.0} high"); // go round
                     break;
                 }
 
@@ -280,7 +339,7 @@ namespace Flocks
                     onWater = true;
                     if (phaseTime >= SplashSeconds)
                     {
-                        heading = flyHeading; target = null; pos.Roll = 0;
+                        heading = flyHeading; NewTarget(null); pos.Roll = 0; badSpots.Clear(); spotChanges = 0;
                         SetPhase(Phase.Water);
                         return;
                     }
@@ -291,7 +350,7 @@ namespace Flocks
             {
                 // clipped something the scan missed: stop pushing into it and climb straight up
                 speed = Math.Min(speed, MinPullSpeed); vy = SteepClimb;
-                if (phase == Phase.Glide) SetPhase(Phase.Fly);
+                if (phase == Phase.Glide) GoAround("clipped something");
             }
             travel += speed * dt;
             pos.Motion.Set(Math.Sin(flyHeading) * speed / 60, onWater ? SurfaceMotion() : vy / 60, Math.Cos(flyHeading) * speed / 60);
@@ -308,7 +367,9 @@ namespace Flocks
         private double CruiseY()
         {
             var pos = entity.Pos; var ba = entity.World.BlockAccessor;
-            double baseY = target?.Y ?? pos.Y, alt = target != null ? GameMath.Clamp(HorDist(target) * 0.25, 6, 22) : 18;
+            // with a spot: high enough to come down at the angle its way in needs, from here
+            double baseY = target?.Y ?? pos.Y, alt = 18;
+            if (target != null) { double d = HorDist(target); alt = Math.Min(40, Math.Max(GameMath.Clamp(d * 0.25, 6, 22), approachSlope * Math.Min(d, LaneLength + 8) + 2)); }
             double ground = 0;
             for (int d = 0; d <= 24; d += 6)
             {
@@ -389,6 +450,69 @@ namespace Flocks
             return best;
         }
 
+        /// <summary>
+        /// Approach bookkeeping, every tick while there is a spot: time spent, and on the first call the lane. True when
+        /// the spot should be given up (too long, too many aborted glides, or no lane in at a manageable slope).
+        /// </summary>
+        private bool TrackApproach(float dt)
+        {
+            approachTime += dt;
+            if (!laneChosen) { laneChosen = true; ChooseLane(); }
+            return approachTime > ApproachGiveUp || goArounds >= MaxGoArounds || approachSlope > MaxApproachSlope;
+        }
+
+        /// <summary>
+        /// The lane in: of 16 directions out from the spot, the one whose way in needs the gentlest descent, with a
+        /// slight preference for the goose's own side so it doesn't fly round the lake for a marginally better one.
+        /// </summary>
+        private void ChooseLane()
+        {
+            var pos = entity.Pos;
+            double bearing = Math.Atan2(pos.X - target.X, pos.Z - target.Z), best = double.MaxValue;
+            for (int i = 0; i < 16; i++)
+            {
+                double th = i * Math.PI / 8, ux = Math.Sin(th), uz = Math.Cos(th);
+                double slope = ApproachSlope(ux, uz, LaneLength + 8);
+                double score = slope + 0.15 * (1 - Math.Cos(GameMath.AngleRadDistance((float)bearing, (float)th)));
+                if (score < best) { best = score; approachSlope = slope; laneX = ux; laneZ = uz; }
+            }
+        }
+
+        /// <summary>Where to steer while there is a spot: out to the lane's outer end until on the lane, then a point
+        /// LaneLook further in along it (laneEnd: aiming at the fixed outer end).</summary>
+        private void LaneAim(out double ax, out double az, out bool laneEnd)
+        {
+            var pos = entity.Pos;
+            double px = pos.X - target.X, pz = pos.Z - target.Z;
+            double t = px * laneX + pz * laneZ, lat = Math.Abs(px * laneZ - pz * laneX);
+            laneEnd = t < 10 || lat > Math.Max(6, t * 0.35);
+            double a = laneEnd ? LaneLength : GameMath.Clamp(t - LaneLook, 0, LaneLength);
+            ax = target.X + laneX * a; az = target.Z + laneZ * a;
+        }
+
+        /// <summary>
+        /// The steepest descent (blocks down per block forward) a straight line into the spot along (ux, uz) must have
+        /// to keep Clearance above every bank or tree top within maxDist of the spot, across the wingspan. Further out,
+        /// the look-ahead climb (AvoidTerrain) deals with the ground. Open water never counts.
+        /// </summary>
+        private double ApproachSlope(double ux, double uz, double maxDist)
+        {
+            var ba = entity.World.BlockAccessor;
+            double worst = 0;
+            var tmp = new BlockPos(0, 0, 0);
+            for (double s = 1.5; s <= maxDist; s += 1)
+                for (int side = -1; side <= 1; side++)
+                {
+                    int x = (int)Math.Floor(target.X + ux * s + uz * side * HalfSpan), z = (int)Math.Floor(target.Z + uz * s - ux * side * HalfSpan);
+                    int h = ba.GetRainMapHeightAt(x, z);
+                    if (h <= 0 || h + 1 + Clearance <= target.Y) continue;
+                    tmp.Set(x, h, z);
+                    if (ba.GetBlock(tmp, BlockLayersAccess.Fluid)?.IsLiquid() == true) continue;
+                    worst = Math.Max(worst, (h + 1 + Clearance - target.Y) / s);
+                }
+            return worst;
+        }
+
         private double ClimbRate(double wantY) => GameMath.Clamp((wantY - entity.Pos.Y) * 0.8, -SinkMax, phaseTime < 2 ? ClimbMax * 0.8 : ClimbMax);
 
         private void Steer(double want, double rate, float dt)
@@ -421,6 +545,7 @@ namespace Flocks
             threatX = t.GetDouble("threatX"); threatZ = t.GetDouble("threatZ");
             target = t.HasAttribute("tx") ? new Vec3d(t.GetDouble("tx"), t.GetDouble("ty"), t.GetDouble("tz")) : null;
             if (target != null && t.GetBool("rawTarget")) { target.Y -= sink; Persist(); } // set by PrepareLanding
+            NewTarget(target);
             flyHeading = entity.Pos.Yaw; speed = cruise; phaseTime = 2; searchTimer = 0;
             if (phase == Phase.Water) Persist();
         }
@@ -453,6 +578,14 @@ namespace Flocks
 
         /// <summary>Climbing away for good, ready to be handed to the sky renderer.</summary>
         public bool DepartingInFlight => phase == Phase.Fly && departing;
+        /// <summary>Why the last glide was aborted (diagnostics and the in-engine tests).</summary>
+        public string LastGoAround { get; private set; }
+
+        private void GoAround(string why) { goArounds++; LastGoAround = why; SetPhase(Phase.Fly); }
+
+        /// <summary>For diagnostics and the in-engine tests: Water, Run, Fly, Glide or Splash, and the landing spot.</summary>
+        public string PhaseName => phase.ToString();
+        public Vec3d Target => target;
         public double FlyHeading => flyHeading;
         public double FlySpeed => speed;
 

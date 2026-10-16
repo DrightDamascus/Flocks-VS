@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- In-engine test mod for Flocks: loaded only into a scratch dedicated server by tools/run_engine_tests.ps1, never shipped. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>FlocksTest</AssemblyName>
+    <Nullable>disable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <VINTAGE_STORY Condition="'$(VINTAGE_STORY)' == ''">%USERPROFILE%\agent-tools\vsref1227</VINTAGE_STORY>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="VintagestoryAPI"><HintPath>$(VINTAGE_STORY)\VintagestoryAPI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Flocks"><HintPath>..\..\Flocks\bin\Release\Flocks.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="modinfo.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
