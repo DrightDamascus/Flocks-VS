@@ -907,6 +907,23 @@ namespace FlocksTest
                 Check(FlockRegistry.Instance.Wariness(guarded.Id) < 0.01, "the scarecrow isn't counted as a disturbance");
                 Check(CropStages(f2x, f2z).All(s => s == 5), "and they leave its crops alone");
             }, 50));
+            steps.Enqueue(("scarecrow mod", () => { }, () => true, () =>
+            {
+                if (!sapi.ModLoader.IsModEnabled("scarecrow")) { Log("scarecrow mod: not installed, its scarecrows not checked"); return; }
+                string sd = Lang.Get("game:item-handbooktext-strawdummy");
+                Check(sd.Contains("ctrl") && sd.Contains("crows"), $"the straw dummy's handbook text keeps the Scarecrow mod's pickup and says it keeps crows off ({sd})");
+                Check(new[] { "scarecrow", "little-scarecrow" }.All(k => Lang.Get("scarecrow:itemdesc-" + k) is string d && d.Contains("accoon") && d.Contains("Crows")), "its scarecrows' descriptions name the crows too");
+                var at = new Vec3d(f1x, y0 + 1, f1z);
+                foreach (var code in new[] { "scarecrow", "little-scarecrow" })
+                {
+                    Check(!Scarecrows.Protects(sapi.World, at, 15), $"nothing guards the first field before the {code} goes up");
+                    var sc = sapi.World.ClassRegistry.CreateEntity(sapi.World.GetEntityType(new AssetLocation("scarecrow", code)));
+                    sc.Pos.SetPos(f1x + 0.5, y0 + 1, f1z - 3.5);
+                    sapi.World.SpawnEntity(sc);
+                    Check(Scarecrows.Protects(sapi.World, at, 15) && Scarecrows.Nearest(sapi.World, at, 15) != null, $"the Scarecrow mod's {code} guards it like the straw dummy");
+                    sc.Die(EnumDespawnReason.Expire);
+                }
+            }, 5));
             steps.Enqueue(("crows roost at dusk", () =>
             {
                 // the clock on to 20:00

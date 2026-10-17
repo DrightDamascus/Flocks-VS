@@ -1,7 +1,9 @@
 # Handoff
 
 Where Flocks stands and what comes next, for whoever picks it up (a new session, or Dright after a break).
-Last updated 2026-10-16. Committed through 0.21.0, the first public release (on the ModDB; Dright's own page text).
+Last updated 2026-10-16. Committed through 0.21.1 (on the ModDB): Scarecrow mod support, asked for by a player; its
+scarecrows keep crows off like the straw dummy, and its texts get our line about crows (checked in game by Dright).
+Before that, 0.21.0 was the first public release (on the ModDB; Dright's own page text).
 0.21.0 added: melee hits birds (only thrown spears miss), the waterbird spin-on-land fix, Animal Cages support (caged
 models, fresh start on release), per-animal switches and EaglesHuntChickens in flocks-server.json, /flocks lineup, and
 cranes switched off for now. Tests at commit: with Biomes, Butchering and Animal Cages loaded, 200 of 202 passed; the
@@ -55,7 +57,8 @@ kill crops like hares do).
     a crop through the farmland's own `ConsumeOnePortion`, exactly as hares do: dead crop, seed kept (Dright). Crops are
     found through vanilla's POIRegistry (VSEssentials, referenced in the csproj); its WalkPois leaves out the last
     chunk column of its range, so the crow asks for a chunk more and filters. The scarecrow check is `Scarecrows.cs`
-    (standing `game:strawdummy` entities, horizontal radius from the server config).
+    (standing `game:strawdummy` entities, and the Scarecrow mod's `scarecrow:scarecrow` and `scarecrow:little-scarecrow`;
+    horizontal radius from the server config).
   - `flocks.owl` (`Owl.cs`): the owl's roost/perch/pounce/feed and its night calls. Trees: ordinary leaves have no
     collision box, but the branches inside a crown are branchy leaves, which do; they are drawn as leaf blocks though,
     so an owl on one is hidden. The roost is the first solid block under a column's leaves (PerchBelowLeaves), reached
@@ -145,6 +148,9 @@ The roster planned so far is done. Open ideas, none agreed with Dright yet:
   catcher's hand at the bird's -caged model (tools/make_caged.py). Not yet seen in game: that swap, and the caged
   birds' look. Birds note their position every second (entity.Attributes, saved, not synced); one spawned more than
   4 blocks from it (let out of a cage) drops its saved state (Relocated) and starts afresh.
+- Scarecrow (Mandikor's, modid scarecrow; tested against 1.8.2, zip in the same folder): only Scarecrows.Codes; no
+  patch. Chiappo's Vintage Scarecrows (modid vintagescarecrow, a remake for 1.21) is not supported: its entity codes
+  were not checked.
 - JSON patches can't reach a file whose first token is a comment: keep comments inside the braces.
 
 ## Loose ends

@@ -40,6 +40,7 @@ DESIGN.md. Version history: CHANGELOG.md.
   and butcher; the smaller birds are plucked on the spot as before.
 - **Animal Cages**: every Flocks animal can be caught (the big birds in the medium cage once wounded); caged birds
   stand with folded wings, and are let out to start a new life where they are released.
+- **Scarecrow**: its scarecrow and little scarecrow keep crows off like the straw dummy (the same radius).
 
 ## Commands
 `/flocks send [count] [species]` sends a passing flock over you. `/flocks schedule` shows today's migration plan.

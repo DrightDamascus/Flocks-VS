@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.21.1
+- Scarecrow mod support (Mandikor's, modid scarecrow): its scarecrow and little scarecrow keep crows off like the straw
+  dummy, within the same ScarecrowRadius (15). The straw dummy already worked with it installed (it keeps the
+  dummy's code). Its texts (the straw dummy's handbook page, which it writes over ours, and its scarecrows'
+  descriptions, which name only hares and raccoons) get our line about crows added at the end. README says so too.
+- Tests: with the Scarecrow mod loaded, each of its scarecrows guards a field.
+
 ## 0.21.0
 The first public release, on the ModDB.
 - Cranes are switched off for now (Dright): they no longer pass over on migration (crane.json maxFlocksPerDay 0, was

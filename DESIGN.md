@@ -206,7 +206,9 @@ Decisions (Dright, 0.13.0), Phase 1 AI:
   blocks across the ground of a standing one, crows don't raid, feed or spawn, and crows feeding there when it goes up fly off (not a disturbance). It never stops working and doesn't need
   moving (Dright: realism that turns into a chore isn't wanted). Crows find crops through vanilla's POIRegistry, the
   food points of interest farmland registers for hares and deer. Server config: CropRaiding, CropRaidHoursMin/Max,
-  ScarecrowRadius, MaxCrowsNearby. Not done (ideas for Dright): mobbing the eagle, gathering at carcasses, following
+  ScarecrowRadius, MaxCrowsNearby. With Mandikor's Scarecrow mod (0.21.1, asked for by a player), its scarecrow and
+  little scarecrow count as well, at the same ScarecrowRadius: that mod's own ranges (16 and 8, 4 for the dummy) are
+  for the animals it scares, and a smaller reach would only mean more of them to put up. Not done (ideas for Dright): mobbing the eagle, gathering at carcasses, following
   players who till or harvest.
 - Done in 0.20.0: the tawny owl, the fourth behaviour type (species habitat "wood", flocks.owl, Owl.cs on
   EntityBehaviorBird), chosen by Dright over the barn owl and the eagle owl: a woodland bird, and the mod's first night

@@ -59,6 +59,8 @@ namespace Flocks
             foreach (var kv in Species.LoadAll(api)) species[kv.Key] = kv.Value;
         }
 
+        public override void AssetsFinalize(ICoreAPI api) => Scarecrows.HandbookText(api);
+
         /// <summary>/flocks (typed with a slash) goes to the server; it only relays the subcommand to the caller's client.</summary>
         private ResidentGeese residents;
         private FlockRegistry registry;
@@ -241,6 +243,7 @@ namespace Flocks
             api.Event.RegisterGameTickListener(scheduler.Tick, 1000);
             api.Event.LevelFinalize += () =>
             {
+                Scarecrows.HandbookText(api);
                 foreach (var sp in species.Values)
                 {
                     if (sp.Meshes == null) sp.CreateMeshes(api);
