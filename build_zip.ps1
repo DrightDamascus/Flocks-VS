@@ -8,5 +8,6 @@ $out = Join-Path $PSScriptRoot 'Flocks/bin/Release'
 $dist = Join-Path $PSScriptRoot 'dist'
 New-Item -ItemType Directory -Path $dist -Force | Out-Null
 $archive = Join-Path $dist "flocks_$($info.version).zip"
-Compress-Archive -LiteralPath (@('modinfo.json','Flocks.dll','Flocks.pdb','assets') | % { Join-Path $out $_ }) -DestinationPath $archive -Force
+# the sound credits travel with the mod: the CC BY-SA and CC BY recordings need their attributions alongside them
+Compress-Archive -LiteralPath ((@('modinfo.json','Flocks.dll','Flocks.pdb','assets') | % { Join-Path $out $_ }) + (Join-Path $PSScriptRoot 'CREDITS.md')) -DestinationPath $archive -Force
 Get-Item $archive
