@@ -1,4 +1,4 @@
-﻿param([string]$GamePath = '%USERPROFILE%\agent-tools\vsref1227')
+﻿param([string]$GamePath = (Join-Path $env:USERPROFILE 'agent-tools\vsref1227'))
 $ErrorActionPreference = 'Stop'
 $project = Join-Path $PSScriptRoot 'Flocks/Flocks.csproj'
 & dotnet build $project -c Release "-p:VINTAGE_STORY=$GamePath" -warnaserror

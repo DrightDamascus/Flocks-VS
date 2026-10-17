@@ -6,7 +6,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <VINTAGE_STORY Condition="'$(VINTAGE_STORY)' == ''">%USERPROFILE%\agent-tools\vsref1227</VINTAGE_STORY>
+    <VINTAGE_STORY Condition="'$(VINTAGE_STORY)' == ''">$(USERPROFILE)\agent-tools\vsref1227</VINTAGE_STORY>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="VintagestoryAPI"><HintPath>$(VINTAGE_STORY)\VintagestoryAPI.dll</HintPath><Private>false</Private></Reference>

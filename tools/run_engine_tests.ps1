@@ -4,7 +4,7 @@ param(
     [int]$TimeoutMinutes = 20,
     # a fixed world, so every run builds the test site on the same terrain (low enough near spawn for the slab)
     [string]$Seed = '424242',
-    # other mods to load alongside (zips), for compatibility runs, e.g. %USERPROFILE%\agent-tools\vsmods\biomes_2.3.1.zip
+    # other mods to load alongside (zips), for compatibility runs, e.g. $env:USERPROFILE\agent-tools\vsmods\biomes_2.3.1.zip
     [string[]]$ExtraMods = @()
 )
 # In-engine tests: a scratch dedicated server (new world, no players) with the built Flocks zip and the FlocksTest mod.
