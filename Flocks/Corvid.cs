@@ -20,7 +20,7 @@ namespace Flocks
     /// own IAnimalFoodSource.ConsumeOnePortion, so the crop dies and still gives its seed back. Never within ScarecrowRadius of a standing straw dummy (Scarecrows), where crows don't come down to feed
     /// either. Disturbances count toward the flock's wariness as for the waterfowl, for the place rather than a lake:
     /// flushed again and again, the flock leaves the area for a couple of days (FlockRegistry).
-    /// Damage: arrows kill; spears and melee are dodged (EntityBehaviorBird), and either way the group flushes.
+    /// Damage: arrows and melee hurt; thrown spears are dodged (EntityBehaviorBird); either way the group flushes.
     /// Leaves have no collision box in this game, so a perched crow holds itself at the perch's height.
     /// </summary>
     public class EntityBehaviorCorvid : EntityBehaviorBird
@@ -96,9 +96,11 @@ namespace Flocks
         public override void OnGameTick(float dt)
         {
             if (entity.World.Side != EnumAppSide.Server) return;
+            if (entity.Alive && HoldIfFrozen()) return;   // /flocks lineup
             if (!entity.Alive) { entity.Pos.Roll = 0; return; }
             if (!restored) { restored = true; Restore(); FlockRegistry.Instance?.Adopt(entity, species); }
             LetSpearsPass(dt);
+            TrackPosition(dt);
             bool grounded = state == State.Forage || state == State.Perch;
             entity.SimulationRange = grounded ? GlobalConstants.DefaultSimulationRange : FlightRange;
             stateTime += dt;
@@ -744,6 +746,10 @@ namespace Flocks
             }
             Persist();
         }
+
+        /// <summary>Let out of a cage somewhere new (EntityBehaviorBird.OnEntitySpawn): no old state, so the first tick
+        /// starts it as a new bird here.</summary>
+        protected override void Relocated() => entity.WatchedAttributes.RemoveAttribute(StateKey);
 
         public override void OnEntityLoaded()
         {

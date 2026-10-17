@@ -217,7 +217,7 @@ namespace FlocksTest
             Check(mt?.Sounds != null && mt.Sounds.ContainsKey("takeoffwings") && mt.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "flocks.waterfowl") == true,
                 "mallard entity file loaded whole (sounds and flocks.waterfowl behaviour present)");
             var spc = sapi.ModLoader.GetModSystem<FlocksModSystem>().SpeciesByCode;
-            Check(spc.ContainsKey("goose") && spc["goose"].Lands && spc["goose"].LandingMin == 7 && spc.ContainsKey("crane") && !spc.ContainsKey("hawk")
+            Check(spc.ContainsKey("goose") && spc["goose"].Lands && spc["goose"].LandingMin == 7 && spc.ContainsKey("crane") && spc["crane"].MaxFlocksPerDay == 0 && !spc.ContainsKey("hawk")
                   && spc.ContainsKey("mallard") && spc["mallard"].MinLakeSize == 25 && spc.ContainsKey("heron") && spc["heron"].Wades && !spc["heron"].ArriveInFlocks
                   && spc.ContainsKey("gull") && spc["gull"].Sea && spc["gull"].Liquid == "saltwater" && spc["gull"].YearRound && spc["gull"].WarinessFactor == 0.5
                   && spc.ContainsKey("crow") && spc["crow"].Ground && spc["crow"].YearRound && !spc["crow"].ArriveInFlocks
@@ -332,7 +332,7 @@ namespace FlocksTest
             steps.Enqueue(("flush toward wall", () =>
             {
                 ResetStats();
-                geese[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 1);
+                geese[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 0.01f);
             }, () => Elapsed > 4 && geese.Where(e => e.Alive).All(e => Phase(e) == "Water"), () => ReportFlight("flush", 2), 90));
 
             FlockRecord treed = null;
@@ -353,7 +353,7 @@ namespace FlocksTest
                 var chick = sapi.World.ClassRegistry.CreateEntity(sapi.World.GetEntityType(new AssetLocation("game", "chicken-hen")));
                 chick.Pos.SetPos(c.X + 50 - 15, y0 + 1, c.Z + 30);
                 sapi.World.SpawnEntity(chick);
-                sapi.Event.RegisterCallback(_ => LoadedGeese()[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = chick, Type = EnumDamageType.BluntAttack }, 1), 3000);
+                sapi.Event.RegisterCallback(_ => LoadedGeese()[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = chick, Type = EnumDamageType.BluntAttack }, 0.01f), 3000);
             }, () => Elapsed > 7 && LoadedGeese().All(e => Phase(e) == "Water"), () =>
             {
                 ReportFlight("tree-ringed pond", 0);
@@ -410,7 +410,7 @@ namespace FlocksTest
             steps.Enqueue(("second disturbance", () =>
             {
                 ResetStats();
-                LoadedGeese()[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 1);
+                LoadedGeese()[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 0.01f);
             }, () => Elapsed > 4 && LoadedGeese().All(e => Phase(e) == "Water"), () =>
             {
                 double w = FlockRegistry.Instance.Wariness(flock.Id);
@@ -424,7 +424,7 @@ namespace FlocksTest
                 ResetStats();
                 var g = LoadedGeese();
                 lakeLeft = g[0].Pos.XYZ;
-                g[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 1);
+                g[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 0.01f);
             }, () => Elapsed > 2 && LoadedGeese().Count == 0, () =>
             {
                 var rec = FlockRegistry.Instance.Get(flock.Id);
@@ -478,7 +478,7 @@ namespace FlocksTest
                 {
                     ResetStats(); FlockRegistry.Instance.Calm();
                     var alive = LoadedGeese();
-                    if (alive.Count > 0) alive[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 1);
+                    if (alive.Count > 0) alive[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 0.01f);
                 }, () => Elapsed > 4 && LoadedGeese().All(e => Phase(e) == "Water"), () =>
                 {
                     long mem = GC.GetTotalMemory(true) / (1024 * 1024);
@@ -508,7 +508,7 @@ namespace FlocksTest
             steps.Enqueue(("mallard flush", () =>
             {
                 ResetStats();
-                LoadedGeese()[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 1);
+                LoadedGeese()[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 0.01f);
             }, () => Elapsed > 3 && LoadedGeese().All(e => Phase(e) == "Water"), () => ReportFlight("mallard flush", 2), 90));
 
             // ---- herons: wading (standing on the bottom of water one block deep), from data plus the wade habitat
@@ -551,8 +551,9 @@ namespace FlocksTest
             steps.Enqueue(("heron flush", () =>
             {
                 ResetStats();
-                LoadedGeese()[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 1);
-            }, () => Elapsed > 4 && LoadedGeese().All(e => Phase(e) == "Water"), () =>
+                LoadedGeese()[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 0.01f);
+            }, () => Elapsed > 4 && LoadedGeese().All(e => Phase(e) == "Water" && !e.Swimming
+                         && LakeSearch.IsWadeable(sapi.World.BlockAccessor, (int)Math.Floor(e.Pos.X), (int)Math.Floor(e.Pos.Z), out _)) || Elapsed > 30, () =>
             {
                 var g = LoadedGeese();
                 Check(stats.Values.Count(st => st.Samples > 0) == 2, "both herons flew");
@@ -577,7 +578,7 @@ namespace FlocksTest
             steps.Enqueue(("eagle soar", () =>
             {
                 eagleHits = eagleLow = eagleSamples = 0; eagleTurned = 0; soarSince = 0; eagleLastYaw = double.NaN; eagleMaxAlt = 0; eagleMinAlt = double.MaxValue; eagleStates.Clear();
-                eagle.ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 1);  // dodged: a startle
+                eagle.ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 0.01f);  // a token blow: a startle
             }, () => Elapsed > 45, () =>
             {
                 Check(eagleStates.Contains("Takeoff") && eagleStates.Contains("Soar"), $"took off and soared (states seen: {string.Join(", ", eagleStates)})");
@@ -741,7 +742,7 @@ namespace FlocksTest
             steps.Enqueue(("gull flush", () =>
             {
                 ResetStats();
-                LoadedGeese()[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 1);
+                LoadedGeese()[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 0.01f);
             }, () => Elapsed > 4 && LoadedGeese().All(e => Phase(e) == "Water"), () =>
             {
                 var g = LoadedGeese();
@@ -823,6 +824,7 @@ namespace FlocksTest
             }, 70));
             Entity walker = null;
             double walkedFrom = 0, flewAt = -1;
+            float crowHp = 0;
             steps.Enqueue(("crows flee a player", () =>
             {
                 // a stand-in player, sensed as one (EntityBehaviorBird.TestPlayers), walking in from 30 blocks
@@ -849,10 +851,13 @@ namespace FlocksTest
             steps.Enqueue(("crow flush", () =>
             {
                 FlockRegistry.Instance.Calm();
+                crowHp = crowList[0].WatchedAttributes.GetTreeAttribute("health")?.GetFloat("currenthealth") ?? 0;
                 crowList[0].ReceiveDamage(new DamageSource { Source = EnumDamageSource.Entity, SourceEntity = threat, Type = EnumDamageType.BluntAttack }, 1);
             }, () => crowList.All(e => CB(e)?.StateName == "Perch") || Elapsed > 40, () =>
             {
                 Check(crowList.All(e => CB(e)?.StateName == "Perch"), $"the group flew up to perches ({string.Join(" ", crowList.Select(e => CB(e)?.StateName))})");
+                float hpNow = crowList[0].WatchedAttributes.GetTreeAttribute("health")?.GetFloat("currenthealth") ?? 0;
+                Check(hpNow < crowHp - 0.5, $"the blow landed: melee hurts birds (health {crowHp} -> {hpNow}); only thrown spears are dodged");
                 Check(crowList.All(e => e.Pos.Y > y0 + 5), $"up off the ground ({string.Join(" ", crowList.Select(e => (e.Pos.Y - y0).ToString("0.0")))} above the slab)");
                 Check(crowList.Count(e => Math.Abs(e.Pos.X - (c.X + 15)) < 2.5 && Math.Abs(e.Pos.Z - (c.Z + 66)) < 2.5) >= 3,
                     $"most in the oak ({string.Join(" ", crowList.Select(e => $"{e.Pos.X - c.X:0},{e.Pos.Y - y0:0},{e.Pos.Z - c.Z:0}"))})");
@@ -925,6 +930,8 @@ namespace FlocksTest
             QueueOwlSteps();
             QueueBiomesSteps();
             QueueButcheringSteps();
+            QueueLandAndCageSteps();
+            QueueConfigSteps();
 
             steps.Enqueue(("memory", () => { }, () => true, () =>
             {
@@ -1175,6 +1182,177 @@ namespace FlocksTest
             }, 5));
         }
 
+        /// <summary>Birds on dry land, let out of cages, and the Animal Cages mod (when installed).</summary>
+        private void QueueLandAndCageSteps()
+        {
+            Entity ashore = null;
+            double ashoreTurn = 0, lastYaw = double.NaN;
+            FlockRecord ashoreFlock = null;
+            steps.Enqueue(("goose ashore", () =>
+            {
+                // on bare stone past the end of the wall, some 25 blocks from pond A: no water within 6, the pond in easy
+                // flying range
+                FlockRegistry.Instance.Calm();
+                ashoreFlock = FlockRegistry.Instance.Create("goose", 1, c);
+                testFlock = ashoreFlock.Id;
+                ashore = sapi.World.ClassRegistry.CreateEntity(sapi.World.GetEntityType(new AssetLocation("flocks", "greylag")));
+                ashore.WatchedAttributes.SetLong(FlockRegistry.FlockIdKey, ashoreFlock.Id);
+                ashore.Pos.SetPos(c.X - 10, y0 + 1, c.Z + 40);
+                sapi.World.SpawnEntity(ashore);
+                ashoreTurn = 0; lastYaw = double.NaN; ResetStats();
+            }, () =>
+            {
+                if (Elapsed < 3)
+                {
+                    // before it decides where to go, it shouldn't spin on the spot (it turned randomly every tick)
+                    if (!double.IsNaN(lastYaw)) ashoreTurn += Math.Abs(GameMath.AngleRadDistance((float)lastYaw, ashore.Pos.Yaw));
+                    lastYaw = ashore.Pos.Yaw;
+                }
+                return Elapsed > 3 && Phase(ashore) == "Water" && (ashore.FeetInLiquid || ashore.Swimming) || Elapsed > 60;
+            }, () =>
+            {
+                Check(ashoreTurn < Math.PI, $"ashore with no water close by it doesn't spin on the spot (turned {ashoreTurn / Math.PI * 180:0} degrees in its first 3 s)");
+                Check(Phase(ashore) == "Water" && (ashore.FeetInLiquid || ashore.Swimming), $"it flew to the pond and settled on the water ({Phase(ashore)} at {Where(ashore)})");
+                ashore.Die(EnumDespawnReason.Expire);
+            }, 70));
+
+            Entity caged = null;
+            Vec3d caughtAt = null, releasedAt = null;
+            steps.Enqueue(("bird let out of a cage", () =>
+            {
+                // a crow feeding on field 1 is caught the way Animal Cages does it (saved to bytes, removed as picked up)
+                // and let out 20 blocks further on, on field 2's side of the slab
+                FlockRegistry.Instance.Calm();
+                var rec = FlockRegistry.Instance.Create("crow", 1, c);
+                testFlock = rec.Id;
+                caged = sapi.World.ClassRegistry.CreateEntity(sapi.World.GetEntityType(new AssetLocation("flocks", "crow")));
+                caged.WatchedAttributes.SetLong(FlockRegistry.FlockIdKey, rec.Id);
+                caughtAt = new Vec3d(c.X + 0.5, y0 + 1, c.Z + 72.5);
+                caged.Pos.SetPos(caughtAt);
+                sapi.World.SpawnEntity(caged);
+            }, () =>
+            {
+                if (Elapsed > 4 && releasedAt == null)
+                {
+                    byte[] bytes;
+                    using (var ms = new System.IO.MemoryStream()) { using var w = new System.IO.BinaryWriter(ms, System.Text.Encoding.UTF8); caged.ToBytes(w, false); w.Flush(); bytes = ms.ToArray(); }
+                    string cls = sapi.World.ClassRegistry.GetEntityClassName(caged.GetType());
+                    caged.Die(EnumDespawnReason.PickedUp);
+                    using (var ms = new System.IO.MemoryStream(bytes)) { using var r = new System.IO.BinaryReader(ms, System.Text.Encoding.UTF8); caged = sapi.World.ClassRegistry.CreateEntity(cls); caged.FromBytes(r, false); }
+                    releasedAt = new Vec3d(c.X - 20.5, y0 + 1, c.Z + 72.5);
+                    caged.Pos.SetPos(releasedAt);
+                    sapi.World.SpawnEntity(caged);
+                }
+                return releasedAt != null && Elapsed > 9;
+            }, () =>
+            {
+                var b = caged.GetBehavior<EntityBehaviorCorvid>();
+                double fromRelease = Math.Sqrt((b.PatchX - releasedAt.X) * (b.PatchX - releasedAt.X) + (b.PatchZ - releasedAt.Z) * (b.PatchZ - releasedAt.Z));
+                Check(caged.Alive && b.StateName == "Forage" && fromRelease < 3 && caged.Pos.HorDistanceTo(releasedAt) < 6,
+                    $"let out of a cage 21 blocks from where it was caught, the crow starts afresh there ({b.StateName}, its patch {fromRelease:0.0} from the release, the bird {caged.Pos.HorDistanceTo(releasedAt):0.0} from it)");
+                caged.Die(EnumDespawnReason.Expire);
+            }, 20));
+
+            steps.Enqueue(("animal cages", () => { }, () => true, () =>
+            {
+                var caged = new[] { "greylag", "mallard", "heron", "eagle", "gull", "crow", "owl" };
+                var missing = caged.Where(b => !sapi.Assets.Exists(new AssetLocation("flocks", $"shapes/entity/bird/{(b == "greylag" ? "greylag" : b)}-caged.json"))).ToList();
+                Check(missing.Count == 0, $"every bird has a standing, wings-folded model for cages ({(missing.Count == 0 ? "all" : "missing " + string.Join(", ", missing))})");
+                if (!sapi.ModLoader.IsModEnabled("animalcages")) { Log("animal cages: not installed, catch lists not checked"); return; }
+                var cfg = sapi.Assets.Get(new AssetLocation("animalcages", "config/defaultconfig.json")).ToObject<Newtonsoft.Json.Linq.JObject>();
+                var small = cfg["smallCatchableEntities"].Select(t => (string)t["name"]).ToList();
+                var medium = cfg["mediumCatchableEntities"].Select(t => (string)t["name"]).ToList();
+                Check(new[] { "mallard", "gull", "crow", "owl", "mouse" }.All(small.Contains) && new[] { "greylag", "heron", "eagle" }.All(medium.Contains),
+                    $"our animals are in Animal Cages' catch lists (small: {string.Join(" ", small.Where(n => !n.Contains('*')))}; medium: {string.Join(" ", medium.Where(n => !n.Contains('*')))})");
+            }, 5));
+        }
+
+        /// <summary>Removes the eagle's usual prey (hares, mallards) within its reach of the chickens' spot, so that step
+        /// sees only chickens.</summary>
+        private void ClearOtherPrey()
+        {
+            var at = new Vec3d(c.X + 12, y0 + 1, c.Z - 20);
+            foreach (var e in sapi.World.GetEntitiesAround(at, 70, 90, e => e.Alive && (e.Code.Path.StartsWith("hare") || e.Code.Path == "mallard")))
+                e.Die(EnumDespawnReason.Expire);
+        }
+
+        /// <summary>The server config's switches: an animal switched off, and eagles taking chickens.</summary>
+        private void QueueConfigSteps()
+        {
+            var cfg = ResidentGeese.Config;
+            steps.Enqueue(("animal switched off", () => { }, () => true, () =>
+            {
+                var spc = sapi.ModLoader.GetModSystem<FlocksModSystem>().SpeciesByCode;
+                cfg.Animals["greylag"] = false;
+                bool landed = sapi.ModLoader.GetModSystem<FlocksModSystem>().Landings.Arrive(new Vec3d(c.X, y0 + 1, c.Z - 60), spc["goose"], false, out string msg);
+                Check(!landed && msg.Contains("switched off") && !cfg.SpeciesEnabled(spc["goose"]) && cfg.SpeciesEnabled(spc["mallard"]),
+                    $"geese switched off: no landing flock ({msg}); mallards still on");
+                cfg.Animals["greylag"] = true;
+                Check(cfg.AnimalEnabled("mouse") && cfg.AnimalEnabled("crane") && cfg.Animals.Count >= 9, $"every animal has a switch, on by default ({string.Join(" ", cfg.Animals.Keys)})");
+            }, 5));
+            Entity hunter = null;
+            var hens = new List<Entity>();
+            string ignoring = null;
+            var lined = new List<(Entity e, Vec3d at)>();
+            steps.Enqueue(("lineup", () =>
+            {
+                // /flocks lineup in front of a stand-in player on the slab, looking north
+                var who = sapi.World.ClassRegistry.CreateEntity(sapi.World.GetEntityType(new AssetLocation("game", "chicken-hen")));
+                who.Pos.SetPos(c.X, y0 + 1, c.Z - 20); who.Pos.Yaw = 0;
+                sapi.World.SpawnEntity(who);
+                var res = sapi.ModLoader.GetModSystem<FlocksModSystem>().Lineup(sapi, who, "stand", 3);
+                Log("lineup: " + res.StatusMessage);
+                who.Die(EnumDespawnReason.Expire);
+                foreach (var e in sapi.World.LoadedEntities.Values.Where(e => e.Alive && e.Code.Domain == "flocks"
+                             && (e.WatchedAttributes.HasAttribute(EntityBehaviorBird.FrozenKey) || e.Attributes.GetBool("flocksLineup"))))
+                {
+                    lined.Add((e, e.Pos.XYZ)); extraPhysics.Add(e);
+                }
+            }, () => Elapsed > 4, () =>
+            {
+                Check(lined.Count == 8 && lined.Select(l => l.e.Code.Path).Distinct().Count() == 8, $"one of each animal lined up ({lined.Count}: {string.Join(" ", lined.Select(l => l.e.Code.Path))})");
+                double moved = lined.Count == 0 ? 99 : lined.Max(l => l.e.Pos.HorDistanceTo(l.at));
+                Check(moved < 0.6 && lined.All(l => l.e.Alive), $"and they stay put, frozen (most moved {moved:0.00} blocks in 4 s)");
+                sapi.ModLoader.GetModSystem<FlocksModSystem>().Lineup(sapi, null, "clear", 0);
+                Check(lined.All(l => !l.e.Alive), "/flocks lineup clear removes them");
+            }, 10));
+            steps.Enqueue(("eagles and chickens", () =>
+            {
+                cfg.EaglesHuntChickens = false;
+                foreach (var e in sapi.World.LoadedEntities.Values.Where(e => e.Alive && e.Code.Path == "eagle").ToList()) e.Die(EnumDespawnReason.Expire);
+                ClearOtherPrey();
+                var ht = sapi.World.GetEntityType(new AssetLocation("game", "chicken-hen"));
+                for (int i = 0; i < 3; i++)
+                {
+                    var h = sapi.World.ClassRegistry.CreateEntity(ht);
+                    h.Pos.SetPos(c.X + 10 + i * 2, y0 + 1, c.Z - 20);
+                    sapi.World.SpawnEntity(h); hens.Add(h);
+                }
+                hunter = sapi.World.ClassRegistry.CreateEntity(sapi.World.GetEntityType(new AssetLocation("flocks", "eagle")));
+                hunter.Pos.SetPos(c.X + 12, y0 + 40, c.Z - 20);
+                sapi.World.SpawnEntity(hunter);
+                extraPhysics.Add(hunter); extraPhysics.AddRange(hens);
+            }, () =>
+            {
+                var rb = hunter.GetBehavior<EntityBehaviorRaptor>();
+                ClearOtherPrey();   // wild hares wander in over a long run: only the chickens should be there to see
+                if (ignoring == null && Elapsed > 12)
+                {
+                    // 12 s of looking with chickens off the menu: it saw no prey; then on
+                    ignoring = $"{rb.LastHunt}; state {rb.StateName}";
+                    cfg.EaglesHuntChickens = true;
+                }
+                return ignoring != null && hens.Any(h => !h.Alive) || Elapsed > 70;
+            }, () =>
+            {
+                Check(ignoring != null && ignoring.StartsWith("0 prey"), $"with EaglesHuntChickens off, chickens out in the open aren't prey ({ignoring})");
+                Check(hens.Any(h => !h.Alive), $"with it on, the eagle takes one ({hens.Count(h => !h.Alive)} of 3; {hunter.GetBehavior<EntityBehaviorRaptor>().LastHunt}; {hunter.GetBehavior<EntityBehaviorRaptor>().StateName})");
+                cfg.EaglesHuntChickens = false;
+                hunter.Die(EnumDespawnReason.Expire);
+                foreach (var h in hens) if (h.Alive) h.Die(EnumDespawnReason.Expire);
+            }, 80));
+        }
+
         private readonly List<long> memory = new();
 
         private bool FrameArrive(out string msg, string species = "goose")
@@ -1190,9 +1368,10 @@ namespace FlocksTest
         {
             if (steps.Count == 0) { Finish(); return; }
             var s = steps.Dequeue();
-            // FLOCKS_TEST_ONLY=owl runs only the steps whose names contain it (the site is built either way)
+            // FLOCKS_TEST_ONLY=owl runs only the steps whose names contain it, or any of several separated by | (the site
+            // is built either way)
             string only = Environment.GetEnvironmentVariable("FLOCKS_TEST_ONLY");
-            if (!string.IsNullOrEmpty(only) && !s.name.Contains(only) && s.name != "memory") { NextStep(); return; }
+            if (!string.IsNullOrEmpty(only) && !only.Split('|').Any(o => s.name.Contains(o)) && s.name != "memory") { NextStep(); return; }
             if (!string.IsNullOrEmpty(only) && s.name == "memory") { Finish(); return; }
             stepName = s.name; stepDone = s.done; stepCheck = s.check; stepTimeout = s.timeout;
             stepStart = sapi.World.ElapsedMilliseconds / 1000.0;

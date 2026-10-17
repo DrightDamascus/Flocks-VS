@@ -247,6 +247,13 @@ Decisions (Dright, 0.13.0), Phase 1 AI:
   plucked, then bare skin (the model's texture repainted).
 - Meat yields (Dright): by the real bird's weight at vanilla's chicken rate (about 0.9 poultry per kg), but never
   less than one whole strip for a small bird (no fractions that sometimes give nothing, no special small item).
+- Melee (Dright, after 0.20.2): blows hit birds; only thrown spears are dodged (they fly past, LetSpearsPass).
+- Animal Cages support (Dright: support it so the mod works with what people use). Catch lists via a patch on its
+  default config; the cage draws the model unanimated, so caught birds get a baked standing pose (-caged models)
+  through a swap of the cage's recorded model path as the bird is removed. A released bird starts afresh where it is,
+  detected by spawning away from its last noted position (cage release is a spawn from saved bytes elsewhere).
+- Waterbirds ashore (Dright: geese hate land and spaz out): with water close they walk to it, with water in flying
+  range they fly there, with none they stay and wander (a bird in a pen keeps to it).
 - Localisation scope (Dright): everything a player sees goes through the lang file, including creature names alive and
   dead and the command help and replies; the long admin/debug reports stay English (technical, mostly numbers).
 

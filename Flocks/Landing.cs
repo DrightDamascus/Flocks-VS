@@ -21,6 +21,7 @@ namespace Flocks
         public static TextCommandResult Land(ICoreServerAPI sapi, Entity caller, int count, Species sp)
         {
             if (caller == null) return TextCommandResult.Error(Lang.Get("flocks:land-needs-player"));
+            if (!ResidentGeese.Config.SpeciesEnabled(sp)) return TextCommandResult.Error(Lang.Get("flocks:animal-off", sp.DisplayName));
             var type = sapi.World.GetEntityType(sp.LandedEntityCode);
             if (type == null) return TextCommandResult.Error(Lang.Get("flocks:land-not-loaded", sp.LandedEntity));
             var rand = sapi.World.Rand;

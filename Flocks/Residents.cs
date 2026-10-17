@@ -40,6 +40,23 @@ namespace Flocks
         public double ScarecrowRadius = 15, CropRaidHoursMin = 3, CropRaidHoursMax = 6;
         /// <summary>Safety cap for land birds (crows): no new spawn when this many are already within NearbyRadius.</summary>
         public int MaxCrowsNearby = 16;
+
+        /// <summary>Every animal of the mod, on or off. Off: it never spawns on its own, no landing flocks of it come in,
+        /// /flocks land refuses it, and its passing flocks aren't drawn in any player's sky (the crane only ever passes
+        /// over). Ones already in the world stay (a caged or kept bird isn't lost).</summary>
+        public Dictionary<string, bool> Animals = new()
+        {
+            ["greylag"] = true, ["mallard"] = true, ["heron"] = true, ["eagle"] = true, ["gull"] = true,
+            ["crow"] = true, ["owl"] = true, ["mouse"] = true, ["crane"] = true,
+        };
+        /// <summary>Golden eagles hunt chickens as well as hares and mallards. They only stoop on prey in the open, so a
+        /// roofed run keeps chickens safe.</summary>
+        public bool EaglesHuntChickens = false;
+
+        /// <summary>Whether the animal (entity code path, e.g. "greylag"; "crane" for the passing cranes) is on.</summary>
+        public bool AnimalEnabled(string code) => Animals == null || !Animals.TryGetValue(code, out bool on) || on;
+        /// <summary>The same for a species: its landed entity, or its own code for a bird that only passes over.</summary>
+        public bool SpeciesEnabled(Species sp) => AnimalEnabled(sp.Lands ? sp.LandedEntityCode.Path : sp.Code);
     }
 
     /// <summary>
@@ -73,6 +90,7 @@ namespace Flocks
         {
             if (properties?.Code == null) return true;
             var code = properties.Code;
+            if (code.Domain == "flocks" && !Cfg.AnimalEnabled(code.Path)) { VetoOff++; return false; }   // switched off (Animals)
             var sp = ByEntity(species, code);
             if (sp == null) return true;
             try

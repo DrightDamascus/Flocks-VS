@@ -1,6 +1,7 @@
 using System;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
 namespace Flocks
@@ -61,6 +62,82 @@ namespace Flocks
                 hitListFields[t] = f;
             }
             return f?.GetValue(projectile) as System.Collections.Generic.List<long>;
+        }
+
+        // ---- frozen for a picture (/flocks lineup)
+
+        /// <summary>Set by /flocks lineup: the bird holds this spot, facing, and animation, and does nothing else.</summary>
+        public const string FrozenKey = "flocksFrozen";
+
+        /// <summary>A frozen bird (FrozenKey): held at its spot with its pose, no behaviour at all. True if frozen; the
+        /// behaviour's tick then stops there (before its first-tick setup, so it joins no flock).</summary>
+        protected bool HoldIfFrozen()
+        {
+            if (entity.WatchedAttributes[FrozenKey] is not ITreeAttribute t) return false;
+            var p = entity.Pos;
+            p.SetPos(t.GetDouble("x"), t.GetDouble("y"), t.GetDouble("z"));
+            p.Motion.Set(0, 0, 0);
+            p.Yaw = (float)t.GetDouble("yaw"); p.Roll = 0;
+            SetAnim(t.GetString("anim", "idle-stand"));
+            return true;
+        }
+
+        // ---- cages (the Animal Cages mod) and other moves: a bird spawned away from where it last was starts afresh
+
+        private const string LastPosKey = "flocksLastPos";
+        private float posSave;
+
+        /// <summary>Notes where the bird is, once a second, in its saved (not synced) attributes. A bird later spawned
+        /// more than RelocatedAt blocks from there was carried off, in a cage, say (OnEntitySpawn).</summary>
+        protected void TrackPosition(float dt)
+        {
+            if ((posSave -= dt) > 0) return;
+            posSave = 1;
+            var t = new TreeAttribute();
+            t.SetDouble("x", entity.Pos.X); t.SetDouble("y", entity.Pos.Y); t.SetDouble("z", entity.Pos.Z);
+            entity.Attributes[LastPosKey] = t;
+        }
+
+        public const double RelocatedAt = 4;
+
+        /// <summary>A bird let out of a cage comes back with everything it had when caught: its perch, its lake, a flight
+        /// in progress. Spawned away from where it last was, it drops that and starts as if new where it is now
+        /// (Relocated). Landing flocks and fresh spawns have no last position and are left alone.</summary>
+        public override void OnEntitySpawn()
+        {
+            base.OnEntitySpawn();
+            if (entity.World.Side != EnumAppSide.Server || entity.Attributes[LastPosKey] is not ITreeAttribute t) return;
+            double dx = t.GetDouble("x") - entity.Pos.X, dy = t.GetDouble("y") - entity.Pos.Y, dz = t.GetDouble("z") - entity.Pos.Z;
+            if (dx * dx + dy * dy + dz * dz < RelocatedAt * RelocatedAt) return;
+            entity.Attributes.RemoveAttribute(LastPosKey);
+            Relocated();
+        }
+
+        /// <summary>Forget the saved state (perch, lake, flight): the bird starts as if newly spawned where it is.</summary>
+        protected virtual void Relocated() { }
+
+        /// <summary>
+        /// Caught in a cage (Animal Cages: the bird is removed as "picked up", just after the cage noted it): the cage
+        /// draws the caught animal's model without animations, and ours, unanimated, have their wings spread for flight.
+        /// Point the cage held in hand at the bird's standing, wings-folded model instead (shapes/entity/bird/<code>-caged,
+        /// tools/make_caged.py). The cage stores the model path as capturedEntityShape.
+        /// </summary>
+        public override void OnEntityDespawn(EntityDespawnData despawn)
+        {
+            base.OnEntityDespawn(despawn);
+            if (entity.World.Side != EnumAppSide.Server || despawn?.Reason != EnumDespawnReason.PickedUp) return;
+            var shape = entity.Properties.Client?.Shape?.Base;
+            if (shape == null) return;
+            string plain = $"{shape.Domain}:shapes/{shape.Path}.json", caged = $"{shape.Domain}:shapes/{shape.Path}-caged.json";
+            if (!entity.World.AssetManager.Exists(new AssetLocation(caged))) return;
+            foreach (var p in entity.World.AllOnlinePlayers)
+            {
+                var slot = p.Entity?.RightHandItemSlot;
+                var attrs = slot?.Itemstack?.Attributes;
+                if (attrs == null || p.Entity.Pos.DistanceTo(entity.Pos) > 12 || attrs.GetString("capturedEntityShape") != plain) continue;
+                attrs.SetString("capturedEntityShape", caged);
+                slot.MarkDirty();
+            }
         }
 
         /// <summary>Flying away for good, ready to be removed once far from every player (FlockRegistry.TryDepart).</summary>
@@ -233,18 +310,15 @@ namespace Flocks
         }
 
         /// <summary>
-        /// Spears and melee are dodged; ranged projectiles (arrows, thrown stones, other mods' shot) are not.
-        /// A projectile hit has SourceEntity = the projectile (not an agent); a melee hit has the attacker itself as
-        /// the source. A thrown spear is a projectile whose code starts with "spear".
+        /// Only thrown spears are dodged (and LetSpearsPass makes sure they never visibly strike). Arrows, thrown stones,
+        /// other mods' shot and melee all hit (Dright: birds can be meleed, just not killed with a thrown spear).
+        /// A projectile hit has SourceEntity = the projectile (not an agent); a thrown spear is a projectile whose code
+        /// starts with "spear". A melee hit has the attacker itself as the source.
         /// </summary>
         protected static bool Dodges(DamageSource source)
         {
             var src = source.SourceEntity;
-            var cause = source.GetCauseEntity();
-            if (src == null && cause == null) return false;                          // fire, falls, drowning, commands
-            if (src != null && !(src is EntityAgent))
-                return src.Code?.Path?.StartsWith("spear") == true;                  // a projectile: only spears miss
-            return true;                                                             // melee by an agent (any weapon)
+            return src != null && src is not EntityAgent && src.Code?.Path?.StartsWith("spear") == true;
         }
     }
 }

@@ -21,8 +21,8 @@ namespace Flocks
     /// Flight state is kept in WatchedAttributes, so a goose that flies out of the loaded area carries on later.
     /// Vanilla's land-creature AI tasks are not used: their pathfinder avoids water and getoutofwater would drag
     /// the birds ashore, so movement is set here directly and the vanilla physics does the rest.
-    /// Damage: arrows and other ranged projectiles hurt it normally. Spears (thrown or held) and melee hits do
-    /// nothing except scare it off - the goose dodges, like a fish slipping a spear.
+    /// Damage: arrows, other ranged projectiles and melee hurt it normally. A thrown spear does nothing except scare
+    /// it off: the goose dodges, like a fish slipping a spear.
     /// </summary>
     public class EntityBehaviorWaterfowl : EntityBehaviorBird
     {
@@ -40,6 +40,8 @@ namespace Flocks
         private long FlockId => entity.WatchedAttributes.GetLong(FlockRegistry.FlockIdKey, 0);
         // far-from-shore check: every few seconds; while too far out, drift is pulled toward the nearest land seen
         private float shoreCheck = 2;
+        /// <summary>Ashore with no water close by: how soon it looks again for water to fly to (Ashore).</summary>
+        private float ashoreCheck;
         private double shoreHeading = double.NaN;
 
         private float fleeRange = 14, takeoffRange = 7, lifeHours = 6, sink = 0.15f;
@@ -145,10 +147,12 @@ namespace Flocks
         public override void OnGameTick(float dt)
         {
             if (entity.World.Side != EnumAppSide.Server) return;
+            if (entity.Alive && HoldIfFrozen()) return;   // /flocks lineup
             var pos = entity.Pos;
             if (!entity.Alive) { pos.Roll = 0; if (entity.Swimming || entity.FeetInLiquid) pos.Motion.Y = SurfaceMotion(); return; }
             if (!restored) { restored = true; Restore(); FlockRegistry.Instance?.Adopt(entity, species); }
             LetSpearsPass(dt);
+            TrackPosition(dt);
             entity.SimulationRange = phase == Phase.Water ? GlobalConstants.DefaultSimulationRange : FlightRange;
             if (Wade)
             {
@@ -218,7 +222,15 @@ namespace Flocks
             // would never collide and could paddle ashore and wander inland. Look ahead and turn back at the edge
             // instead (a goose already ashore just heads back toward water).
             if (inWater && !WaterAt(heading, 0.8)) heading = TowardWater(heading);
-            else if (!inWater) heading = TowardWater(heading);
+            else if (!inWater)
+            {
+                // ashore: walk to water close by; else fly to water further off; with none in reach (a bird let out of
+                // a cage in a pen, say), stay and wander slowly
+                double h = NearestWater(heading);
+                if (!double.IsNaN(h)) heading = h;
+                else if (Ashore(dt)) return;
+                else { heading += (rand.NextDouble() - 0.5) * 0.1; speedNow = Math.Min(speedNow, driftSpeed); }
+            }
             pos.Motion.X = Math.Sin(heading) * speedNow;
             pos.Motion.Z = Math.Cos(heading) * speedNow;
             if (inWater) pos.Motion.Y = SurfaceMotion();
@@ -622,6 +634,10 @@ namespace Flocks
 
         /// <summary>A goose loaded from a save mid-flight needs its flight range before its first tick: beyond the
         /// default 128 blocks from every player it would otherwise be inactive and never tick to set it.</summary>
+        /// <summary>Let out of a cage somewhere new (EntityBehaviorBird.OnEntitySpawn): no old state, so the first tick
+        /// starts it as a new bird here.</summary>
+        protected override void Relocated() => entity.WatchedAttributes.RemoveAttribute(FlightKey);
+
         public override void OnEntityLoaded()
         {
             if (entity.WatchedAttributes.HasAttribute(FlightKey)) entity.SimulationRange = FlightRange;
@@ -697,8 +713,16 @@ namespace Flocks
             if (entity.Swimming) pos.Motion.Y = SurfaceMotion();
             if (!wading)
             {
-                heading = TowardWade(heading);
-                speedNow = StalkSpeed; SetAnim("walk");
+                // out of the shallows: walk to them if they are close; else fly to some, or stay and wander (Ashore)
+                double h = NearestWade(heading);
+                if (!double.IsNaN(h)) { heading = h; speedNow = StalkSpeed; SetAnim("walk"); }
+                else if (Ashore(dt)) return;
+                else
+                {
+                    if ((activityTime -= dt) <= 0) { activityTime = 3 + (float)rand.NextDouble() * 6; heading += (rand.NextDouble() - 0.5) * 2; activity = rand.NextDouble() < 0.4 ? "stalk" : "rest"; }
+                    speedNow = activity == "stalk" ? StalkSpeed * 0.6 : 0;
+                    SetAnim(speedNow > 0 ? "walk" : "idle-stand");
+                }
             }
             else if (fleeing)
             {
@@ -742,6 +766,14 @@ namespace Flocks
         /// <summary>The heading itself if wadeable water is just ahead, else toward the nearest within 6 blocks, else a turn.</summary>
         private double TowardWade(double current)
         {
+            double h = NearestWade(current);
+            return double.IsNaN(h) ? current + Math.PI * (0.5 + rand.NextDouble()) : h;
+        }
+
+        /// <summary>The heading itself if wadeable water is just ahead, else toward the nearest within 6 blocks; NaN if
+        /// there is none. (A random turn instead, every tick, made a heron out of the water spin on the spot.)</summary>
+        private double NearestWade(double current)
+        {
             if (WadeAt(current, 0.8)) return current;
             for (int dist = 1; dist <= 6; dist++)
                 for (int i = 0; i < 8; i++)
@@ -749,7 +781,25 @@ namespace Flocks
                     double h = current + (i % 2 == 0 ? 1 : -1) * ((i + 1) / 2) * Math.PI / 4;
                     if (WadeAt(h, dist)) return h;
                 }
-            return current + Math.PI * (0.5 + rand.NextDouble());
+            return double.NaN;
+        }
+
+        /// <summary>
+        /// Ashore with no water of its kind within 6 blocks: every few seconds it looks for some within flying range and,
+        /// finding it, flies off to land there (alone: nothing is chasing it, so it is no disturbance). True if it took
+        /// off. Without this a goose put down far from water (a creature item, a cage) turned randomly every tick and
+        /// spun on the spot; with no water in reach it now stays put, so a bird let out in a pen keeps to it.
+        /// </summary>
+        private bool Ashore(float dt)
+        {
+            if ((ashoreCheck -= dt) > 0) return false;
+            ashoreCheck = 4;
+            var pos = entity.Pos;
+            var spots = FindSpots(pos.XYZ, pos.X, pos.Z);
+            if (spots == null || spots.Count == 0) return false;
+            var spot = Pick(spots);
+            Takeoff(Math.Atan2(spot.X - pos.X, spot.Z - pos.Z), spot, false, pos.X, pos.Z, 0);
+            return true;
         }
 
         /// <summary>Its water (fresh, or the sea for sea birds) at the goose's level (or one below, for a goose standing
@@ -772,6 +822,14 @@ namespace Flocks
         /// blocks (closest to the current heading on ties), else a random turn.</summary>
         private double TowardWater(double current)
         {
+            double h = NearestWater(current);
+            return double.IsNaN(h) ? current + Math.PI * (0.5 + rand.NextDouble()) : h;
+        }
+
+        /// <summary>The heading itself if there's water just ahead, else the direction of the nearest water within 6
+        /// blocks (closest to the current heading on ties); NaN if there is none.</summary>
+        private double NearestWater(double current)
+        {
             if (WaterAt(current, 0.8)) return current;
             for (int dist = 1; dist <= 6; dist++)
             {
@@ -783,7 +841,7 @@ namespace Flocks
                 }
                 if (!double.IsNaN(best)) return best;
             }
-            return current + Math.PI * (0.5 + rand.NextDouble());
+            return double.NaN;
         }
 
         // ------------------------------------------------------------------------------------------------ damage

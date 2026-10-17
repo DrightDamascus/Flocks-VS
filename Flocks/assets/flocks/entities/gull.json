@@ -41,7 +41,7 @@
 		behaviors: [
 			{ code: "repulseagents" },
 			{ code: "controlledphysics", stepHeight: 0.5 },
-			// before "health": it zeroes spear and melee damage before health applies it. Gulls are bold: they let you
+			// before "health": it zeroes thrown spear damage before health applies it. Gulls are bold: they let you
 			// much closer than ducks. After a takeoff the group wheels over the water for a while before settling again
 			// further along; every 1.5-4 game hours it goes up of its own accord; and it glides half the time it flies.
 			{ code: "flocks.waterfowl", species: "gull", fleeRange: 9, takeoffRange: 4.5, lifeHours: 6, sink: 0.1,

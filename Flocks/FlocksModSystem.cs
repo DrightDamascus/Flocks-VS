@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
@@ -71,16 +72,17 @@ namespace Flocks
             var ch = sapi.Network.GetChannel("flocks");
             registry = new FlockRegistry(sapi, residents.Cfg);
             landings = new LandingFlocks(sapi, species);
-            // with the Biomes mod: tell each client which species don't fly over where its player is
+            // tell each client which species don't fly over its player: switched off in the server config (Animals), or,
+            // with the Biomes mod, not of the realm the player stands in
             var realmsSent = new Dictionary<string, string>();
             sapi.Event.RegisterGameTickListener(_ =>
             {
-                if (!BiomesCompat.Active(sapi)) return;
                 foreach (IServerPlayer plr in sapi.World.AllOnlinePlayers)
                 {
                     if (plr.Entity == null || plr.ConnectionState != EnumClientState.Playing) continue;
                     var pos = plr.Entity.Pos.AsBlockPos;
-                    var absent = species.Values.Where(sp => !BiomesCompat.Allows(sapi, sp, pos)).Select(sp => sp.Code).OrderBy(c => c).ToArray();
+                    var absent = species.Values.Where(sp => !residents.Cfg.SpeciesEnabled(sp) || !BiomesCompat.Allows(sapi, sp, pos))
+                        .Select(sp => sp.Code).OrderBy(c => c).ToArray();
                     string key = string.Join(",", absent);
                     if (realmsSent.TryGetValue(plr.PlayerUID, out var last) && last == key) continue;
                     realmsSent[plr.PlayerUID] = key;
@@ -142,10 +144,68 @@ namespace Flocks
                     return TextCommandResult.Success(lines.Count == 0 ? Lang.Get("flocks:cmd-near-none") : string.Join("\n", lines));
                 })
                 .EndSubCommand()
+                .BeginSubCommand("lineup").WithDescription(Lang.Get("flocks:cmd-lineup")).RequiresPlayer()
+                .RequiresPrivilege(Privilege.controlserver)
+                .WithArgs(p.OptionalWord("pose"), p.OptionalDouble("spacing", 2.5))
+                .HandleWith(args => Lineup(sapi, args.Caller.Entity, args[0] as string ?? "stand", (double)args[1]))
+                .EndSubCommand()
                 .BeginSubCommand("residents").WithDescription(Lang.Get("flocks:cmd-residents"))
                 .RequiresPrivilege(Privilege.controlserver)
                 .HandleWith(args => TextCommandResult.Success(residents.Report() + "\n" + registry.Report()))
                 .EndSubCommand();
+        }
+
+        /// <summary>
+        /// /flocks lineup [stand|fly|clear] [spacing]: one of each Flocks animal in a row across in front of the player,
+        /// biggest first, frozen facing them (EntityBehaviorBird.FrozenKey): standing on the ground, or held in the air
+        /// gliding with the wings spread. For pictures. "clear" removes them. The mouse runs on vanilla's AI, which is
+        /// switched off for this one.
+        /// </summary>
+        public TextCommandResult Lineup(ICoreServerAPI sapi, Entity caller, string pose, double spacing)
+        {
+            var world = sapi.World;
+            bool Frozen(Entity e) => e.WatchedAttributes.HasAttribute(EntityBehaviorBird.FrozenKey) || e.Attributes.GetBool("flocksLineup");
+            if (pose == "clear")
+            {
+                int n = 0;
+                foreach (var e in world.LoadedEntities.Values.Where(e => e.Alive && e.Code.Domain == "flocks" && Frozen(e)).ToList()) { e.Die(EnumDespawnReason.Removed); n++; }
+                return TextCommandResult.Success(Lang.Get("flocks:lineup-cleared", n));
+            }
+            if (pose != "stand" && pose != "fly") return TextCommandResult.Error(Lang.Get("flocks:lineup-usage"));
+            spacing = GameMath.Clamp(spacing, 1, 8);
+            var order = new[] { "eagle", "heron", "greylag", "gull", "mallard", "crow", "owl", "mouse" };
+            var types = order.Select(c => world.GetEntityType(new AssetLocation("flocks", c))).Where(t => t != null).ToList();
+            // the row: 6 blocks ahead of the player, across their view
+            double look = caller.Pos.Yaw, fx = -Math.Sin(look), fz = -Math.Cos(look);   // the player looks along (-sin, -cos)
+            double ax = -fz, az = fx;
+            double cx = caller.Pos.X + fx * 6, cz = caller.Pos.Z + fz * 6;
+            for (int i = 0; i < types.Count; i++)
+            {
+                double off = (i - (types.Count - 1) / 2.0) * spacing;
+                double x = cx + ax * off, z = cz + az * off;
+                int top = world.BlockAccessor.GetRainMapHeightAt((int)Math.Floor(x), (int)Math.Floor(z));
+                double y = top + 1 + (pose == "fly" ? 3 : 0);
+                var e = world.ClassRegistry.CreateEntity(types[i]);
+                e.Pos.SetPos(x, y, z);
+                double yaw = Math.Atan2(caller.Pos.X - x, caller.Pos.Z - z);
+                e.Pos.Yaw = (float)yaw;
+                bool bird = e.Code.Path != "mouse";
+                if (bird)
+                {
+                    var t = new Vintagestory.API.Datastructures.TreeAttribute();
+                    t.SetDouble("x", x); t.SetDouble("y", y); t.SetDouble("z", z); t.SetDouble("yaw", yaw);
+                    t.SetString("anim", pose == "fly" ? "fly-soar" : "idle-stand");
+                    e.WatchedAttributes[EntityBehaviorBird.FrozenKey] = t;
+                }
+                world.SpawnEntity(e);
+                if (!bird)
+                {
+                    // vanilla's AI would walk it off: switch it off for this mouse only
+                    e.SidedProperties.Behaviors.RemoveAll(b => b is Vintagestory.GameContent.EntityBehaviorTaskAI);
+                    e.Attributes.SetBool("flocksLineup", true);
+                }
+            }
+            return TextCommandResult.Success(Lang.Get("flocks:lineup-done", types.Count, pose == "fly" ? Lang.Get("flocks:lineup-flying") : Lang.Get("flocks:lineup-standing")));
         }
 
         /// <summary>A species that lands (has a landed entity), by code; default goose.</summary>

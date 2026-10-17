@@ -1,0 +1,118 @@
+// The Animal Cages mod (modid animalcages), applied only when it is installed: our animals in its default catch
+// lists (small cage: the chicken-sized ones and the mouse; medium cage: the big birds, once hurt below half
+// health). Caught birds are drawn standing with folded wings (shapes/entity/bird/*-caged). Written by
+// tools/make_caged.py.
+[
+	{
+		"op": "add",
+		"path": "/smallCatchableEntities/-",
+		"value": {
+			"name": "mallard",
+			"scale": 0.7
+		},
+		"file": "animalcages:config/defaultconfig.json",
+		"dependsOn": [
+			{
+				"modid": "animalcages"
+			}
+		]
+	},
+	{
+		"op": "add",
+		"path": "/smallCatchableEntities/-",
+		"value": {
+			"name": "gull",
+			"scale": 0.67
+		},
+		"file": "animalcages:config/defaultconfig.json",
+		"dependsOn": [
+			{
+				"modid": "animalcages"
+			}
+		]
+	},
+	{
+		"op": "add",
+		"path": "/smallCatchableEntities/-",
+		"value": {
+			"name": "crow",
+			"scale": 0.68
+		},
+		"file": "animalcages:config/defaultconfig.json",
+		"dependsOn": [
+			{
+				"modid": "animalcages"
+			}
+		]
+	},
+	{
+		"op": "add",
+		"path": "/smallCatchableEntities/-",
+		"value": {
+			"name": "owl",
+			"scale": 0.75
+		},
+		"file": "animalcages:config/defaultconfig.json",
+		"dependsOn": [
+			{
+				"modid": "animalcages"
+			}
+		]
+	},
+	{
+		"op": "add",
+		"path": "/smallCatchableEntities/-",
+		"value": {
+			"name": "mouse",
+			"scale": 0.4
+		},
+		"file": "animalcages:config/defaultconfig.json",
+		"dependsOn": [
+			{
+				"modid": "animalcages"
+			}
+		]
+	},
+	{
+		"op": "add",
+		"path": "/mediumCatchableEntities/-",
+		"value": {
+			"name": "greylag",
+			"scale": 0.63
+		},
+		"file": "animalcages:config/defaultconfig.json",
+		"dependsOn": [
+			{
+				"modid": "animalcages"
+			}
+		]
+	},
+	{
+		"op": "add",
+		"path": "/mediumCatchableEntities/-",
+		"value": {
+			"name": "heron",
+			"scale": 0.57
+		},
+		"file": "animalcages:config/defaultconfig.json",
+		"dependsOn": [
+			{
+				"modid": "animalcages"
+			}
+		]
+	},
+	{
+		"op": "add",
+		"path": "/mediumCatchableEntities/-",
+		"value": {
+			"name": "eagle",
+			"scale": 0.89
+		},
+		"file": "animalcages:config/defaultconfig.json",
+		"dependsOn": [
+			{
+				"modid": "animalcages"
+			}
+		]
+	}
+]

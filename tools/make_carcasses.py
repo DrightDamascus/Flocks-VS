@@ -60,16 +60,32 @@ def death_pose(mod):
     return anim["keyframes"][-1]["elements"]
 
 
-def build(mod, pose, drop=()):
+def build(mod, pose, drop=(), two_sided=False):
     """The bird's model with the pose baked into its elements' rotations (an animation's rotations add to them), less
-    the dropped parts (after packing, so the texture layout stays the entity's)."""
+    the dropped parts (after packing, so the texture layout stays the entity's). two_sided: the feather planes (wings,
+    tail: a top face only) get a bottom face too, its texture mirrored so the cut-outs match. The game draws entities
+    from both sides, but blocks and items only from the front, so in a cage the wings vanished from below."""
     root = mod.shape()
     height = g.pack(root)
+    if two_sided:
+        for el in root.walk():
+            if tuple(el.faces) != ("up",): continue
+            el.faces = ("up", "down")
+            src = el.uv_from or el
+            u0, v0, u1, v1 = src.uv["up"]
+            src.uv["down"] = [u1, v0, u0, v1]       # the down face runs along x the other way (El.point)
+            src.px["down"] = src.px["up"]           # (for preview_model, which reads the pixel rectangle)
     for el in list(root.walk()):
         el.children = [c for c in el.children if c.name not in drop]
     for el in root.walk():
         p = pose.get(el.name)
-        if p: el.rot = tuple(r + p.get("rotation" + a, 0) for r, a in zip(el.rot, "XYZ"))
+        if not p: continue
+        el.rot = tuple(r + p.get("rotation" + a, 0) for r, a in zip(el.rot, "XYZ"))
+        off = [p.get("offset" + a, 0) for a in "XYZ"]
+        if any(off):                    # an offset moves the element and everything hanging off it (the ground stance's lift)
+            for e in el.walk():
+                e.frm = [v + o for v, o in zip(e.frm, off)]; e.to = [v + o for v, o in zip(e.to, off)]
+                e.origin = [v + o for v, o in zip(e.origin, off)]
     return root, height
 
 

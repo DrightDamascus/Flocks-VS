@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.21.0
+The first public release, on the ModDB.
+- Cranes are switched off for now (Dright): they no longer pass over on migration (crane.json maxFlocksPerDay 0, was
+  2). /flocks send crane still draws a flock, for testing.
+- Melee hits birds (Dright: birds can be meleed, just not killed with a thrown spear). Only thrown spears are still
+  dodged, flying past. The handbook's hunting text says so.
+- Fix: a goose, duck or gull put down on dry land with no water within 6 blocks (a creature item, a cage) spun on the
+  spot: it took a random turn every tick looking for water. Now it flies to water in reach, or with none, stays and
+  wanders slowly. Herons out of the shallows the same.
+- Animal Cages mod support (patches/animalcages.json, applied only when it is installed): our animals are in its
+  catch lists, the small cage for the mallard, gull, crow, owl and mouse, the medium cage for the goose, heron and
+  eagle (once hurt below half health, as for any wild animal). The cage draws an animal without animations, which for
+  our birds meant wings spread for flight, so a caught bird's cage is pointed at its standing, wings-folded model
+  (shapes/entity/bird/*-caged, tools/make_caged.py). A bird let out of a cage away from where it was caught starts
+  afresh where it is (its perch, territory, patch or lake), instead of heading back.
+- Server config (flocks-server.json): Animals switches every animal of the mod on or off (greylag, mallard, heron,
+  eagle, gull, crow, owl, mouse, crane). Off: it never spawns on its own, no landing flocks of it come in, /flocks land
+  refuses it, and its passing flocks aren't drawn in any player's sky; ones already in the world stay. EaglesHuntChickens
+  (off by default) adds chickens to the golden eagle's prey; it only stoops on prey in the open, so a roofed run keeps
+  them safe. (Dright.)
+- /flocks lineup [stand|fly|clear] [spacing] (admin): one of each Flocks animal in a row in front of you, biggest first,
+  frozen facing you, standing or gliding in the air, for pictures (Dright, for the mod page).
+- Animal Cages: caged birds' wings and tails have a back face too (the cage is drawn as a block, front faces only, so
+  they vanished from below: Dright).
+- Tests: a goose ashore doesn't spin and flies to the pond; a crow caught and let out elsewhere starts afresh there;
+  with Animal Cages, our animals are in its lists and every bird has a caged model; a blow lands (a crow loses
+  health). FLOCKS_TEST_ONLY takes several names separated by |. An animal switched off gets no landing flock; with
+  EaglesHuntChickens off chickens aren't prey, with it on the eagle takes one. Herons that come down on the edge of the
+  shallows get time to walk into them before the check.
+
 ## 0.20.2
 - Localisation: dead creatures have names ("Dead greylag goose": the game looks up item-dead-creature-<code>, which
   was missing, so a corpse showed the raw key). The /flocks command help and every reply and error go through the

@@ -47,7 +47,7 @@ namespace Flocks
                 if (plr.Entity == null || plr.ConnectionState != EnumClientState.Playing) continue;
                 foreach (var sp in species.Values)
                 {
-                    if (!sp.Lands || !sp.ArriveInFlocks) continue;
+                    if (!sp.Lands || !sp.ArriveInFlocks || !ResidentGeese.Config.SpeciesEnabled(sp)) continue;
                     var key = (plr.PlayerUID, sp.Code);
                     if (!plans.TryGetValue(key, out var plan) || plan.day != day)
                     {
@@ -99,6 +99,7 @@ namespace Flocks
             if (centre.HorizontalSquareDistanceTo(p.X, p.Z) < MinFromPlayer * MinFromPlayer) { msg = Lang.Get("flocks:arrive-too-close", MinFromPlayer.ToString("0")); return false; }
             if (!force && !ResidentGeese.InSeason(sapi.World, centre.AsBlockPos, sp)) { msg = Lang.Get("flocks:arrive-season", name); return false; }
             if (!force && !BiomesCompat.Allows(sapi, sp, centre.AsBlockPos)) { msg = Lang.Get("flocks:arrive-realm", name); return false; }
+            if (!ResidentGeese.Config.SpeciesEnabled(sp)) { msg = Lang.Get("flocks:animal-off", name); return false; }
             if (sapi.World.GetEntitiesAround(centre, 48, 24, e => e.Alive && e.Code.Equals(code)).Length > 0) { msg = Lang.Get("flocks:arrive-occupied", name); return false; }
             var type = sapi.World.GetEntityType(code);
             if (type == null) { msg = Lang.Get("flocks:arrive-not-loaded", code); return false; }

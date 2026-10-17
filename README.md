@@ -5,7 +5,7 @@ lakes, can be hunted, and come and go with the year. Install on both server and 
 DESIGN.md. Version history: CHANGELOG.md.
 
 ## What it does
-- **Passing flocks** (drawn by each client, no entities): geese, cranes, mallards and now and then a heron cross
+- **Passing flocks** (drawn by each client, no entities): geese, mallards and now and then a heron cross
   the sky on migration days in spring and autumn, at their own hours and heights, held back by storms, calling as they
   pass. On the coast, loose groups of gulls pass at any time of year.
 - **Landing flocks** (real entities): on spring migration days a flock of greylag geese or mallards flies in from up
@@ -31,24 +31,28 @@ DESIGN.md. Version history: CHANGELOG.md.
   and trees on the way. A flock that keeps being disturbed abandons the lake for a while (lake wariness).
 - **Flocks have a lasting identity** (saved with the world): a flock that leaves in autumn returns next spring with
   whoever survived; a flock that was killed off is replaced by a new one.
-- Arrows and other projectiles kill birds; thrown spears fly past them and melee is dodged. Sneaking gets you closer, as with vanilla
+- Arrows, other projectiles and melee kill birds; thrown spears fly past them. Sneaking gets you closer, as with vanilla
   animals; creative players go unnoticed.
 
 ## Other mods
 - **Biomes**: each bird (and the mouse) spawns only in its own realms, and landing and passing flocks keep to them too.
 - **Butchering**: geese, herons, eagles and gulls become carcasses (the bird itself, hanging on the hook) to carry home
   and butcher; the smaller birds are plucked on the spot as before.
+- **Animal Cages**: every Flocks animal can be caught (the big birds in the medium cage once wounded); caged birds
+  stand with folded wings, and are let out to start a new life where they are released.
 
 ## Commands
 `/flocks send [count] [species]` sends a passing flock over you. `/flocks schedule` shows today's migration plan.
 Admin (controlserver): `/flocks arrive [species]` sends a landing flock to a lake near you now; `/flocks land [count]
 [species]` puts a group straight onto nearby water; `/flocks calm` resets lake wariness; `/flocks residents` shows
-spawning, loaded birds, flocks and abandoned lakes.
+spawning, loaded birds, flocks and abandoned lakes; `/flocks lineup [stand|fly|clear]` puts one of each animal in a
+frozen row in front of you, for pictures.
 
 ## Settings
 `ModConfig/flocks.json` (client): automatic migration, flocks per day, storm thresholds, call volume, species on/off.
 `ModConfig/flocks-server.json` (server): resident spawning, lake size and shore distance, crowding caps, lake wariness,
-crop raiding (on/off, how often) and the scarecrow's radius.
+crop raiding (on/off, how often) and the scarecrow's radius, every animal on or off (`Animals`), and whether eagles
+hunt chickens (`EaglesHuntChickens`, off by default).
 
 ## Birds are data
 Each bird is a file in `assets/<domain>/config/flocks-species/` (any mod can add one): its drawn-flock shapes, size,

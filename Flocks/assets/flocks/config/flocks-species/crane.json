@@ -15,6 +15,7 @@
 	// earlier than geese in autumn and early in spring, through the day, in V's of 7-25
 	springStart: 0.02, springEnd: 0.18, autumnStart: 0.55, autumnEnd: 0.75,
 	hours: [8, 17],
-	maxFlocksPerDay: 2, countMin: 7, countMax: 25,
+	// Off for now (Dright): no migration days. Was 2. /flocks send crane still draws a flock.
+	maxFlocksPerDay: 0, countMin: 7, countMax: 25,
 	callSound: "crane/call", callVariants: 6, callGapMin: 8, callGapMax: 20
 }

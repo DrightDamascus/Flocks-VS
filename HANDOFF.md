@@ -1,17 +1,17 @@
 # Handoff
 
 Where Flocks stands and what comes next, for whoever picks it up (a new session, or Dright after a break).
-Last updated 2026-10-16. Committed through 0.20.2: localisation (dead names, command texts), Butchering carcasses
-for the goose, heron, eagle and gull (they work in game; Dright hasn't looked at every one), meat by real weight, the
-eagle's perch landing. 0.20.1 was Biomes support (Hydromancerx's patch). Before that, 0.19.1 and
-0.20.0 went in as one commit, both tried in game by Dright:
-0.19.1 removed the hawk, made the eagle rest 1200 s after a meal like vanilla predators and let thrown spears fly past
-birds; 0.20.0 added the tawny owl and the wood mouse and fixed crows, owls and mice spawning. DESIGN.md has the
-reasoning behind each piece; CHANGELOG.md has the per-version detail.
+Last updated 2026-10-16. Committed through 0.21.0, the first public release (on the ModDB; Dright's own page text).
+0.21.0 added: melee hits birds (only thrown spears miss), the waterbird spin-on-land fix, Animal Cages support (caged
+models, fresh start on release), per-animal switches and EaglesHuntChickens in flocks-server.json, /flocks lineup, and
+cranes switched off for now. Tests at commit: with Biomes, Butchering and Animal Cages loaded, 200 of 202 passed; the
+two failures were the new chickens step tripping over wild hares near the test spot (test-side; fixed to clear them
+first, but that fix had not been rerun). The run without other mods was still going when Dright chose to commit.
+Earlier: 0.20.2 localisation, Butchering carcasses, meat by weight; 0.20.1 Biomes (Hydromancerx's patch); 0.19.1 and
+0.20.0 the owl and mouse. DESIGN.md has the reasoning behind each piece; CHANGELOG.md has the per-version detail.
 
-Agreed next (Dright): prepare a formal release on the ModDB once the owl and mouse are properly tested: localisation
-of everything, including corpses (dead entity names), then compatibility with popular mods such as Butchery. Dright is
-fine with it being published as AI-assisted.
+Next (Dright): handling what players report after the release. The ModDB page says the mod uses AI without naming the
+model or the method; keep it that way unless Dright says otherwise.
 
 ## State
 
@@ -24,7 +24,7 @@ Vintage Story 1.22.7 mod, C# (.NET), server and client. Phase 1 (the AI) is done
 | Grey heron | wades water one block deep; stalks, strikes; alone | done (0.16.0) |
 | Golden eagle | perches, soars on thermals, stoops on hares and mallards | done (0.17.0) |
 | Herring gull | floats on the sea along the coast, all year; bold; wheels, loafing flights | done (0.18.0) |
-| Common crane | drawn sky flocks only | done |
+| Common crane | drawn sky flocks only | switched off for now (Dright, after 0.20.2): crane.json maxFlocksPerDay 0, was 2 |
 | Hawk | was a drawn sky flock with vanilla's unused hawk shape | removed (0.19.1) |
 | Carrion crow | feeds on open ground, perches and roosts in trees, raids crops; the straw dummy is its scarecrow | done (0.19.0) |
 | Tawny owl | roosts hidden in a crown by day; hunts mice at night from the open (crown edges, posts, walls); hoots | done (0.20.0) |
@@ -139,10 +139,19 @@ The roster planned so far is done. Open ideas, none agreed with Dright yet:
   The carcass shapes are our models posed (dead, hanging head down by the feet with the feet at y 10, like
   Butchering's chicken) and a plucked texture each; the heron's has no legs. They work in game (Dright); not every
   carcass has been looked at on the hook, and the held/slot/ground transforms are guesses (tune with .tfedit).
+- Animal Cages (modid animalcages; tested against 5.0.1, zip in the same folder): patches/animalcages.json adds our
+  animals to its default catch lists (players with their own cage config add them there). The cage draws the caught
+  animal's model without animations; EntityBehaviorBird.OnEntityDespawn (reason PickedUp) points the cage in the
+  catcher's hand at the bird's -caged model (tools/make_caged.py). Not yet seen in game: that swap, and the caged
+  birds' look. Birds note their position every second (entity.Attributes, saved, not synced); one spawned more than
+  4 blocks from it (let out of a cage) drops its saved state (Relocated) and starts afresh.
 - JSON patches can't reach a file whose first token is a comment: keep comments inside the braces.
 
 ## Loose ends
 
+- Butchering carcasses (Dright, 0.20.2; noted, not fixed): the wings are single planes (up face only, like the
+  flying birds' feathers), and on the carcass item they are drawn one-sided, so from the wrong angle they vanish.
+  A fix would give the carcass shapes' wing planes a down face too (in tools/make_carcasses.py), or thin boxes.
 - Herons once (1 run in many) settled at the edge of pond A's one-block-deep rim with their middle over the deep
   part: supported by the rim, but the "heron flush" check wants the column under the middle wadeable. Harmless to
   look at; if it recurs, have a wading bird nudge itself onto the wadeable column after landing.

@@ -22,7 +22,7 @@ namespace Flocks
     /// A perch is the first block with a collision box under a column's leaves (a branch, or the trunk's top), so the owl
     /// can always drop onto it straight down through the foliage (PerchBelowLeaves). Branchy leaves are drawn as leaf
     /// blocks, so an owl there can't be seen: right for a roost, not for hunting, which it does from the open.
-    /// Owl flight is silent: no wingbeat sounds. Damage: arrows kill; spears and melee are dodged (EntityBehaviorBird).
+    /// Owl flight is silent: no wingbeat sounds. Damage: arrows and melee hurt; thrown spears are dodged (EntityBehaviorBird).
     /// </summary>
     public class EntityBehaviorOwl : EntityBehaviorBird
     {
@@ -94,9 +94,11 @@ namespace Flocks
         public override void OnGameTick(float dt)
         {
             if (entity.World.Side != EnumAppSide.Server) return;
+            if (entity.Alive && HoldIfFrozen()) return;   // /flocks lineup
             if (!entity.Alive) { entity.Pos.Roll = 0; return; }
             if (!restored) { restored = true; Restore(); }
             LetSpearsPass(dt);
+            TrackPosition(dt);
             bool sitting = state == State.Roost || state == State.Perch || state == State.Feed;
             entity.SimulationRange = sitting ? GlobalConstants.DefaultSimulationRange : FlightRange;
             stateTime += dt;
@@ -679,6 +681,10 @@ namespace Flocks
             if (roost != null) TakeOff(roost.Clone(), Kind.Roost);
             else { state = State.Roost; Persist(); }
         }
+
+        /// <summary>Let out of a cage somewhere new (EntityBehaviorBird.OnEntitySpawn): no old state, so the first tick
+        /// starts it as a new bird here.</summary>
+        protected override void Relocated() => entity.WatchedAttributes.RemoveAttribute(StateKey);
 
         public override void OnEntityLoaded()
         {

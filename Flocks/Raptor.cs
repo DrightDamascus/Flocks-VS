@@ -18,8 +18,8 @@ namespace Flocks
     /// wings swept back, accelerating to 38 blocks/s, strikes, and mantles over the kill on the ground (walking onto
     /// it if the strike knocked it aside) before going back up. A miss pulls up out of the dive.
     /// Players: a perched or feeding eagle takes off when one comes close (sensed as vanilla animals sense players);
-    /// a soaring one ignores them. Shots that come close and hits make it take off or veer away; melee and spears are
-    /// dodged, arrows are not (EntityBehaviorBird).
+    /// a soaring one ignores them. Shots that come close and hits make it take off or veer away; thrown spears are
+    /// dodged, arrows and melee are not (EntityBehaviorBird).
     /// </summary>
     public class EntityBehaviorRaptor : EntityBehaviorBird
     {
@@ -101,9 +101,11 @@ namespace Flocks
         public override void OnGameTick(float dt)
         {
             if (entity.World.Side != EnumAppSide.Server) return;
+            if (entity.Alive && HoldIfFrozen()) return;   // /flocks lineup
             if (!entity.Alive) { entity.Pos.Roll = 0; return; }
             if (!restored) { restored = true; Restore(); }
             LetSpearsPass(dt);
+            TrackPosition(dt);
             bool grounded = state == State.Perch || state == State.Feed;
             entity.SimulationRange = grounded ? GlobalConstants.DefaultSimulationRange : FlightRange;
             stateTime += dt;
@@ -417,9 +419,12 @@ namespace Flocks
         /// <summary>What the last look for prey found (diagnostics and the in-engine tests).</summary>
         public string LastHunt { get; private set; } = "no look yet";
 
+        private static readonly AssetLocation Chickens = new("game", "chicken-*");
+
         private bool IsPrey(Entity e)
         {
             if (e.Code == null) return false;
+            if (ResidentGeese.Config.EaglesHuntChickens && WildcardUtil.Match(Chickens, e.Code)) return true;   // server config
             foreach (var c in preyCodes) if (WildcardUtil.Match(new AssetLocation(c), e.Code)) return true;
             return false;
         }
@@ -534,6 +539,10 @@ namespace Flocks
             flyHeading = entity.Pos.Yaw; speed = state == State.Soar ? soarSpeed : 0;
             Persist();
         }
+
+        /// <summary>Let out of a cage somewhere new (EntityBehaviorBird.OnEntitySpawn): no old state, so the first tick
+        /// starts it as a new bird here.</summary>
+        protected override void Relocated() => entity.WatchedAttributes.RemoveAttribute(StateKey);
 
         public override void OnEntityLoaded()
         {

@@ -41,7 +41,7 @@
 		behaviors: [
 			{ code: "repulseagents" },
 			{ code: "controlledphysics", stepHeight: 0.6 },
-			// before "health": it zeroes spear and melee damage before health applies it
+			// before "health": it zeroes thrown spear damage before health applies it
 			{ code: "flocks.waterfowl", species: "goose", fleeRange: 14, takeoffRange: 7, lifeHours: 6, sink: 0.22, cruiseSpeedMin: 11, cruiseSpeedMax: 13.5,
 			  takeoffWingsChance: 0.6, takeoffCallChance: 0.4 },
 			{ code: "health", currenthealth: 4, maxhealth: 4 },

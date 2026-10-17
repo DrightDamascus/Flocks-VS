@@ -40,7 +40,7 @@
 		behaviors: [
 			{ code: "repulseagents" },
 			{ code: "controlledphysics", stepHeight: 1.1 },
-			// perch, soar on thermals, stoop on prey (Raptor.cs). Before "health": it zeroes spear and melee damage.
+			// perch, soar on thermals, stoop on prey (Raptor.cs). Before "health": it zeroes thrown spear damage.
 			{ code: "flocks.raptor", territory: 200, fleeRange: 26, takeoffRange: 16, soarSpeed: 10,
 			  soarAltitudeMin: 35, soarAltitudeMax: 65, stoopSpeed: 38,
 			  // after a meal it doesn't hunt for 20 minutes, like vanilla's foxes, wolves and bears ("saturated")

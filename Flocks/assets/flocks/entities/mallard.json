@@ -43,7 +43,7 @@
 		behaviors: [
 			{ code: "repulseagents" },
 			{ code: "controlledphysics", stepHeight: 0.5 },
-			// before "health": it zeroes spear and melee damage before health applies it. Mallards let you a little
+			// before "health": it zeroes thrown spear damage before health applies it. Mallards let you a little
 			// closer than geese, spring straight up instead of running, and fly faster.
 			{ code: "flocks.waterfowl", species: "mallard", fleeRange: 12, takeoffRange: 6, lifeHours: 6, sink: 0.16,
 			  cruiseSpeedMin: 15, cruiseSpeedMax: 18, takeoffRunSeconds: 0.15, takeoffRunSpeed: 4,
