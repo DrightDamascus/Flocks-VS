@@ -199,6 +199,17 @@ namespace FlocksTest
                 }
             }
             Check(shapes >= 9 && anims > 40 && badAnims.Count == 0, $"every shape's animations will build on the client ({shapes} shapes, {anims} animations; {(badAnims.Count == 0 ? "ok" : string.Join("; ", badAnims.Take(6)))})");
+            // every creature's name, alive and dead, the keys Entity.GetName looks up (a missing one shows the raw key)
+            var unnamed = sapi.World.EntityTypes.Where(t => t.Code.Domain == "flocks")
+                .SelectMany(t => new[] { $"flocks:item-creature-{t.Code.Path}", $"flocks:item-dead-creature-{t.Code.Path}" })
+                .Where(k => !Lang.HasTranslation(k)).ToList();
+            Check(unnamed.Count == 0, $"every creature has a name, alive and dead ({(unnamed.Count == 0 ? "ok" : "missing: " + string.Join(", ", unnamed))})");
+            // command help and messages come from the lang file (a raw key shows if it wasn't loaded yet at registration)
+            var cmd = sapi.ChatCommands.Get("flocks");
+            var descs = new[] { cmd?.Description }.Concat(new[] { "send", "schedule", "land", "arrive", "calm", "near", "residents" }.Select(n => cmd?[n]?.Description)).ToList();
+            var spcN = sapi.ModLoader.GetModSystem<FlocksModSystem>().SpeciesByCode;
+            Check(descs.All(t => !string.IsNullOrEmpty(t) && !t.StartsWith("flocks:")) && spcN["goose"].DisplayName == "greylag geese" && spcN["owl"].DisplayName == "tawny owls",
+                $"command help and species names are translated ({string.Join(" | ", descs.Take(3))}; {spcN["goose"].DisplayName})");
             var branchy = sapi.World.GetBlock(new AssetLocation("game", "leavesbranchy-placed-oak"));
             Check(branchy?.CollisionBoxes?.Length > 0 && (sapi.World.GetBlock(new AssetLocation("game", "leaves-placed-oak"))?.CollisionBoxes?.Length ?? 0) == 0,
                 $"branchy leaves (tree branches) are solid, ordinary leaves aren't ({branchy?.Code}: {branchy?.CollisionBoxes?.Length ?? -1} boxes)");
@@ -614,7 +625,7 @@ namespace FlocksTest
                 var ba = sapi.World.BlockAccessor;
                 for (int dx = 0; dx < 3; dx++) for (int dz = 0; dz < 3; dz++) for (int dy = 0; dy < 5; dy++)
                     ba.SetBlock(granite, ledgeAt.AddCopy(dx, dy, dz));
-                eagle.TeleportToDouble(mx + 2.5, y0 + 6, mz + 0.5);
+                Place(eagle, mx + 2.5, y0 + 6, mz + 0.5);
                 eagleStates.Clear();
             }, () => Elapsed > 15, () =>
             {
@@ -651,6 +662,7 @@ namespace FlocksTest
             // ---- the eagle hunts mallards on pond A: they may see it coming; either way the flock is disturbed
             FlockRecord hunted = null;
             var huntedDucks = new List<Entity>();
+            bool stoopOrdered = false;
             steps.Enqueue(("eagle hunts mallards", () =>
             {
                 FlockRegistry.Instance.Calm(); huntedDucks.Clear(); eagleStates.Clear();
@@ -664,18 +676,25 @@ namespace FlocksTest
                     e.Pos.SetPos(c.X - 40 + (i % 3) * 2, y0 + 0.8, c.Z + (i / 3) * 2);   // the middle of pond A
                     sapi.World.SpawnEntity(e); huntedDucks.Add(e);
                 }
-                eagle.TeleportToDouble(c.X - 15, y0 + 36, c.Z);   // soaring 25 blocks off, 35 up
+                stoopOrdered = false;
             }, () =>
             {
-                if (Elapsed < 3) return false;
-                if (Elapsed < 3.2) Check(eagle.GetBehavior<EntityBehaviorRaptor>().Hunt(huntedDucks[0]), "eagle stoops on a mallard");
+                if (Elapsed < 3) return false;   // the ducks settle first
+                if (!stoopOrdered)
+                {
+                    // 25 blocks off and 35 up, and stooping at once: the eagle was perched, and a perched bird leaves its
+                    // height to physics, so put up there and left perched it would just fall (and die of the fall)
+                    stoopOrdered = true;
+                    Place(eagle, c.X - 15, y0 + 36, c.Z);
+                    Check(eagle.GetBehavior<EntityBehaviorRaptor>().Hunt(huntedDucks[0]), "eagle stoops on a mallard");
+                }
                 return (eagleStates.Contains("Stoop") && RState(eagle) != "Stoop") || Elapsed > 40;
             }, () =>
             {
                 int dead = huntedDucks.Count(e => !e.Alive), flew = huntedDucks.Count(e => e.Alive && Phase(e) != "Water");
                 double w = FlockRegistry.Instance.Wariness(hunted.Id);
                 var rb = eagle.GetBehavior<EntityBehaviorRaptor>();
-                Log($"mallard hunt: {dead} caught, {flew} flying, eagle now {RState(eagle)} for {rb.StateTime:0.0} s, diving {rb.Diving}, at site " +
+                Log($"mallard hunt: {dead} caught, {flew} flying, eagle {(eagle.Alive ? "alive" : "DEAD")}, now {RState(eagle)} for {rb.StateTime:0.0} s, diving {rb.Diving}, at site " +
                     $"{eagle.Pos.X - c.X:0.0},{eagle.Pos.Y - y0:0.0},{eagle.Pos.Z - c.Z:0.0}, motion {eagle.Pos.Motion.Length() * 60:0.0} b/s, tracked {eagle.IsTracked}, " +
                     $"prey {(rb.Prey == null ? "none" : $"{rb.Prey.Pos.X - c.X:0.0},{rb.Prey.Pos.Y - y0:0.0},{rb.Prey.Pos.Z - c.Z:0.0}")} " +
                     $"(states {string.Join(", ", eagleStates)}), flock wariness {w:0.0}");
@@ -905,6 +924,7 @@ namespace FlocksTest
 
             QueueOwlSteps();
             QueueBiomesSteps();
+            QueueButcheringSteps();
 
             steps.Enqueue(("memory", () => { }, () => true, () =>
             {
@@ -945,6 +965,17 @@ namespace FlocksTest
             var head = ba.GetBlock(new BlockPos(x, (int)Math.Floor(e.Pos.Y + 0.3), z));
             what = $"on {ba.GetBlock(new BlockPos(x, top, z))?.Code?.Path} at {top - y0}, at its head {head?.Code?.Path}, owl feet {e.Pos.Y - y0:0.00}";
             return (head == null || head.Id == 0) && Math.Abs(e.Pos.Y - (top + 1)) < 0.35;
+        }
+
+        /// <summary>Moves an entity at once. Not TeleportToDouble: that marks it teleporting until a chunk-load callback
+        /// comes back from another thread, and the entity isn't ticked meanwhile. With the harness stepping physics, a bird
+        /// put high up then falls (and the fall can kill it) whenever the callback is slow, which made the eagle steps
+        /// flaky. The fall start is reset too, so a later landing isn't counted as a fall from where it was before.</summary>
+        private static void Place(Entity e, double x, double y, double z)
+        {
+            e.Pos.SetPos(x, y, z);
+            e.Pos.Motion.Set(0, 0, 0);
+            e.PositionBeforeFalling.Set(x, y, z);
         }
 
         private void SetHour(double hour)
@@ -1006,7 +1037,8 @@ namespace FlocksTest
                 () => OB(owl)?.StateName == "Perch" || Elapsed > 40, () =>
             {
                 bool open = InTheOpen(owl, out string what);
-                Check(OB(owl)?.StateName == "Perch" && open && InOwlTree(owl.Pos.XYZ) > 0,
+                // any tree in its territory will do: the natural forest below the test slab is fair game too
+                Check(OB(owl)?.StateName == "Perch" && open,
                     $"after dusk it hunts from the outside of a crown, in the open where it can be seen ({OB(owl)?.StateName}, tree {InOwlTree(owl.Pos.XYZ)}; {what})");
                 Check(!OnBranch(owl, out _), "not hidden inside the leaves");
                 Check(owlHits == 0, $"no collisions in flight ({owlHits} of {owlSamples} samples)");
@@ -1078,8 +1110,8 @@ namespace FlocksTest
             steps.Enqueue(("owl roosts at dawn", () => { SetHour(6.5); owlHits = 0; owlSamples = 0; }, () => OB(owl)?.StateName == "Roost" || Elapsed > 50, () =>
             {
                 bool branch = OnBranch(owl, out string what);
-                Check(OB(owl)?.StateName == "Roost" && branch && InOwlTree(owl.Pos.XYZ) > 0,
-                    $"back to roost in a tree in the morning ({OB(owl)?.StateName}, tree {InOwlTree(owl.Pos.XYZ)}; {what})");
+                Check(OB(owl)?.StateName == "Roost" && branch,
+                    $"back to roost hidden in a tree in the morning ({OB(owl)?.StateName}, tree {InOwlTree(owl.Pos.XYZ)}; {what})");
                 Check(owlHits == 0, $"no collisions in flight ({owlHits} of {owlSamples} samples)");
                 var ba = sapi.World.BlockAccessor;
                 Check(EntityBehaviorOwl.HasRoostNear(ba, new Vec3d(OwlTree1X + 10, y0 + 1, OwlTreeZ)) && !EntityBehaviorOwl.HasRoostNear(ba, c),
@@ -1115,6 +1147,31 @@ namespace FlocksTest
                 var nowhere = new Species { Code = "test-nowhere-goose", Name = "test geese", LandedEntity = "flocks:greylag", YearRound = true, Biorealm = new string[0] };
                 bool landed = sapi.ModLoader.GetModSystem<FlocksModSystem>().Landings.Arrive(new Vec3d(c.X, y0 + 1, c.Z - 60), nowhere, false, out string msg2);
                 Check(!landed && msg2.Contains("realm"), $"a landing flock of birds from no realm here is refused ({msg2})");
+            }, 5));
+        }
+
+        /// <summary>With the Butchering mod installed: the big birds (goose, heron, eagle, gull) become carcasses, the small
+        /// ones (mallard, crow, owl, mouse) keep the field harvest, and every carcass state has a name. Without it, no
+        /// carcass items exist at all.</summary>
+        private void QueueButcheringSteps()
+        {
+            steps.Enqueue(("butchering carcasses", () => { }, () => true, () =>
+            {
+                var big = new[] { "greylag", "heron", "eagle", "gull" };
+                var small = new[] { "mallard", "crow", "owl", "mouse" };
+                bool Butcherable(string code) => sapi.World.GetEntityType(new AssetLocation("flocks", code))?.Server?.BehaviorsAsJsonObj?.Any(b => b["code"].AsString() == "butcherable") == true;
+                var items = big.SelectMany(b => new[] { "dead", "bledout", "skinned", "rotten" }.Select(st => sapi.World.GetItem(new AssetLocation("flocks", $"deadbird-{b}-1-{st}")))).ToList();
+                if (!sapi.ModLoader.IsModEnabled("butchering"))
+                {
+                    Check(items.All(i => i == null) && !big.Any(Butcherable), "without Butchering there are no carcass items and the birds are harvested as usual");
+                    return;
+                }
+                Check(items.All(i => i != null && i.GetType().Name == "ItemButcherable"),
+                    $"a carcass item for each big bird in every state ({items.Count(i => i != null)} of {items.Count}; class {items.FirstOrDefault(i => i != null)?.GetType().Name})");
+                Check(big.All(Butcherable) && !small.Any(Butcherable),
+                    $"the goose, heron, eagle and gull are butcherable; the mallard, crow, owl and mouse keep the field harvest ({string.Join(" ", big.Concat(small).Select(b => b + (Butcherable(b) ? "+" : "-")))})");
+                var unnamed = items.Where(i => i != null && i.GetHeldItemName(new ItemStack(i)).Contains("deadbird")).Select(i => i.Code.Path).ToList();
+                Check(unnamed.Count == 0, $"every carcass has a name ({(unnamed.Count == 0 ? items[0].GetHeldItemName(new ItemStack(items[0])) : "unnamed: " + string.Join(", ", unnamed))})");
             }, 5));
         }
 

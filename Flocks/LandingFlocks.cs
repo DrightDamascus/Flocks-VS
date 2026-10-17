@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
@@ -87,20 +88,20 @@ namespace Flocks
         /// <summary>The same for a position standing in for the player (the in-engine tests use it).</summary>
         public bool Arrive(Vec3d p, Species sp, bool force, out string msg)
         {
-            if (!sp.Lands) { msg = $"{sp.Code} doesn't land."; return false; }
-            if (sp.Ground || sp.Soars || sp.Woodland) { msg = $"{sp.Name ?? sp.Code} don't come in landing flocks; try /flocks land."; return false; }
+            string name = sp.DisplayName;
+            if (!sp.Lands) { msg = Lang.Get("flocks:arrive-doesnt-land", name); return false; }
+            if (sp.Ground || sp.Soars || sp.Woodland) { msg = Lang.Get("flocks:arrive-not-in-flocks", name); return false; }
             var code = sp.LandedEntityCode;
-            string name = sp.Name ?? sp.Code;
             var ba = sapi.World.BlockAccessor;
             var spots = LakeSearch.FindSpots(ba, p, p.X, p.Z, sp.MinLake(Landing.MinPatch), rand, sp.Liquid);
-            if (spots == null || spots.Count == 0) { msg = "No lake to land on within 160 blocks."; return false; }
+            if (spots == null || spots.Count == 0) { msg = Lang.Get("flocks:arrive-no-lake"); return false; }
             var centre = spots[spots.Count / 2];
-            if (centre.HorizontalSquareDistanceTo(p.X, p.Z) < MinFromPlayer * MinFromPlayer) { msg = $"The nearest landing water is under {MinFromPlayer:0} blocks from you."; return false; }
-            if (!force && !ResidentGeese.InSeason(sapi.World, centre.AsBlockPos, sp)) { msg = $"Out of season for {name} there."; return false; }
-            if (!force && !BiomesCompat.Allows(sapi, sp, centre.AsBlockPos)) { msg = $"No {name} in this realm (Biomes)."; return false; }
-            if (sapi.World.GetEntitiesAround(centre, 48, 24, e => e.Alive && e.Code.Equals(code)).Length > 0) { msg = $"There are {name} on that lake already."; return false; }
+            if (centre.HorizontalSquareDistanceTo(p.X, p.Z) < MinFromPlayer * MinFromPlayer) { msg = Lang.Get("flocks:arrive-too-close", MinFromPlayer.ToString("0")); return false; }
+            if (!force && !ResidentGeese.InSeason(sapi.World, centre.AsBlockPos, sp)) { msg = Lang.Get("flocks:arrive-season", name); return false; }
+            if (!force && !BiomesCompat.Allows(sapi, sp, centre.AsBlockPos)) { msg = Lang.Get("flocks:arrive-realm", name); return false; }
+            if (sapi.World.GetEntitiesAround(centre, 48, 24, e => e.Alive && e.Code.Equals(code)).Length > 0) { msg = Lang.Get("flocks:arrive-occupied", name); return false; }
             var type = sapi.World.GetEntityType(code);
-            if (type == null) { msg = $"Entity type {code} is not loaded."; return false; }
+            if (type == null) { msg = Lang.Get("flocks:arrive-not-loaded", code); return false; }
 
             // Spring heads poleward (north is heading pi, -Z), so they come in from the equator side, give or take 25 deg.
             double lat = sapi.World.Calendar.OnGetLatitude((int)centre.Z);
@@ -118,7 +119,7 @@ namespace Flocks
                 if (ba.GetChunkAtBlockPos(new BlockPos((int)ex, (int)centre.Y, (int)ez)) == null) continue;
                 entry = d; break;
             }
-            if (entry == 0) { msg = "No loaded ground far enough out for the flock to fly in from."; return false; }
+            if (entry == 0) { msg = Lang.Get("flocks:arrive-no-entry"); return false; }
             // a comfortable height above the water and the ground at the start; Waterfowl climbs over anything later
             double ey = Math.Max(centre.Y + 24, MaxGround(ba, ex, ez, dx, dz, -8, 40) + 12);
 
@@ -136,7 +137,7 @@ namespace Flocks
                 e.Pos.SetPos(ex + dx * along + dz * across, ey + rank * 0.15 + (rand.NextDouble() - 0.5) * 0.4, ez + dz * along - dx * across);
                 sapi.World.SpawnEntity(e);
             }
-            msg = $"A flock of {n} {name} (flock #{flock.Id}) is flying in from {entry} blocks out to land at {centre.X:0}, {centre.Y:0}, {centre.Z:0}.";
+            msg = Lang.Get("flocks:arrive-started", n, name, flock.Id, entry, centre.X.ToString("0"), centre.Y.ToString("0"), centre.Z.ToString("0"));
             sapi.Logger.Notification("[Flocks] landing: {0}", msg);
             return true;
         }

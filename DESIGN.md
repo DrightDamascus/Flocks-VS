@@ -1,4 +1,4 @@
-﻿# Flocks - design (step 1)
+# Flocks - design (step 1)
 
 ## Behaviour
 - Purely visual, client-only. Birds never land, never collide, are not entities, cannot be hunted.
@@ -237,6 +237,18 @@ Decisions (Dright, 0.13.0), Phase 1 AI:
   only on change) and the client leaves them out. Biomes is reached through its documented public API by reflection,
   so Flocks has no hard dependency; anything unexpected logs once and allows everything. Seasons are left to Flocks
   (its own migration windows), so the realm data passed to Biomes says every season.
+- Butchering support (Dright chose: full carcasses for the big birds only). Butchering is opt-in per animal: a patch
+  adds its "butcherable" behaviour, which on an empty-handed right click turns the dead animal into a carcass item
+  carrying the animal's own drops and weight; Butchering scales those and adds blood and offal on the hook and table.
+  Goose, heron, eagle and gull get it; mallard, crow, owl and mouse stay small game, plucked on the spot. Sizes follow
+  Butchering's own animals: all "small" (chicken, hare, fox), mass 0.02 for goose and eagle (like its duck), 0.01 for
+  heron and gull. The carcass is each bird's own model posed, as Butchering does for its chicken (its generic shape
+  for modded animals turned an eagle into "a leg": Dright): lying dead, hanging head down by the feet, feathered until
+  plucked, then bare skin (the model's texture repainted).
+- Meat yields (Dright): by the real bird's weight at vanilla's chicken rate (about 0.9 poultry per kg), but never
+  less than one whole strip for a small bird (no fractions that sometimes give nothing, no special small item).
+- Localisation scope (Dright): everything a player sees goes through the lang file, including creature names alive and
+  dead and the command help and replies; the long admin/debug reports stay English (technical, mostly numbers).
 
 Next steps:
 - Hand-off from the sky: when a planned goose flock passes a suitable lake (fresh water, 36+ surface blocks, 64+

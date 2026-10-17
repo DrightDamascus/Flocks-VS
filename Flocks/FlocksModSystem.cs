@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using ProtoBuf;
@@ -88,8 +89,8 @@ namespace Flocks
             }, 20000, 3000);
             sapi.Event.PlayerDisconnect += plr => realmsSent.Remove(plr.PlayerUID);
             var p = sapi.ChatCommands.Parsers;
-            sapi.ChatCommands.Create("flocks").WithDescription("Flocks (client-side birds)").RequiresPrivilege(Privilege.chat)
-                .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [species, e.g. goose, crane, gull]").RequiresPlayer()
+            sapi.ChatCommands.Create("flocks").WithDescription(Lang.Get("flocks:cmd-flocks")).RequiresPrivilege(Privilege.chat)
+                .BeginSubCommand("send").WithDescription(Lang.Get("flocks:cmd-send")).RequiresPlayer()
                 .WithArgs(p.OptionalInt("count", 12), p.OptionalWord("species"))
                 .HandleWith(args =>
                 {
@@ -97,14 +98,14 @@ namespace Flocks
                     return TextCommandResult.Success();
                 })
                 .EndSubCommand()
-                .BeginSubCommand("schedule").WithDescription("Show today's migration plan and why").RequiresPlayer()
+                .BeginSubCommand("schedule").WithDescription(Lang.Get("flocks:cmd-schedule")).RequiresPlayer()
                 .HandleWith(args =>
                 {
                     ch.SendPacket(new SendFlockPacket { Command = "schedule" }, (IServerPlayer)args.Caller.Player);
                     return TextCommandResult.Success();
                 })
                 .EndSubCommand()
-                .BeginSubCommand("land").WithDescription("Debug: put a group of birds on open water (crows and owls: open ground) near you: /flocks land [count] [species, default goose]").RequiresPlayer()
+                .BeginSubCommand("land").WithDescription(Lang.Get("flocks:cmd-land")).RequiresPlayer()
                 .RequiresPrivilege(Privilege.controlserver)
                 .WithArgs(p.OptionalInt("count", 0), p.OptionalWord("species"))
                 .HandleWith(args =>
@@ -113,7 +114,7 @@ namespace Flocks
                     return sp == null ? TextCommandResult.Error(err) : Landing.Land(sapi, args.Caller.Entity, (int)args[0], sp);
                 })
                 .EndSubCommand()
-                .BeginSubCommand("arrive").WithDescription("Debug: send a landing flock to a lake near you now (any season): /flocks arrive [species, default goose]").RequiresPlayer()
+                .BeginSubCommand("arrive").WithDescription(Lang.Get("flocks:cmd-arrive")).RequiresPlayer()
                 .RequiresPrivilege(Privilege.controlserver)
                 .WithArgs(p.OptionalWord("species"))
                 .HandleWith(args =>
@@ -124,11 +125,11 @@ namespace Flocks
                     return ok ? TextCommandResult.Success(msg) : TextCommandResult.Error(msg);
                 })
                 .EndSubCommand()
-                .BeginSubCommand("calm").WithDescription("Admin: calm every flock and forget abandoned lakes (lake wariness)")
+                .BeginSubCommand("calm").WithDescription(Lang.Get("flocks:cmd-calm"))
                 .RequiresPrivilege(Privilege.controlserver)
-                .HandleWith(args => { registry.Calm(); return TextCommandResult.Success("All flocks calm; no lakes abandoned."); })
+                .HandleWith(args => { registry.Calm(); return TextCommandResult.Success(Lang.Get("flocks:cmd-calm-done")); })
                 .EndSubCommand()
-                .BeginSubCommand("near").WithDescription("Debug: the birds within 48 blocks of you, what they are doing, and whether they sense you").RequiresPlayer()
+                .BeginSubCommand("near").WithDescription(Lang.Get("flocks:cmd-near")).RequiresPlayer()
                 .HandleWith(args =>
                 {
                     var me = args.Caller.Entity;
@@ -138,10 +139,10 @@ namespace Flocks
                         if (lines.Count >= 12) { lines.Add("..."); break; }
                         lines.Add(e.GetBehavior<EntityBehaviorBird>().Diagnose(args.Caller.Player));
                     }
-                    return TextCommandResult.Success(lines.Count == 0 ? "No Flocks birds within 48 blocks." : string.Join("\n", lines));
+                    return TextCommandResult.Success(lines.Count == 0 ? Lang.Get("flocks:cmd-near-none") : string.Join("\n", lines));
                 })
                 .EndSubCommand()
-                .BeginSubCommand("residents").WithDescription("Debug: resident geese state (spawn checks and vetoes, geese near each player, season)")
+                .BeginSubCommand("residents").WithDescription(Lang.Get("flocks:cmd-residents"))
                 .RequiresPrivilege(Privilege.controlserver)
                 .HandleWith(args => TextCommandResult.Success(residents.Report() + "\n" + registry.Report()))
                 .EndSubCommand();
@@ -153,7 +154,7 @@ namespace Flocks
             code = (code ?? DefaultSpecies).ToLowerInvariant();
             err = null;
             if (species.TryGetValue(code, out var sp) && sp.Lands) return sp;
-            err = $"No landing species '{code}'. Landing species: {string.Join(", ", species.Values.Where(s => s.Lands).Select(s => s.Code))}.";
+            err = Lang.Get("flocks:cmd-no-landing-species", code, string.Join(", ", species.Values.Where(s => s.Lands).Select(s => s.Code)));
             return null;
         }
 
@@ -161,12 +162,12 @@ namespace Flocks
         {
             int n = GameMath.Clamp(count, 1, 60);
             ok = false;
-            if (species == null || renderer == null) return "Flocks client part not running.";
+            if (species == null || renderer == null) return Lang.Get("flocks:send-not-running");
             code = (code ?? DefaultSpecies).ToLowerInvariant();
-            if (!species.TryGetValue(code, out var sp)) return $"Unknown species '{code}'. Try: {string.Join(", ", species.Keys)}.";
-            if (sp.Meshes?.Ok != true) return $"No {code} meshes loaded; see [Flocks] lines in client-main.log.";
+            if (!species.TryGetValue(code, out var sp)) return Lang.Get("flocks:send-unknown", code, string.Join(", ", species.Keys));
+            if (sp.Meshes?.Ok != true) return Lang.Get("flocks:send-no-meshes", sp.DisplayName);
             renderer.Send(sp, n); ok = true;
-            return $"Sent {n} {code} ({sp.Meshes.Loaded}) overhead from ~{renderer.VisibleRange(sp):0} blocks out ({renderer.Count} flock(s) in the sky).";
+            return Lang.Get("flocks:send-sent", n, sp.DisplayName, renderer.VisibleRange(sp).ToString("0"), renderer.Count);
         }
 
         private string Schedule() => scheduler?.Report() ?? "Flocks client part not running.";
@@ -197,8 +198,8 @@ namespace Flocks
                 api.ShowChatMessage("[Flocks] " + msg);
             });
             var p = api.ChatCommands.Parsers;
-            api.ChatCommands.Create("flocks").WithDescription("Flocks (client-only birds)")
-                .BeginSubCommand("send").WithDescription("Send a visual flock over you: /flocks send [count] [species, e.g. goose, crane, gull]")
+            api.ChatCommands.Create("flocks").WithDescription(Lang.Get("flocks:cmd-flocks"))
+                .BeginSubCommand("send").WithDescription(Lang.Get("flocks:cmd-send"))
                 .WithArgs(p.OptionalInt("count", 12), p.OptionalWord("species"))
                 .HandleWith(args =>
                 {
@@ -206,7 +207,7 @@ namespace Flocks
                     return ok ? TextCommandResult.Success(msg) : TextCommandResult.Error(msg);
                 })
                 .EndSubCommand()
-                .BeginSubCommand("schedule").WithDescription("Show today's migration plan and why")
+                .BeginSubCommand("schedule").WithDescription(Lang.Get("flocks:cmd-schedule"))
                 .HandleWith(args => TextCommandResult.Success(Schedule()))
                 .EndSubCommand();
             api.Logger.Notification("[Flocks] client loaded; automatic migration {0}", config.AutoMigration ? "on" : "off");

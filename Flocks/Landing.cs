@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
@@ -19,16 +20,16 @@ namespace Flocks
 
         public static TextCommandResult Land(ICoreServerAPI sapi, Entity caller, int count, Species sp)
         {
-            if (caller == null) return TextCommandResult.Error("Needs a player.");
+            if (caller == null) return TextCommandResult.Error(Lang.Get("flocks:land-needs-player"));
             var type = sapi.World.GetEntityType(sp.LandedEntityCode);
-            if (type == null) return TextCommandResult.Error($"Entity type {sp.LandedEntity} is not loaded; see server-main.log.");
+            if (type == null) return TextCommandResult.Error(Lang.Get("flocks:land-not-loaded", sp.LandedEntity));
             var rand = sapi.World.Rand;
             // the species' landing flock size, like a landing flock or a natural group
             int n = count > 0 ? GameMath.Clamp(count, 1, 30) : sp.LandingMin + rand.Next(Math.Max(1, sp.LandingMax - sp.LandingMin + 1));
             if (sp.Ground || sp.Woodland) return LandOnGround(sapi, caller, n, sp);
             int minPatch = sp.MinLake(MinPatch);
             var patch = FindPatch(sapi.World.BlockAccessor, caller.Pos.AsBlockPos, minPatch, sp.Liquid);
-            if (patch == null) return TextCommandResult.Error($"No open {(sp.Sea ? "sea" : "water")} with {minPatch}+ surface blocks at least {Clear:0} blocks from you (they would flee at once) within {Radius} blocks.");
+            if (patch == null) return TextCommandResult.Error(Lang.Get("flocks:land-no-water", Lang.Get(sp.Sea ? "flocks:land-sea" : "flocks:land-water"), minPatch, Clear.ToString("0"), Radius));
 
             // a compact group on the nearest water past Clear: the columns closest to the first such column
             double px = caller.Pos.X, pz = caller.Pos.Z;
@@ -50,7 +51,7 @@ namespace Flocks
                 sapi.World.SpawnEntity(e);
                 spawned++;
             }
-            return TextCommandResult.Success($"Landed {spawned} {sp.Name ?? sp.Code} on water at {anchor.X}, {anchor.Y}, {anchor.Z} (~{Dist(anchor):0} blocks away, patch of {patch.Count}+ blocks).");
+            return TextCommandResult.Success(Lang.Get("flocks:land-landed-water", spawned, sp.DisplayName, anchor.X, anchor.Y, anchor.Z, Dist(anchor).ToString("0")));
         }
 
         /// <summary>Land birds (crows): a group on open ground at least Clear from the player. Owls too: each takes the place
@@ -59,7 +60,7 @@ namespace Flocks
         {
             var type = sapi.World.GetEntityType(sp.LandedEntityCode);
             var spots = EntityBehaviorCorvid.GroundSpots(sapi.World, caller.Pos.XYZ, caller.Pos.X, caller.Pos.Z, Clear, Clear, sapi.World.Rand);
-            if (spots == null || spots.Count == 0) return TextCommandResult.Error($"No open ground (soil, sand or gravel, open to the sky) {Clear:0}-64 blocks from you.");
+            if (spots == null || spots.Count == 0) return TextCommandResult.Error(Lang.Get("flocks:land-no-ground", Clear.ToString("0")));
             var flock = sp.Woodland ? null : FlockRegistry.Instance?.Create(sp.Code, n, spots[0]);
             for (int i = 0; i < n; i++)
             {
@@ -71,7 +72,7 @@ namespace Flocks
                 sapi.World.SpawnEntity(e);
             }
             var at = spots[0];
-            return TextCommandResult.Success($"Landed {n} {sp.Name ?? sp.Code} on the ground at {at.X:0}, {at.Y:0}, {at.Z:0} (~{caller.Pos.HorDistanceTo(at):0} blocks away).");
+            return TextCommandResult.Success(Lang.Get("flocks:land-landed-ground", n, sp.DisplayName, at.X.ToString("0"), at.Y.ToString("0"), at.Z.ToString("0"), caller.Pos.HorDistanceTo(at).ToString("0")));
         }
 
         /// <summary>Nearest surface patch of the liquid (rain-map top is still water, or sea water) with at least MinPatch

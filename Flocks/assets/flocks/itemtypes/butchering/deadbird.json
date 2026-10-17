@@ -1,0 +1,318 @@
+{
+	// Butchering mod carcasses for the big birds: written by tools/make_carcasses.py (edit that, not this). Disabled
+	// here; patches/butchering.json enables it when Butchering is installed (its item class only exists then).
+	"enabled": false,
+	"code": "deadbird",
+	"class": "butcherable",
+	"variantgroups": [
+		{
+			"code": "type",
+			"states": [
+				"greylag",
+				"heron",
+				"eagle",
+				"gull"
+			]
+		},
+		{
+			"code": "texture",
+			"states": [
+				"1"
+			]
+		},
+		{
+			"code": "state",
+			"states": [
+				"dead",
+				"skinned",
+				"bledout",
+				"rotten"
+			]
+		}
+	],
+	"maxstacksize": 1,
+	"behaviors": [],
+	"texturesByType": {
+		"deadbird-greylag-1-dead": {
+			"gull": {
+				"base": "flocks:entity/bird/gull"
+			}
+		},
+		"deadbird-greylag-1-bledout": {
+			"gull": {
+				"base": "flocks:entity/bird/gull"
+			}
+		},
+		"deadbird-greylag-1-skinned": {
+			"gull": {
+				"base": "flocks:item/carcass/greylag-plucked"
+			}
+		},
+		"deadbird-greylag-1-rotten": {
+			"gull": {
+				"base": "game:block/creature/rot/rot"
+			}
+		},
+		"deadbird-heron-1-dead": {
+			"heron": {
+				"base": "flocks:entity/bird/heron"
+			}
+		},
+		"deadbird-heron-1-bledout": {
+			"heron": {
+				"base": "flocks:entity/bird/heron"
+			}
+		},
+		"deadbird-heron-1-skinned": {
+			"heron": {
+				"base": "flocks:item/carcass/heron-plucked"
+			}
+		},
+		"deadbird-heron-1-rotten": {
+			"heron": {
+				"base": "game:block/creature/rot/rot"
+			}
+		},
+		"deadbird-eagle-1-dead": {
+			"eagle": {
+				"base": "flocks:entity/bird/eagle"
+			}
+		},
+		"deadbird-eagle-1-bledout": {
+			"eagle": {
+				"base": "flocks:entity/bird/eagle"
+			}
+		},
+		"deadbird-eagle-1-skinned": {
+			"eagle": {
+				"base": "flocks:item/carcass/eagle-plucked"
+			}
+		},
+		"deadbird-eagle-1-rotten": {
+			"eagle": {
+				"base": "game:block/creature/rot/rot"
+			}
+		},
+		"deadbird-gull-1-dead": {
+			"gull": {
+				"base": "flocks:entity/bird/gull"
+			}
+		},
+		"deadbird-gull-1-bledout": {
+			"gull": {
+				"base": "flocks:entity/bird/gull"
+			}
+		},
+		"deadbird-gull-1-skinned": {
+			"gull": {
+				"base": "flocks:item/carcass/gull-plucked"
+			}
+		},
+		"deadbird-gull-1-rotten": {
+			"gull": {
+				"base": "game:block/creature/rot/rot"
+			}
+		}
+	},
+	"attributesByType": {
+		"deadbird-greylag-1-*": {
+			"size": 0.5,
+			"mass": 0.02,
+			"bloodType": "butchering:bloodportion",
+			"butcheringWorkLoad": "small",
+			"handbookByType": {
+				"*-rotten": {
+					"exclude": false
+				},
+				"*": {
+					"exclude": true
+				}
+			},
+			"hangingShape": {
+				"base": "flocks:item/carcass/greylag-hanging"
+			},
+			"excludeRewards": [],
+			"butcheringRewards": [],
+			"skinningRewards": []
+		},
+		"deadbird-heron-1-*": {
+			"size": 0.5,
+			"mass": 0.01,
+			"bloodType": "butchering:bloodportion",
+			"butcheringWorkLoad": "small",
+			"handbookByType": {
+				"*-rotten": {
+					"exclude": false
+				},
+				"*": {
+					"exclude": true
+				}
+			},
+			"hangingShape": {
+				"base": "flocks:item/carcass/heron-hanging"
+			},
+			"excludeRewards": [],
+			"butcheringRewards": [],
+			"skinningRewards": []
+		},
+		"deadbird-eagle-1-*": {
+			"size": 0.5,
+			"mass": 0.02,
+			"bloodType": "butchering:bloodportion",
+			"butcheringWorkLoad": "small",
+			"handbookByType": {
+				"*-rotten": {
+					"exclude": false
+				},
+				"*": {
+					"exclude": true
+				}
+			},
+			"hangingShape": {
+				"base": "flocks:item/carcass/eagle-hanging"
+			},
+			"excludeRewards": [],
+			"butcheringRewards": [],
+			"skinningRewards": []
+		},
+		"deadbird-gull-1-*": {
+			"size": 0.5,
+			"mass": 0.01,
+			"bloodType": "butchering:bloodportion",
+			"butcheringWorkLoad": "small",
+			"handbookByType": {
+				"*-rotten": {
+					"exclude": false
+				},
+				"*": {
+					"exclude": true
+				}
+			},
+			"hangingShape": {
+				"base": "flocks:item/carcass/gull-hanging"
+			},
+			"excludeRewards": [],
+			"butcheringRewards": [],
+			"skinningRewards": []
+		}
+	},
+	"shapeByType": {
+		"deadbird-greylag-1-*": {
+			"base": "flocks:item/carcass/greylag-dead"
+		},
+		"deadbird-heron-1-*": {
+			"base": "flocks:item/carcass/heron-dead"
+		},
+		"deadbird-eagle-1-*": {
+			"base": "flocks:item/carcass/eagle-dead"
+		},
+		"deadbird-gull-1-*": {
+			"base": "flocks:item/carcass/gull-dead"
+		}
+	},
+	"storageFlagsbytype": {
+		"*-rotten": 1,
+		"*": 32769
+	},
+	"transitionablePropsByType": {
+		"*-rotten": [],
+		"*": [
+			{
+				"type": "perish",
+				"freshHours": {
+					"avg": 80
+				},
+				"transitionHours": {
+					"avg": 24
+				},
+				"transitionedStack": {
+					"type": "item",
+					"code": "flocks:deadbird-{type}-1-rotten"
+				},
+				"transitionRatio": 1
+			}
+		]
+	},
+	"creativeinventory": {
+		"general": [
+			"*"
+		],
+		"items": [
+			"*"
+		]
+	},
+	"heldTpIdleAnimation": "holdunderarm",
+	"guiTransform": {
+		"translation": {
+			"x": 0,
+			"y": 0,
+			"z": 0
+		},
+		"rotation": {
+			"x": -30,
+			"y": 135,
+			"z": 0
+		},
+		"origin": {
+			"x": 0.5,
+			"y": 0.2,
+			"z": 0.5
+		},
+		"scale": 0.7,
+		"rotate": true
+	},
+	"fpHandTransform": {
+		"translation": {
+			"x": 0,
+			"y": 0,
+			"z": 0.3
+		},
+		"rotation": {
+			"x": 0,
+			"y": 90,
+			"z": 0
+		},
+		"origin": {
+			"x": 0.5,
+			"y": 0.2,
+			"z": 0.5
+		},
+		"scale": 0.6
+	},
+	"tpHandTransform": {
+		"translation": {
+			"x": -0.6,
+			"y": -0.2,
+			"z": -0.5
+		},
+		"rotation": {
+			"x": 0,
+			"y": 90,
+			"z": -20
+		},
+		"origin": {
+			"x": 0.5,
+			"y": 0.2,
+			"z": 0.5
+		},
+		"scale": 0.5
+	},
+	"groundTransform": {
+		"translation": {
+			"x": 0,
+			"y": 0,
+			"z": 0
+		},
+		"rotation": {
+			"x": 0,
+			"y": 0,
+			"z": 0
+		},
+		"origin": {
+			"x": 0.5,
+			"y": 0,
+			"z": 0.5
+		},
+		"scale": 1
+	}
+}

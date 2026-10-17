@@ -1,0 +1,128 @@
+// The Butchering mod (modid butchering), applied only when it is installed: the goose, heron, eagle and gull
+// become carcasses to carry home and butcher (itemtypes/butchering/deadbird.json); the smaller birds keep the
+// quick field harvest. Written by tools/make_carcasses.py.
+[
+	{
+		"op": "replace",
+		"path": "/enabled",
+		"value": true,
+		"file": "flocks:itemtypes/butchering/deadbird.json",
+		"dependsOn": [
+			{
+				"modid": "butchering"
+			}
+		]
+	},
+	{
+		"op": "add",
+		"path": "/server/behaviors/-",
+		"value": {
+			"code": "butcherable",
+			"item": "flocks:deadbird-greylag-1-dead"
+		},
+		"file": "flocks:entities/greylag.json",
+		"dependsOn": [
+			{
+				"modid": "butchering"
+			}
+		]
+	},
+	{
+		"op": "add",
+		"path": "/client/behaviors/-",
+		"value": {
+			"code": "butcherable",
+			"item": "flocks:deadbird-greylag-1-dead"
+		},
+		"file": "flocks:entities/greylag.json",
+		"dependsOn": [
+			{
+				"modid": "butchering"
+			}
+		]
+	},
+	{
+		"op": "add",
+		"path": "/server/behaviors/-",
+		"value": {
+			"code": "butcherable",
+			"item": "flocks:deadbird-heron-1-dead"
+		},
+		"file": "flocks:entities/heron.json",
+		"dependsOn": [
+			{
+				"modid": "butchering"
+			}
+		]
+	},
+	{
+		"op": "add",
+		"path": "/client/behaviors/-",
+		"value": {
+			"code": "butcherable",
+			"item": "flocks:deadbird-heron-1-dead"
+		},
+		"file": "flocks:entities/heron.json",
+		"dependsOn": [
+			{
+				"modid": "butchering"
+			}
+		]
+	},
+	{
+		"op": "add",
+		"path": "/server/behaviors/-",
+		"value": {
+			"code": "butcherable",
+			"item": "flocks:deadbird-eagle-1-dead"
+		},
+		"file": "flocks:entities/eagle.json",
+		"dependsOn": [
+			{
+				"modid": "butchering"
+			}
+		]
+	},
+	{
+		"op": "add",
+		"path": "/client/behaviors/-",
+		"value": {
+			"code": "butcherable",
+			"item": "flocks:deadbird-eagle-1-dead"
+		},
+		"file": "flocks:entities/eagle.json",
+		"dependsOn": [
+			{
+				"modid": "butchering"
+			}
+		]
+	},
+	{
+		"op": "add",
+		"path": "/server/behaviors/-",
+		"value": {
+			"code": "butcherable",
+			"item": "flocks:deadbird-gull-1-dead"
+		},
+		"file": "flocks:entities/gull.json",
+		"dependsOn": [
+			{
+				"modid": "butchering"
+			}
+		]
+	},
+	{
+		"op": "add",
+		"path": "/client/behaviors/-",
+		"value": {
+			"code": "butcherable",
+			"item": "flocks:deadbird-gull-1-dead"
+		},
+		"file": "flocks:entities/gull.json",
+		"dependsOn": [
+			{
+				"modid": "butchering"
+			}
+		]
+	}
+]

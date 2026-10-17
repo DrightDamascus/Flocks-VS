@@ -47,7 +47,7 @@
 			{ code: "health", currenthealth: 4, maxhealth: 4 },
 			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
 			{ code: "harvestable", drops: [
-				{ type: "item", code: "game:poultry-raw", quantity: { avg: 2, var: 0.5 } },
+				{ type: "item", code: "game:poultry-raw", quantity: { avg: 3.25, var: 0.5 } },
 				{ type: "item", code: "game:feather", quantity: { avg: 14, var: 2 } }
 			] },
 			{ code: "floatupwhenstuck", onlyWhenDead: true }

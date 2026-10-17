@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.20.2
+- Localisation: dead creatures have names ("Dead greylag goose": the game looks up item-dead-creature-<code>, which
+  was missing, so a corpse showed the raw key). The /flocks command help and every reply and error go through the
+  lang file, with species names from new flocks:species-<code> keys (falling back to the name in the species file).
+  The long admin and debug reports (/flocks residents, /flocks near, the schedule detail) stay English (Dright).
+- Butchering mod support (patches/butchering.json, applied only when Butchering is installed): the greylag goose,
+  grey heron, golden eagle and herring gull become carcasses to carry home, hang, bleed, pluck and butcher, like
+  Butchering's own animals; the mallard, crow, owl and mouse keep the quick field harvest (Dright). Carcass item
+  flocks:deadbird-<bird>-1-<state>. Like Butchering's chicken, the carcass is the bird's own model: lying in its
+  death pose, and hanging head down by the feet on the hook, at its in-game size; feathered while dead and bled out,
+  bare skin once plucked, rotten when rotten. The heron's carcass has no legs (Dright), so it hangs by its body. (A first try on Butchering's generic carcass shape made an eagle on the
+  hook look like a leg: Dright.) Yields from each bird's own drops, scaled by Butchering. Written by
+  tools/make_carcasses.py (--preview renders the poses).
+- Meat by real weight, at vanilla's chicken rate (1.75 poultry for a 2 kg chicken): greylag goose 2 -> 3.25,
+  golden eagle 2 -> 3.5, grey heron 2 -> 1.25 (mostly neck, legs and feathers). The mallard, gull, crow and owl keep
+  one strip each: nothing smaller than a chicken's share yields less than a whole one (Dright). Butchering scales
+  these too, so the big carcasses are now worth carrying home.
+- Fix: the golden eagle could come to rest on a perch with its feet over the edge (it counted itself landed within
+  1.5 blocks of the spot) and slip off. It now lands only nearly over the spot, or standing on something solid.
+- Tests: the eagle's mallard-hunt step was flaky because it put a perched eagle 35 blocks up and only ordered the
+  stoop 3 s later (a perched bird leaves its height to physics, so it fell and died); it also used the game's teleport,
+  which leaves the entity unticked until a chunk callback returns. Now placed directly and stooping at once. The owl
+  may hunt and roost in any tree in its territory, including the natural forest below the test slab; the checks
+  judge where it sits (in the open at night, hidden by day), not which tree. New checks: every creature's live and
+  dead names, translated command help, and (with Butchering) the carcasses.
+
 ## 0.20.1
 - Biomes mod support (patches/biomes.json, applied only when Biomes is installed): each animal spawns only in its
   realms. Contributed by Hydromancerx of the Biomes team; the mallard's entry fixed (it was keyed "mallard-*", but the

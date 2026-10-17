@@ -315,7 +315,10 @@ namespace Flocks
                         double aim = perchSpot.Y + Math.Max(0, d - 1) * 0.7;
                         vy = GameMath.Clamp((aim - pos.Y) * 0.9, -3.5, 2.5);
                         SetAnim("land");
-                        bool onPerch = d < 1.5 && Math.Abs(pos.Y - perchSpot.Y) < 0.4;
+                        // On it: nearly over the spot, or standing within reach of it with something solid under its middle.
+                        // (Within 1.5 blocks alone let it stop with its feet over the edge of a wall and slip off.)
+                        bool supported = entity.OnGround && SolidUnder(pos.X, pos.Y - 0.1, pos.Z);
+                        bool onPerch = Math.Abs(pos.Y - perchSpot.Y) < 0.4 && (d < 0.5 || (d < 1.5 && supported));
                         // caught on something short of it: hop up and come in again
                         if (entity.OnGround && !onPerch) vy = 3;
                         else if (onPerch && (entity.OnGround || pos.Y <= perchSpot.Y + 0.3))
@@ -452,6 +455,12 @@ namespace Flocks
             var best = cands[0];
             perchSpot = new Vec3d(best.x + 0.5, best.top + 1, best.z + 0.5);
             return true;
+        }
+
+        private bool SolidUnder(double x, double y, double z)
+        {
+            var b = entity.World.BlockAccessor.GetBlock(new BlockPos((int)Math.Floor(x), (int)Math.Floor(y), (int)Math.Floor(z)));
+            return b?.CollisionBoxes != null && b.CollisionBoxes.Length > 0;
         }
 
         /// <summary>The highest block it can stand on: the rain map's top, or the first solid block below it if that is a

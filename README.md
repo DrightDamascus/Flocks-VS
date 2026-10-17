@@ -36,6 +36,8 @@ DESIGN.md. Version history: CHANGELOG.md.
 
 ## Other mods
 - **Biomes**: each bird (and the mouse) spawns only in its own realms, and landing and passing flocks keep to them too.
+- **Butchering**: geese, herons, eagles and gulls become carcasses (the bird itself, hanging on the hook) to carry home
+  and butcher; the smaller birds are plucked on the spot as before.
 
 ## Commands
 `/flocks send [count] [species]` sends a passing flock over you. `/flocks schedule` shows today's migration plan.

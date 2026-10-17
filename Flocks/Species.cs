@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 
 namespace Flocks
 {
@@ -15,8 +16,10 @@ namespace Flocks
     public class Species
     {
         public string Code;
-        /// <summary>Plural name for messages, e.g. "greylag geese".</summary>
+        /// <summary>Plural name for messages, e.g. "greylag geese"; the lang key flocks:species-&lt;code&gt; wins if there is one.</summary>
         public string Name;
+        /// <summary>The plural name in the current language: lang key flocks:species-&lt;code&gt;, else Name, else the code.</summary>
+        [Newtonsoft.Json.JsonIgnore] public string DisplayName => Lang.HasTranslation("flocks:species-" + Code) ? Lang.Get("flocks:species-" + Code) : (Name ?? Code);
 
         // ---- drawn flocks (client)
         /// <summary>Shapes to try, in order, for the drawn flocks; the first that loads is used.</summary>

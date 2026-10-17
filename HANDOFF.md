@@ -1,7 +1,9 @@
 # Handoff
 
 Where Flocks stands and what comes next, for whoever picks it up (a new session, or Dright after a break).
-Last updated 2026-10-16. Committed through 0.20.1 (Biomes support, by Hydromancerx's patch). Before that, 0.19.1 and
+Last updated 2026-10-16. Committed through 0.20.2: localisation (dead names, command texts), Butchering carcasses
+for the goose, heron, eagle and gull (they work in game; Dright hasn't looked at every one), meat by real weight, the
+eagle's perch landing. 0.20.1 was Biomes support (Hydromancerx's patch). Before that, 0.19.1 and
 0.20.0 went in as one commit, both tried in game by Dright:
 0.19.1 removed the hawk, made the eagle rest 1200 s after a meal like vanilla predators and let thrown spears fly past
 birds; 0.20.0 added the tawny owl and the wood mouse and fixed crows, owls and mice spawning. DESIGN.md has the
@@ -130,10 +132,20 @@ The roster planned so far is done. Open ideas, none agreed with Dright yet:
   makes landing flocks and drawn passing flocks follow them, through Biomes' public API (Biomes.Api.ExternalData,
   EntityBiomeData) by reflection. Engine tests: `-ExtraMods <zip>` loads other mods; `FLOCKS_TEST_ONLY=biomes` runs
   the Biomes step. Not yet seen in game: the sky flocks staying away outside a species' realm.
+- Butchering (modid butchering; tested against 1.14.3, zip in the same folder): the goose, heron, eagle and gull are
+  butcherable (patches/butchering.json adds Butchering's "butcherable" behaviour, pointing at the carcass item
+  itemtypes/butchering/deadbird.json, which is disabled unless Butchering is installed: its item class only exists
+  then). Both written by tools/make_carcasses.py. The other birds and the mouse keep vanilla's field harvest (Dright).
+  The carcass shapes are our models posed (dead, hanging head down by the feet with the feet at y 10, like
+  Butchering's chicken) and a plucked texture each; the heron's has no legs. They work in game (Dright); not every
+  carcass has been looked at on the hook, and the held/slot/ground transforms are guesses (tune with .tfedit).
 - JSON patches can't reach a file whose first token is a comment: keep comments inside the braces.
 
 ## Loose ends
 
+- Herons once (1 run in many) settled at the edge of pond A's one-block-deep rim with their middle over the deep
+  part: supported by the rim, but the "heron flush" check wants the column under the middle wadeable. Harmless to
+  look at; if it recurs, have a wading bird nudge itself onto the wadeable column after landing.
 - Crows never spawned on their own in 0.19.0: their spawn block codes lacked the `game:` domain. Fixed in 0.20.0; any
   new entity's spawnconditions must name blocks as `game:...`. Watch the server log for "none of these blocks exists".
 - The owl in game (Dright, 0.20.0): hard to see; the night hooting is nice. Left as it is for now. If it is taken up
