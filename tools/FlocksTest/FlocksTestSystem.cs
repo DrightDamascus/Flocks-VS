@@ -20,7 +20,7 @@ namespace FlocksTest
     /// landing flock from far out over natural terrain; repeated cycles with memory and entity counts. Each step logs
     /// PASS/FAIL lines with the measurements behind them, and the server shuts down at the end.
     /// </summary>
-    public class FlocksTestSystem : ModSystem
+    public partial class FlocksTestSystem : ModSystem
     {
         private ICoreServerAPI sapi;
         private Vec3d c;                // site centre (x, slab top y, z)
@@ -232,6 +232,7 @@ namespace FlocksTest
             threat.Pos.SetPos(x0 - 62.5, y0 + 1, z0 + 0.5); // west shore of pond A
             sapi.World.SpawnEntity(threat);
 
+            StartProfiler();
             QueueSteps();
             sapi.Event.RegisterGameTickListener(Sample, 100);
             sapi.Event.RegisterGameTickListener(Physics, 20);
@@ -700,7 +701,10 @@ namespace FlocksTest
                     $"prey {(rb.Prey == null ? "none" : $"{rb.Prey.Pos.X - c.X:0.0},{rb.Prey.Pos.Y - y0:0.0},{rb.Prey.Pos.Z - c.Z:0.0}")} " +
                     $"(states {string.Join(", ", eagleStates)}), flock wariness {w:0.0}");
                 Check(eagleStates.Contains("Stoop") && RState(eagle) != "Stoop", $"the stoop ended ({RState(eagle)})");
-                Check(w >= 1, $"the attack disturbed the flock (wariness {w:0.0}; they leave the lake at {new FlocksServerConfig().LeaveAt})");
+                // disturbed enough to leave (spotted the eagle, then lost one), the flock abandons the lake and its wariness
+                // starts again from 0: that counts too
+                bool left = FlockRegistry.Instance.IsAbandoned(c.X - 40, c.Z);
+                Check(w >= 1 || left, $"the attack disturbed the flock (wariness {w:0.0}{(left ? ", and they abandoned the lake" : "")}; they leave the lake at {new FlocksServerConfig().LeaveAt})");
                 Check(dead == 0 || RState(eagle) == "ToPerch" || RState(eagle) == "Feed" || RState(eagle) == "Takeoff",
                     "a duck caught on the water is carried off, not left floating");
             }, 50));
@@ -949,6 +953,7 @@ namespace FlocksTest
             QueueButcheringSteps();
             QueueLandAndCageSteps();
             QueueConfigSteps();
+            QueuePerfSteps();
 
             steps.Enqueue(("memory", () => { }, () => true, () =>
             {
@@ -1405,12 +1410,14 @@ namespace FlocksTest
             if (timedOut) Check(false, $"timed out after {stepTimeout:0} s; phases: {string.Join(" ", LoadedGeese().Select(e => Phase(e) + "@" + Where(e)))}");
             else Log($"step done in {Elapsed:0.0} s");
             try { stepCheck(); } catch (Exception ex) { Check(false, "check threw " + ex); }
+            ReportStepCost(stepName, Elapsed);
             stepDone = null;
             NextStep();
         }
 
         private void Finish()
         {
+            ReportRunCost();
             Log("==== SUMMARY: " + pass + " passed, " + fail + " failed");
             foreach (var line in summary) Log(line);
             sapi.Event.RegisterCallback(_ => sapi.Server.ShutDown(), 1000);

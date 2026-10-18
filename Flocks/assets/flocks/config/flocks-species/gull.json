@@ -18,7 +18,7 @@
 	yearRound: true,
 	hours: [6, 19.5],
 	maxFlocksPerDay: 3, countMin: 3, countMax: 12,
-	callSound: "gull/flock", callVariants: 3, callGapMin: 5, callGapMax: 14,
+	callSound: "gull/idle/call", callVariants: 4, callGapMin: 8, callGapMax: 20,
 	landedEntity: "flocks:gull",
 	habitat: "sea",
 	arriveInFlocks: false,

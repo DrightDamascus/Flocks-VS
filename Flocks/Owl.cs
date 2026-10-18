@@ -99,6 +99,7 @@ namespace Flocks
             if (!restored) { restored = true; Restore(); }
             LetSpearsPass(dt);
             TrackPosition(dt);
+            IdleCalls();
             bool sitting = state == State.Roost || state == State.Perch || state == State.Feed;
             entity.SimulationRange = sitting ? GlobalConstants.DefaultSimulationRange : FlightRange;
             stateTime += dt;

@@ -16,7 +16,7 @@
 	springStart: 0.03, springEnd: 0.22, autumnStart: 0.62, autumnEnd: 0.85,
 	hours: [6.5, 10, 15.5, 19],
 	maxFlocksPerDay: 3, countMin: 7, countMax: 25,
-	callSound: "goose/flight", callVariants: 3, callGapMin: 6, callGapMax: 15,
+	callSound: "goose/honk", callVariants: 6, callGapMin: 10, callGapMax: 25,
 	landedEntity: "flocks:greylag",
 	landingMin: 7, landingMax: 12
 }

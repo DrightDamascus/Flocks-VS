@@ -11,6 +11,7 @@
   <ItemGroup>
     <Reference Include="VintagestoryAPI"><HintPath>$(VINTAGE_STORY)\VintagestoryAPI.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Newtonsoft.Json"><HintPath>$(VINTAGE_STORY)\Lib\Newtonsoft.Json.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(VINTAGE_STORY)\Lib\0Harmony.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Flocks"><HintPath>..\..\Flocks\bin\Release\Flocks.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
   <ItemGroup>

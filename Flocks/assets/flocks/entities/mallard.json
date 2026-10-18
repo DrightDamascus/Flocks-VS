@@ -47,7 +47,7 @@
 			// closer than geese, spring straight up instead of running, and fly faster.
 			{ code: "flocks.waterfowl", species: "mallard", fleeRange: 12, takeoffRange: 6, lifeHours: 6, sink: 0.16,
 			  cruiseSpeedMin: 15, cruiseSpeedMax: 18, takeoffRunSeconds: 0.15, takeoffRunSpeed: 4,
-			  takeoffWingsChance: 0.7, takeoffCallChance: 0.5 },
+			  takeoffWingsChance: 0.7, takeoffCallChance: 0.5, idleGap: 12, flapSpeed: 3.6 },
 			{ code: "health", currenthealth: 3, maxhealth: 3 },
 			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
 			{ code: "harvestable", drops: [
@@ -60,7 +60,7 @@
 		// a wider climate, smaller groups, and smaller ponds (species minLakeSize; season and the rest in Residents.cs).
 		spawnconditions: {
 			worldgen: {
-				TriesPerChunk: { avg: 0.04, var: 0 },
+				TriesPerChunk: { avg: 0.02, var: 0 },
 				tryOnlySurface: true,
 				groupSize: { dist: "verynarrowgaussian", avg: 6, var: 3 },
 				insideBlockCodes: ["game:water-still-7"],
@@ -71,8 +71,8 @@
 			runtime: {
 				group: "passive",
 				MinDistanceToPlayer: 32,
-				chance: 0.01,
-				maxQuantity: 20,
+				chance: 0.005,
+				maxQuantity: 10,
 				tryOnlySurface: true,
 				groupSize: { dist: "verynarrowgaussian", avg: 6, var: 3 },
 				insideBlockCodes: ["game:water-still-7"],
@@ -86,12 +86,12 @@
 		hurt: "flocks:duck/hurt",
 		death: "flocks:duck/death",
 		// single quacks and soft feeding mutters
-		idle: { path: "flocks:duck/idle/*", pitch: { avg: 1, var: 0.12 }, range: 28 },
+		idle: { path: "flocks:duck/idle/*", pitch: { avg: 1, var: 0.12 }, range: 24 },
 		takeoffsplash: { path: "game:environment/smallsplash", pitch: { avg: 1.15, var: 0.1 }, range: 24, volume: { avg: 0.45 } },
 		// the goose wingbeats, pitched up: a duck's wings are smaller and faster
 		takeoffwings: { path: "flocks:wings/flap*", pitch: { avg: 1.35, var: 0.1 }, range: 28, volume: { avg: 0.8 } },
-		takeoffcall: { path: "flocks:duck/call*", pitch: { avg: 1, var: 0.08 }, range: 40, volume: { avg: 0.7 } },
+		takeoffcall: { path: "flocks:duck/call*", pitch: { avg: 1, var: 0.08 }, range: 32, volume: { avg: 0.7 } },
 		landsplash: { path: "game:environment/mediumsplash", pitch: { avg: 1.15, var: 0.1 }, range: 24, volume: { avg: 0.4 } }
 	},
-	idleSoundChance: 0.03
+	idleSoundChance: 0.02
 }

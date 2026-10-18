@@ -106,6 +106,7 @@ namespace Flocks
             if (!restored) { restored = true; Restore(); }
             LetSpearsPass(dt);
             TrackPosition(dt);
+            IdleCalls();
             bool grounded = state == State.Perch || state == State.Feed;
             entity.SimulationRange = grounded ? GlobalConstants.DefaultSimulationRange : FlightRange;
             stateTime += dt;

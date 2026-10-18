@@ -1,7 +1,7 @@
 # Handoff
 
 Where Flocks stands and what comes next, for whoever picks it up (a new session, or Dright after a break).
-Last updated 2026-10-16. Committed through 0.21.1 (on the ModDB): Scarecrow mod support, asked for by a player; its
+Last updated 2026-10-17. Committed through 0.21.1 (on the ModDB): Scarecrow mod support, asked for by a player; its
 scarecrows keep crows off like the straw dummy, and its texts get our line about crows (checked in game by Dright).
 Before that, 0.21.0 was the first public release (on the ModDB; Dright's own page text).
 0.21.0 added: melee hits birds (only thrown spears miss), the waterbird spin-on-land fix, Animal Cages support (caged
@@ -12,7 +12,22 @@ first, but that fix had not been rerun). The run without other mods was still go
 Earlier: 0.20.2 localisation, Butchering carcasses, meat by weight; 0.20.1 Biomes (Hydromancerx's patch); 0.19.1 and
 0.20.0 the owl and mouse. DESIGN.md has the reasoning behind each piece; CHANGELOG.md has the per-version detail.
 
-Next (Dright): handling what players report after the release. The ModDB page says the mod uses AI without naming the
+On the ModDB, not committed: 0.21.2, quieter birds and fewer of them, after a player's report (so many
+birds, so loud, you can't hear the game; the recordings like a zoo). Every clip cleaned and about 10 dB quieter
+(tools/clean_sounds.py), nearby birds of a kind take turns calling (BirdCalls.cs), shorter ranges, spawn caps halved,
+CallRate and Numbers in the server config; and stronger, faster wingbeats in flight (flapSpeed per bird, a deeper
+fly-flap in every generator), after another player found the birds float rather than flap. CHANGELOG has the numbers.
+Its build is dist/flocks_0.21.2.zip in the main tree.
+
+This commit is 0.21.2 as released, reconstructed (2026-10-18): its code decompiles the same as the ModDB DLL, and
+its assets are the ModDB zip's. The model generators here (tools/make_*.py) are the art pass's, newer than these
+shapes and textures: don't rerun them for a 0.21.x patch.
+
+In progress: 0.22.0, young waterfowl (Dright's pick): goslings following their parents on the water and ashore,
+then ducklings. Plan in DESIGN.md ("Planned for 0.22.0"); so far only the gosling model (tools/make_gosling.py),
+not yet in an entity or seen in game.
+
+Also next (Dright): handling what players report after the release. The ModDB page says the mod uses AI without naming the
 model or the method; keep it that way unless Dright says otherwise.
 
 ## State
@@ -89,10 +104,33 @@ kill crops like hares do).
   and an engine-test check reads every shape for it. The shared pieces live in `make_greylag.py`. Pass
   `--texture` to repaint (this overwrites hand edits). Every animation keyframe must set all three axes of a group,
   or the game crashes; the generators handle that.
+  The 0.22.0 art pass (eagle first, then every bird; no textures were hand-edited before it):
+  - Textures in vanilla's manner (compare its hawk and hen): soft value-noise clouds, grain, ragged colour edges and
+    visible feathers, never regular geometric patterns. The toolkit in `make_greylag.py`: `plumage` (base colour
+    with soft patches), `feathered` (rows of feathers with fringes and shadows; at 2 px per unit a feather must be
+    4-6 px or it reads as speckle, hence `FEATHER`), `rough` (ragged blend edges), `lift` (baked light), `grain`.
+  - `El(res=2)` paints an element at double density (heads and bills), so eyes can be more than a 2x2 square.
+    `round_eye` draws one with an optional ring and pupil and a single pale-tan shine pixel (`SHINE`, Dright: light
+    brown, not white). The eagle's eye is its own: gold (artistic liberty), half covered by a brow sloping down to
+    the bill (fierce; a round ringed eye looked creepy).
+  - Detail builders: `perching_foot` (toes and claws, like vanilla's hawk), `webbed_foot`, `split_tail` (three
+    planes), `scapulars` (on the body: on the arm they swung out when folding). Plus per-bird pieces: the owl's
+    facial disc plate with the eyes set back in holes, the heron's crest, breast and back plumes, the crow's
+    nasal bristles.
+  - The fold (`FOLDED`) draws the wings in and down over the back and flanks; the old flat fold left the leading
+    edges standing out like a cape. The heron's arm is twice as broad as its body, so its fold also stretches the
+    arm to half its chord (`stretchX` 0.5). Vanilla never uses keyframe stretch on entities: if the folded heron
+    looks wrong in game, that is the first suspect. `preview_model.py` applies stretch as o + R·S·(v - o), and
+    `make_carcasses.build` bakes it into geometry for the caged and carcass models.
+  - `tools/birds_preview.png` and `birds_preview_flight.png`: before/after of every bird; `eagle_preview*.png`.
 - **Creature items** (`assets/flocks/itemtypes/creature.json`): creative-tab items that place the birds. Add each new
   entity bird to its states, shapes and textures, and give it a name in `lang/en.json`.
 - **Sounds**: recordings from Wikimedia Commons, xeno-canto and the British Library (CC licences), trimmed and
-  converted to .ogg (mono 44.1 kHz, mean about -19 dB, peak under -1 dB). Credit every source in CREDITS.md and in
+  converted to .ogg (mono 44.1 kHz), then cleaned with tools/clean_sounds.py (background out, gaps silent, about
+  -28 dB RMS while sounding, hurt and death -24, peaks under -6 dB: near vanilla's animals). Keep new clips at that
+  level and as clean; vanilla's are silent between sounds, and louder clips with background read as a zoo (0.21.2).
+  Idle calls go through EntityBehaviorBird.IdleCalls (entity idleSoundChance, spaced by the behaviour's idleGap);
+  takeoff and landing sounds through PlaySpaced. Credit every source in CREDITS.md and in
   modinfo.json's description. When downloading, use the User-Agent `FlocksModSoundFetch/1.0` and never personal
   details. Commons rate-limits quick runs of downloads (HTTP 429): pause between files.
 
@@ -127,6 +165,15 @@ The roster planned so far is done. Open ideas, none agreed with Dright yet:
   morning groups flying out from it and evening groups back.
 - Gulls: standing on beaches and shores (a "standing ashore" state the waterfowl don't have yet); scavenging.
 - Goslings and eggs; domestication.
+- Crow taming (a player request after 0.21.1; Dright: noted for later, to pair with falconry). Feeding crows over time
+  (daily cap) raises their standing with that player: 0 wild, 1 cautious (smaller flee radius), 2 acquainted (moves
+  a few blocks off), 3 friendly (doesn't flee, now and then leaves a gift after eating). Attacking one costs a stage,
+  a kill three, down to -1 disliked (flees wider, alarm calls that flush other prey), -2 hostile (swoops and pecks),
+  -3 grudge (draws predators onto the player). Thoughts so far: hold the standing per player per area, not per crow
+  (crows depart and are removed; real crows also pass grudges on); stages 0..2 are mostly scaling fleeRange and
+  takeoffRange; a gift table of its own, not sand panning (free ore); drift back toward 0 over days so one kill
+  isn't a long chore; food left on the ground for wild crows; -3 is the fragile part (vanilla predators don't chase
+  crows, so it would mean setting their target to the player). A shared bird-standing store could serve falconry too.
 
 ## Compatibility
 

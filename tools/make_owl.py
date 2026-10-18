@@ -16,7 +16,7 @@ round, hooting, eating (on the ground, over its catch), walking, and death.
 import json, math, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import make_greylag as g
-from make_greylag import El, mul, mix, frac
+from make_greylag import El, mul, mix, frac, plumage, feathered, rough, lift, grain, clamp01, cloud
 
 HERE = g.HERE
 ROOT = g.ROOT
@@ -35,89 +35,124 @@ CLAW = (44, 38, 34)
 
 
 def mottle(x, y, z, scale=1.0):
-    """Upperparts: rufous with dark shaft streaks and fine barring, so it reads as bark at a distance."""
-    lx, lz = frac(x / (1.1 * scale)), frac((z + math.floor(x / (1.1 * scale)) * 0.5) / (1.0 * scale))
-    if 0.42 < lz < 0.58 and lx < 0.8: return STREAK
-    if lx > 0.78: return RUF_DK if 0.2 < lz < 0.8 else RUF
-    if frac(y * 1.7 + x * 0.3) < 0.18: return RUF_DK
-    return RUF if frac(z * 0.7 + y * 0.2) > 0.3 else RUF_LT
+    """Upperparts: rufous, softly mottled, with dark shaft streaks and fine barring, so it reads as bark at a distance.
+    Painted with make_greylag's texture toolkit (plumage, feathered, rough...) in vanilla's soft manner."""
+    c = plumage(x, y, z, RUF, RUF_DK, RUF_LT, 1.0 * scale)
+    c = feathered(c, x, z + y, RUF_LT, 0.9 * scale, 0.8 * scale, 0.45, shadow=0.75)
+    lz = frac((z + y) / (0.8 * scale * g.FEATHER) + 0.5 * (math.floor(x / (0.9 * scale * g.FEATHER)) % 2))
+    if abs(lz - 0.5) < 0.1 and cloud(x, y, z, 0.7) > 0.45: c = mix(c, STREAK, 0.7)   # dark shaft streaks
+    if frac(y * 1.7 + x * 0.3) < 0.15: c = mul(c, 0.85)                               # fine bars
+    return c
 
 
-def underparts(u, v):
-    """Buff breast and belly with bold dark streaks crossed by fine bars (u across, v along the body)."""
-    lu = frac(u / 1.2)
-    if lu < 0.16: return STREAK
-    if lu < 0.3 and frac(v / 0.8) < 0.3: return RUF_DK
-    return BUFF if frac(v * 0.9 + u * 0.2) > 0.2 else BUFF_LT
+def underparts(x, y, z, u, v):
+    """Buff breast and belly with bold, soft-edged dark streaks crossed by fine bars (u across, v along the body)."""
+    c = plumage(x, y, z, BUFF, mix(BUFF, RUF, 0.4), BUFF_LT, 1.0)
+    lu = frac(u / 1.2 + (cloud(x, y, z, 0.8) - 0.5) * 0.25)
+    if lu < 0.14: return mix(c, STREAK, 0.85)
+    if lu < 0.3 and frac(v / 0.8) < 0.3: return mix(c, RUF_DK, 0.6)
+    return c
 
 
 # ---------------------------------------------------------------- materials
 def m_body(x, y, z, face, fu, fv):
-    if face == "up":
-        # a row of white spots along each side of the back (the scapulars)
-        if abs(abs(z - 8.0) - 2.0) < 0.35 and 0.3 < frac(x / 1.3) < 0.6: return SPOT
-        return mottle(x, y, z)
-    if face == "down": return underparts(z, x)
-    if face == "west": return underparts(z, y)
+    if face == "up": return mottle(x, y, z)
+    if face == "down": return underparts(x, y, z, z, x)
+    if face == "west": return underparts(x, y, z, z, y)
     if face == "east": return mottle(x, y, z)
-    return mottle(x, y, z) if y > 4.8 else underparts(x, y)
+    return lift(mix(underparts(x, y, z, x, y), mottle(x, y, z), rough((y - 4.8) / 0.5, x, y, z, 0.6)), y, 2.4, 6.6)
 
 
 def m_breast(x, y, z, face, fu, fv):
-    return underparts(z if face in ("west", "up", "down") else x, y)
+    return underparts(x, y, z, z if face in ("west", "up", "down") else x, y)
 
 
 def m_neck(x, y, z, face, fu, fv):
-    return mottle(x, y, z, 0.8) if face in ("up", "east") else underparts(z, y)
+    return mottle(x, y, z, 0.8) if face in ("up", "east") else underparts(x, y, z, z, y)
 
 
 EYES = ((6.85, 6.9), (9.15, 6.9))          # (z, y) of each eye on the face
 EYE_R, DISC_R = 0.6, 1.75
 
 
-def facial_disc(z, y):
-    """The face: two round discs about the eyes with fine concentric rings, a dark rim round the outside, pale
-    'eyebrows' forming a V between the eyes down to the bill, big black eyes."""
-    d = min(math.hypot(z - ez, y - ey) for ez, ey in EYES)
-    if d < EYE_R: return EYE
-    if d < EYE_R + 0.25: return RUF_DK
-    if abs(z - 8.0) < 0.55 and 5.6 < y < 8.2 and abs(z - 8.0) < (y - 5.4) * 0.35 + 0.15: return BUFF_LT
-    if d < DISC_R: return DISC_LT if frac(d * 2.2) > 0.55 else DISC
-    if d < DISC_R + 0.45 and y < 8.0: return RIM
-    return mottle(0, y, z, 0.8)
-
-
 def m_head(x, y, z, face, fu, fv):
-    if face == "west": return facial_disc(z, y)
+    """Under the disc plate only the eyes show (big and dark, each with its shine); the rest of the face is the
+    disc's colour, so it reads through any gap. The crown and back of the head are mottled."""
+    if face == "west":
+        for ez, ey in EYES:
+            e = g.round_eye(ez - z, y - ey, EYE_R, (30, 22, 16))     # du toward the bill: the eyes' inner corners
+            if e: return e
+        return plumage(x, y, z, DISC, RUF_DK, DISC_LT, 0.8)
     if face in ("north", "south") and x < -1.6 and y < 7.6:
-        return RIM if x > -2.0 else DISC              # the disc wraps a little round the sides of the face
-    if face == "down": return underparts(z, x)
+        return plumage(x, y, z, DISC, RUF_DK, DISC_LT, 0.8) if x < -2.0 else plumage(x, y, z, RIM, mul(RIM, 0.8), RUF_DK, 0.8)
+    if face == "down": return underparts(x, y, z, z, x)
     return mottle(x, y, z, 0.8)
 
 
+def m_disc(x, y, z, face, fu, fv):
+    """The facial disc, standing a little proud of the face: two round discs of fine concentric feathers about the
+    eyes (cut out, so the eyes sit back in them), a dark rim round the outside, and pale "eyebrows" in a V between
+    the eyes down to the bill."""
+    d = min(math.hypot(z - ez, y - ey) for ez, ey in EYES)
+    if d < EYE_R - 0.05: return None
+    if d < EYE_R + 0.2: return plumage(x, y, z, RUF_DK, STREAK, RUF, 0.6)                   # the eye's dark surround
+    pale = plumage(x, y, z, BUFF_LT, BUFF, SPOT, 0.6)
+    if 5.5 < y < 7.9 and abs(z - 8.0) < (y - 5.4) * 0.2 + 0.12: return pale                    # the pale V
+    ez, ey = min(EYES, key=lambda e: abs(z - e[0]))
+    if y > ey + 0.35 and EYE_R + 0.2 < math.hypot(z - ez, y - ey) < EYE_R + 0.5: return mix(pale, DISC_LT, 0.3)   # brows
+    if d < DISC_R:
+        ring = frac(d * 2.4 + (cloud(x, y, z, 0.5) - 0.5) * 0.3)
+        c = plumage(x, y, z, DISC, mix(DISC, RUF_DK, 0.4), DISC_LT, 0.7)
+        return mix(c, DISC_LT, 0.6) if ring > 0.6 else c
+    if d < DISC_R + 0.45 and y < 8.0: return plumage(x, y, z, RIM, mul(RIM, 0.8), RUF_DK, 0.6)  # the dark rim
+    return None                                                                                 # head shows round it
+
+
 def m_bill(x, y, z, face, fu, fv):
-    return BILL_DK if face in ("down", "north", "south") and y < 5.3 else BILL
+    c = BILL_DK if face in ("down", "north", "south") and y < 5.3 else BILL
+    return grain(mul(c, 1.06) if face == "up" else c, x, y, z, 0.04)
 
 
 def m_legs(x, y, z, face, fu, fv):
-    return BUFF if frac(x * 1.5 + y) > 0.25 else BUFF_LT        # feathered to the toes
+    # feathered to the toes: fluffy buff with faint bars
+    c = plumage(x, y, z, BUFF, mix(BUFF, RUF, 0.3), BUFF_LT, 0.6)
+    return mul(c, 0.88) if frac(x * 1.5 + y) < 0.2 else c
 
 
-def m_feet(x, y, z, face, fu, fv):
-    return CLAW if x > HIP[0] + LEG + 0.9 else BUFF_LT
+def m_toe(x, y, z, face, fu, fv):
+    return mul(m_legs(x, y, z, face, fu, fv), 1.05)
+
+
+def m_claw(x, y, z, face, fu, fv):
+    return grain(CLAW, x, y, z, 0.05)
 
 
 def m_edge(x, y, z, face, fu, fv):
-    return RUF_DK
+    return plumage(x, y, z, RUF_DK, mul(RUF_DK, 0.85), RUF, 1.0)
 
 
 def m_tail(x, y, z, face, fu, fv):
-    """Short, rounded, rufous with dark bars."""
+    """Short, rounded, rufous with soft dark bars."""
     end = 11.0 - x
     edge = abs(z - 8.0) / 1.7
     if end < 1.1 * edge ** 2 - 0.05: return None
-    if frac((x - 7.4) / 0.9) < 0.28: return STREAK
-    return RUF if frac((z - 6.3) / 0.85) > 0.12 else RUF_DK
+    c = plumage(x, y, z, RUF, RUF_DK, RUF_LT, 1.0, (2.0, 1, 0.6))
+    bar = frac((x - 7.4) / 0.9 + (cloud(x, 0, z, 0.8) - 0.5) * 0.3)
+    if bar < 0.28: c = mix(c, STREAK, 0.75)
+    return mul(c, 0.85) if frac((z - 6.3) / 0.85) < 0.12 else c
+
+
+SCAP_X = (1.8, 6.6)
+
+
+def m_scapulars(x, y, z, face, fu, fv):
+    """Scapulars with the tawny owl's row of white spots along them."""
+    end = SCAP_X[1] - x
+    lz = frac(abs(z - 8.0) / 0.9)
+    if end < 0.8 * (2 * lz - 1) ** 2: return None
+    c = mottle(x, y, z)
+    if 0.25 < lz < 0.75 and 0.15 < frac(x / 1.3) < 0.5 and abs(z - 8.0) > 1.8: c = mix(c, SPOT, 0.85)
+    return c
 
 
 def m_arm(x, y, z, face, fu, fv):
@@ -125,12 +160,13 @@ def m_arm(x, y, z, face, fu, fv):
     c, s = g.wing_coords(x, z, ARM_X[0], ARM_X[1], ARM_ROOT, ARM_LEN)
     lz = frac(abs(z - 8.0) / 1.2)
     if c > 0.96 and (lz < 0.1 or lz > 0.9): return None
-    if c < 0.08: return RUF_DK
-    if c < 0.45:
-        if abs(c - 0.4) < 0.04 and 0.3 < lz < 0.7: return SPOT
-        return mottle(c * 8, 0, abs(z - 8.0))
-    if frac((c - 0.45) / 0.12) < 0.35: return RUF_DK
-    return RUF_LT if 0.1 < lz < 0.9 else RUF
+    coverts = mottle(x, y, z)
+    if abs(c - 0.4) < 0.045 and 0.3 < lz < 0.7: coverts = mix(coverts, SPOT, 0.85)
+    coverts = mix(coverts, plumage(x, y, z, RUF_DK, STREAK, RUF, 1.0), clamp01((0.12 - c) / 0.05))
+    sec = plumage(x, y, z, RUF_LT, RUF, BUFF, 1.0, (2.6, 1, 0.5))
+    if frac((c - 0.45) / 0.12 + (cloud(x, 0, z, 0.8) - 0.5) * 0.2) < 0.35: sec = mix(sec, RUF_DK, 0.75)
+    if min(lz, 1 - lz) < 0.1: sec = mul(sec, 0.85)
+    return mix(coverts, sec, rough((c - 0.45) / 0.06, x, y, z, 0.4))
 
 
 FINGERS = 4
@@ -144,13 +180,15 @@ def m_hand(x, y, z, face, fu, fv):
     trail = 1.0 - 0.5 * s ** 2.2
     if s > 0.99 or c < lead or c > trail: return None
     k = (c - lead) / (trail - lead)
-    if k < 0.25: return RUF_DK if frac(s * 6) > 0.3 else RUF
+    f = frac(k * FINGERS)
     if s > 0.82:
-        f = frac(k * FINGERS)
         gap = 0.08 + 0.3 * (s - 0.82) / 0.18
         if f < gap / 2 or f > 1 - gap / 2: return None
-    if frac(s * 7.5) < 0.3: return STREAK                       # bars across the primaries
-    return RUF_LT if frac(k * FINGERS) > 0.12 else RUF
+    prim = plumage(x, y, z, RUF_LT, RUF, BUFF, 1.0, (0.6, 1, 2.6))
+    if frac(s * 7.5 + (cloud(x, 0, z, 0.8) - 0.5) * 0.2) < 0.3: prim = mix(prim, STREAK, 0.8)   # bars
+    if f < 0.12: prim = mul(prim, 0.85)
+    coverts = plumage(x, y, z, RUF_DK, STREAK, RUF, 1.0)
+    return mix(prim, coverts, rough((0.25 - k) / 0.06, x, y, z, 0.4))
 
 
 # ---------------------------------------------------------------- geometry
@@ -187,17 +225,21 @@ def wing(side):
 def shape():
     body = El("Body", [1.0, 2.4, 5.6], [7.8, 6.6, 10.4], m_body)
     breast = El("Breast", [0.2, 2.8, 6.0], [1.0, 6.2, 10.0], m_breast)
+    belly = El("Belly", [1.6, 1.95, 6.2], [7.0, 2.4, 9.8], m_breast)        # rounds the underside (0.22.0)
     neck = El("Neck", [-0.6, 4.6, 6.4], [1.0, 6.6, 9.6], m_neck, origin=[NECK_ORIGIN[0], NECK_ORIGIN[1], 8])
-    head = El("Head", [-2.6, 4.2, 5.7], [1.4, 8.4, 10.3], m_head, origin=[0.2, 5.4, 8])
-    bill = El("Bill", [-3.0, 5.2, 7.6], [-2.6, 6.2, 8.4], m_bill)
-    tip = El("BillTip", [-3.05, 4.75, 7.75], [-2.65, 5.25, 8.25], m_bill)
-    tail = El("Tail", [7.4, 4.0, 6.3], [11.0, 4.0, 9.7], m_tail, faces=("up",), origin=[7.4, 4.0, 8], rot=(0, 0, 3))
-    leg_l = El("LegL", [HIP[0], 2.5, 8.5], [HIP[0] + LEG, 3.2, 9.3], m_legs, origin=[HIP[0], HIP[1], 8.9])
-    leg_r = El("LegR", [HIP[0], 2.5, 6.7], [HIP[0] + LEG, 3.2, 7.5], m_legs, origin=[HIP[0], HIP[1], 7.1])
-    foot_l = El("FootL", [HIP[0] + LEG, 2.3, 8.2], [HIP[0] + LEG + 1.3, 2.75, 9.6], m_feet)
-    foot_r = El("FootR", [HIP[0] + LEG, 2.3, 6.4], [HIP[0] + LEG + 1.3, 2.75, 7.8], m_feet)
-    leg_l.add(foot_l); leg_r.add(foot_r)
-    body.add(breast, neck.add(head.add(bill.add(tip))), tail, leg_l, leg_r, wing("L"), wing("R"))
+    head = El("Head", [-2.6, 4.2, 5.7], [1.4, 8.4, 10.3], m_head, origin=[0.2, 5.4, 8], res=2)
+    # the facial disc stands a little proud of the face, the eyes set back in holes in it (0.22.0)
+    disc = El("FacialDisc", [-2.85, 4.4, 5.6], [-2.85, 8.3, 10.4], m_disc, faces=("west",), res=2)
+    bill = El("Bill", [-3.0, 5.2, 7.6], [-2.6, 6.2, 8.4], m_bill, res=2)
+    tip = El("BillTip", [-3.05, 4.75, 7.75], [-2.65, 5.25, 8.25], m_bill, res=2)
+    tail = g.split_tail(El("Tail", [7.4, 4.0, 6.3], [11.0, 4.0, 9.7], m_tail, faces=("up",), origin=[7.4, 4.0, 8], rot=(0, 0, 3)), m_tail, fan=7)
+    legs = []
+    for side, zc in (("L", 8.9), ("R", 7.1)):
+        leg = El("Leg" + side, [HIP[0], 2.5, zc - 0.4], [HIP[0] + LEG, 3.2, zc + 0.4], m_legs, origin=[HIP[0], HIP[1], zc])
+        legs.append(leg.add(g.perching_foot(side, HIP[0] + LEG, 2.85, zc, m_toe, m_claw, toes=(0.9, 1.1, 0.9), hind=0.8,
+                                            t=0.42, w=0.38, claw=0.45)))
+    scaps = [g.scapulars(s, SCAP_X[0], SCAP_X[1], 6.72, 8 + ARM_ROOT, 1.4, 0.5, m_scapulars) for s in "LR"]
+    body.add(breast, belly, neck.add(head.add(disc, bill.add(tip))), tail, *legs, *scaps, wing("L"), wing("R"))
     return body
 
 
@@ -237,8 +279,8 @@ def air(frame, arm, hand, extra=None):
 
 def animations():
     # soft, deep, unhurried beats
-    flap = [air(0, 0, -14, {"Body": {"rotationZ": 1}}), air(8, 40, 10, {"Body": {"rotationZ": 0}}),
-            air(15, 0, 18, {"Body": {"rotationZ": -1}}), air(23, -34, -8, {"Body": {"rotationZ": 0}})]
+    flap = [air(0, 0, -16, {"Body": {"rotationZ": 1}}), air(8, 48, 12, {"Body": {"rotationZ": 0}}),
+            air(15, 0, 22, {"Body": {"rotationZ": -1}}), air(23, -42, -10, {"Body": {"rotationZ": 0}})]   # deeper in 0.21.2
     glide = [air(0, 3, 0), air(20, 1, 2), air(40, 3, 0)]
     dangle = {"LegL": {"rotationZ": -55}, "LegR": {"rotationZ": -65}, "FootL": {"rotationZ": -30}, "FootR": {"rotationZ": -30}}
 

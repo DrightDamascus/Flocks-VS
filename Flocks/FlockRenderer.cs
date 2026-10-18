@@ -54,7 +54,7 @@ namespace Flocks
         /// <summary>Volume of the flying flocks' distant calls (client config FlockCallVolume; 0 = silent).</summary>
         public float CallVolume = 1f;
         /// <summary>Calls fade out linearly over this many blocks from the calling bird.</summary>
-        public float CallRange = 220;
+        public float CallRange = 160;
 
         /// <summary>The landed goose entity's default size (entities/greylag.json client.size); the sky goose uses the
         /// loaded value, so the two always match.</summary>

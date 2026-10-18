@@ -18,7 +18,7 @@ their far end. A segment's pitch above forward-horizontal is minus the sum of it
 import json, math, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import make_greylag as g
-from make_greylag import El, mul, mix, frac
+from make_greylag import El, mul, mix, frac, plumage, feathered, rough, lift, grain, clamp01, cloud
 
 HERE = g.HERE
 ROOT = g.ROOT
@@ -37,55 +37,118 @@ EYE = (226, 196, 64)
 
 
 # ---------------------------------------------------------------- materials
+# Painted with make_greylag's texture toolkit (plumage, feathered, rough...): soft feathering in vanilla's manner.
+def grey(x, y, z, a, b, size=1.3):
+    return feathered(plumage(x, y, z, GREY, GREY_DK, GREY_LT, 1.3), a, b, GREY_LT, size, size * 0.9, 0.45, shadow=0.84)
+
+
+def white(x, y, z, s=1.2):
+    return grain(plumage(x, y, z, WHITE, NECK_W, (244, 244, 240), s), x, y, z, 0.02)
+
+
 def m_body(x, y, z, face, fu, fv):
     if face == "up":
-        return PLUME if frac(z * 0.9 + x * 0.12) > 0.78 else GREY       # long pale plumes along the back
-    if face == "down": return WHITE if frac(x * 0.6) > 0.25 else mix(WHITE, STREAK, 0.35)
+        c = grey(x, y, z, x, z)
+        streak = frac(z * 0.9 + x * 0.12 + (cloud(x, 0, z, 1.0) - 0.5) * 0.2)
+        return mix(c, PLUME, 0.7) if streak > 0.78 else c                            # long pale plumes along the back
+    if face == "down":
+        c = white(x, y, z)
+        return mix(c, STREAK, 0.4) if frac(x * 0.6 + (cloud(x, 0, z, 0.8) - 0.5) * 0.3) < 0.22 else c
     if face in ("north", "south"):
-        if x < 4.2 and y > 4.6: return BLACK                            # black shoulder patch
-        if y < 3.6: return mix(WHITE, GREY_LT, 0.4)
-        return GREY_LT if y < 4.6 else GREY
-    return GREY_LT
+        c = mix(white(x, y, z), plumage(x, y, z, GREY_LT, GREY, WHITE, 1.2), rough((y - 3.4) / 0.6, x, y, z, 0.5))
+        c = mix(c, grey(x, y, z, x, y), rough((y - 4.6) / 0.5, x, y, z, 0.5))
+        black = rough((4.3 - x) / 0.4, x, y, z, 0.4) * rough((y - 4.5) / 0.3, x, y, z, 0.4)   # the black shoulder patch
+        return lift(mix(c, plumage(x, y, z, BLACK, (20, 20, 24), BLACK_LT, 0.8), black), y, 2.8, 6.2)
+    return plumage(x, y, z, GREY_LT, GREY, WHITE, 1.2)
 
 
 def m_rump(x, y, z, face, fu, fv):
-    return GREY if face == "up" else GREY_LT
+    return grey(x, y, z, x, z) if face == "up" else plumage(x, y, z, GREY_LT, GREY, WHITE, 1.2)
 
 
 def m_neck(x, y, z, face, fu, fv):
     # pale neck; the front (the down face, which faces forward when the neck is raised) carries a line of black streaks
-    if face == "down": return STREAK if abs(z - 8.0) < 0.18 and frac(x * 1.1) < 0.6 else NECK_W
-    return NECK_W if face != "up" else mix(NECK_W, GREY_LT, 0.4)
+    c = white(x, y, z, 0.9)
+    if face == "down":
+        if abs(z - 8.0) < 0.22 and frac(x * 1.1 + (cloud(x, 0, z, 0.6) - 0.5) * 0.3) < 0.6: return mix(c, STREAK, 0.85)
+        return c
+    return mix(c, GREY_LT, 0.45) if face == "up" else c
+
+
+EYE_C = (-9.4, 5.55)
 
 
 def m_head(x, y, z, face, fu, fv):
-    if face in ("north", "south") and -9.55 < x < -9.05 and 5.35 < y < 5.85: return EYE
-    if face in ("north", "south") and 5.45 < y < 5.95 and x > -9.6: return BLACK   # stripe from the eye to the crest
-    if face == "up" and abs(z - 8.0) > 0.45: return BLACK                       # dark sides of the crown
-    return WHITE
+    if face in ("north", "south"):
+        e = g.round_eye(x - EYE_C[0], y - EYE_C[1], 0.35, EYE, pupil=0.18)
+        if e: return e
+        stripe = clamp01(1 - abs(y - 5.85 - 0.05 * (x - EYE_C[0])) / 0.22) * clamp01((x - EYE_C[0] + 0.3) / 0.3)
+        c = white(x, y, z, 0.8)
+        if x < EYE_C[0] - 0.35 and y < 5.4: c = mix(c, BILL, 0.35)                   # bare yellowish skin before the eye
+        return mix(c, plumage(x, y, z, BLACK, (20, 20, 24), BLACK_LT, 0.6), stripe)  # stripe from the eye to the crest
+    if face == "up":
+        side = rough((abs(z - 8.0) - 0.4) / 0.15, x, y, z, 0.3)                      # dark sides of the crown
+        return mix(white(x, y, z, 0.8), plumage(x, y, z, BLACK, (20, 20, 24), BLACK_LT, 0.6), side)
+    return white(x, y, z, 0.8)
 
 
 def m_crest(x, y, z, face, fu, fv):
-    return BLACK
+    return plumage(x, y, z, BLACK, (20, 20, 24), BLACK_LT, 0.6, (2.0, 1, 1))
+
+
+def m_crest_plume(x, y, z, face, fu, fv):
+    """Two long black plumes trailing back from the crown, tapering to points."""
+    t = (x - CREST_X[0]) / (CREST_X[1] - CREST_X[0])
+    lz = abs(frac((z - 7.6) / 0.4) - 0.5) * 2
+    if lz > 0.9 * (1 - t) + 0.1 or t > 0.98: return None
+    return plumage(x, y, z, BLACK, (20, 20, 24), BLACK_LT, 0.6, (2.0, 1, 1))
 
 
 def m_bill(x, y, z, face, fu, fv):
-    return BILL_DK if face == "down" else BILL
+    c = mix(BILL, mul(BILL, 0.82), clamp01((-12.0 - x) / 3.0))                     # duskier toward the tip
+    if face == "up": c = mix(c, (120, 100, 60), 0.4)                                 # the dark culmen
+    elif face == "down": c = BILL_DK
+    elif -11.4 < x < -10.8 and 5.2 < y < 5.3: c = mul(c, 0.6)                        # nostril slit
+    return grain(c, x, y, z, 0.03)
 
 
 def m_legs(x, y, z, face, fu, fv):
-    return mul(LEGS, 0.85) if face == "down" else LEGS
+    c = mul(LEGS, 0.85) if face == "down" else LEGS
+    return grain(mul(c, 0.9) if frac(x * 1.6) < 0.18 else c, x, y, z, 0.05)          # scaly
+
+
+def m_claw(x, y, z, face, fu, fv):
+    return grain((50, 44, 38), x, y, z, 0.05)
 
 
 def m_edge(x, y, z, face, fu, fv):
-    return GREY_DK
+    return plumage(x, y, z, WHITE, NECK_W, GREY_LT, 1.0)                              # the pale leading edge
 
 
 def m_tail(x, y, z, face, fu, fv):
     end = 14.4 - x
     edge = abs(z - 8.0) / 1.9
     if end < 0.9 * edge ** 2 - 0.1: return None                             # short rounded tail
-    return GREY if frac((z - 6.1) / 0.95) > 0.12 else GREY_DK
+    c = plumage(x, y, z, GREY, GREY_DK, GREY_LT, 1.0, (2.0, 1, 0.6))
+    return mul(c, 0.85) if frac((z - 6.1) / 0.95) < 0.12 else c
+
+
+def m_plumes(x, y, z, face, fu, fv):
+    """Long, pale grey back plumes trailing over the tail, each tapering to a point."""
+    end = PLUME_X[1] - x
+    lz = abs(frac(abs(z - 8.0) / 0.6) - 0.5) * 2
+    if end < 3.0 * lz: return None
+    c = plumage(x, y, z, PLUME, GREY_LT, (214, 218, 222), 0.8, (2.4, 1, 0.5))
+    return mul(c, 0.86) if lz > 0.8 else c
+
+
+def m_breast_plumes(x, y, z, face, fu, fv):
+    """The lank white plumes hanging from the lower neck, streaked with a little black, ragged at their ends."""
+    hang = y - BREAST_Y[0]                                                  # 0 at the plume tips .. top at the neck
+    lx = abs(frac(x / 0.55) - 0.5) * 2
+    if hang < 0.9 * lx + 0.25 * cloud(x, 0, z, 0.4): return None
+    c = white(x, y, z, 0.7)
+    return mix(c, STREAK, 0.5) if abs(frac(x / 1.1) - 0.5) < 0.08 else c
 
 
 def m_arm(x, y, z, face, fu, fv):
@@ -93,9 +156,11 @@ def m_arm(x, y, z, face, fu, fv):
     c, s = g.wing_coords(x, z, ARM_X[0], ARM_X[1], ARM_ROOT, ARM_LEN)
     lz = frac(abs(z - 8.0) / 1.5)
     if c > 0.95 and (lz < 0.16 or lz > 0.84): return None
-    if c < 0.08: return WHITE
-    if c < 0.55: return GREY_LT if frac((c - 0.08) / 0.12) > 0.75 else GREY
-    return BLACK_LT if 0.12 < lz < 0.88 else BLACK
+    coverts = grey(x, y, z, x, abs(z - 8.0), 1.1)
+    coverts = mix(coverts, white(x, y, z), clamp01((0.1 - c) / 0.04))
+    sec = plumage(x, y, z, BLACK_LT, BLACK, mix(BLACK_LT, GREY_DK, 0.5), 1.0, (2.6, 1, 0.5))
+    if min(lz, 1 - lz) < 0.12: sec = mul(sec, 0.78)
+    return mix(coverts, sec, rough((c - 0.55) / 0.06, x, y, z, 0.4))
 
 
 def m_hand(x, y, z, face, fu, fv):
@@ -105,10 +170,12 @@ def m_hand(x, y, z, face, fu, fv):
     trail = 1.0 - 0.45 * s ** 2.2                    # rounded, not pointed
     if s > 0.985 or c < lead or c > trail: return None
     k = (c - lead) / (trail - lead)
-    if k < 0.25: return GREY
     lf = frac((k - 0.25) / 0.75 * 6.0)
     if k > 0.8 and s > 0.7 and lf < 0.2: return None                     # separated tips
-    return BLACK if lf > 0.12 else mul(BLACK, 0.8)
+    prim = plumage(x, y, z, BLACK, (20, 20, 24), BLACK_LT, 1.0, (0.6, 1, 2.6))
+    if lf < 0.12: prim = mul(prim, 0.75)
+    elif abs(lf - 0.5) < 0.06: prim = mul(prim, 1.3)
+    return mix(prim, grey(x, y, z, x, abs(z - 8.0), 1.1), rough((0.25 - k) / 0.06, x, y, z, 0.4))
 
 
 # ---------------------------------------------------------------- geometry
@@ -174,7 +241,11 @@ def with_(base, **parts):
     return els
 
 
-FOLDED = g.FOLDED
+# The shared fold (make_greylag) suits the narrow-winged birds; the heron's arm is twice as broad as its body, so its
+# trailing edge came out the far side. Folded, the arm is stretched to half its chord (stretchX: the secondaries
+# stacking as on a real folded wing), droops onto the flank and is drawn in.
+FOLDED = {**g.FOLDED, "ArmL": {"rotationX": 14, "rotationY": 95, "offsetZ": -0.6, "offsetY": -0.8, "stretchX": 0.5},
+          "ArmR": {"rotationX": -14, "rotationY": -95, "offsetZ": 0.6, "offsetY": -0.8, "stretchX": 0.5}}
 
 
 def stance(body, swing_l=0.0, swing_r=0.0):
@@ -212,10 +283,10 @@ def ground(frame, neckpose, body=-18, swing_l=0.0, swing_r=0.0, extra=None):
 def animations():
     # slow, deep, arched beats; neck drawn in and legs trailing throughout
     flap = [
-        flight_key(0, 0, -18, {"Body": {"rotationZ": 1}}),
-        flight_key(8, 40, 6, {"Body": {"rotationZ": 0}}),
-        flight_key(16, 2, 22, {"Body": {"rotationZ": -1}}),
-        flight_key(24, -38, -14, {"Body": {"rotationZ": 0}}),
+        flight_key(0, 0, -20, {"Body": {"rotationZ": 1}}),    # deeper in 0.21.2 (was +40/-38)
+        flight_key(8, 50, 8, {"Body": {"rotationZ": 0}}),
+        flight_key(16, 2, 26, {"Body": {"rotationZ": -1}}),
+        flight_key(24, -46, -16, {"Body": {"rotationZ": 0}}),
     ]
     soar = [flight_key(0, 4, -6), flight_key(15, 2, -4)]     # wings bowed slightly down
     # takeoff: big strokes, neck half out, legs dangling
@@ -242,10 +313,10 @@ def animations():
     # the strike: cocked back, lunge down and forward, hold, recover
     strike = [ground(0, neck(60, 150, 0), body=-12), ground(6, neck(64, 158, 4), body=-12),
               ground(9, neck(10, -35, -55), body=8), ground(16, neck(12, -32, -50), body=8), ground(28, neck(100, -10, 0), body=-14)]
-    death = [g.ground_key(0, Body=(0, 0, 0), Neck=(0, 0, 0), Neck2=(0, 0, 0), Head=(0, 0, 0)),
-             g.ground_key(6, Body=(35, 0, 0), Neck=(0, 0, 10), Neck2=(0, 0, 10), Head=(0, 0, 10)),
-             g.ground_key(14, Body=(82, 0, 0), Neck=(0, 0, 15), Neck2=(0, 0, 25), Head=(0, 0, 10), LegL=(0, 0, -30), LegR=(0, 0, -15)),
-             g.ground_key(23, Body=(82, 0, 0), Neck=(0, 0, 15), Neck2=(0, 0, 25), Head=(0, 0, 10), LegL=(0, 0, -30), LegR=(0, 0, -15))]
+    death = [g.ground_key(0, FOLDED, Body=(0, 0, 0), Neck=(0, 0, 0), Neck2=(0, 0, 0), Head=(0, 0, 0)),
+             g.ground_key(6, FOLDED, Body=(35, 0, 0), Neck=(0, 0, 10), Neck2=(0, 0, 10), Head=(0, 0, 10)),
+             g.ground_key(14, FOLDED, Body=(82, 0, 0), Neck=(0, 0, 15), Neck2=(0, 0, 25), Head=(0, 0, 10), LegL=(0, 0, -30), LegR=(0, 0, -15)),
+             g.ground_key(23, FOLDED, Body=(82, 0, 0), Neck=(0, 0, 15), Neck2=(0, 0, 25), Head=(0, 0, 10), LegL=(0, 0, -30), LegR=(0, 0, -15))]
     return [
         {"name": "fly-flap", "code": "fly-flap", "quantityframes": 30, "onAnimationEnd": "Repeat", "keyframes": flap},
         {"name": "fly-soar", "code": "fly-soar", "quantityframes": 30, "onAnimationEnd": "Repeat", "keyframes": soar},

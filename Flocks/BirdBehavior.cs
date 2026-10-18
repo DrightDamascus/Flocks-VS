@@ -34,6 +34,45 @@ namespace Flocks
 
         protected EntityBehaviorBird(Entity entity) : base(entity) { }
 
+        /// <summary>Idle calls (attribute idleGap, seconds): the entity's idleSoundChance is rolled here instead of by the
+        /// game, the same way (per tick, chance / 100), but a bird keeps quiet while another of its kind within
+        /// BirdCalls.Radius called less than idleGap seconds ago. A lone bird calls as often as before; a flock of twenty
+        /// no longer calls twenty times as often. The server config's CallRate scales both.</summary>
+        private float idleChance, idleGap = 12;
+        /// <summary>Wingbeats per second in ordinary flight (attribute flapSpeed; fly-flap is one beat of 30 frames and the
+        /// game plays 30 a second, so this is its animation speed). 0 = the behaviour's own AnimSpeed.</summary>
+        private float flapSpeed;
+        /// <summary>Takeoff and landing sounds, spaced across a flock (seconds between two of one sound near each other):
+        /// a flock of twenty going up gives a couple of alarm calls and a few wingbeats, not twenty of each.</summary>
+        protected const double TakeoffCallGap = 1.5, WingsGap = 0.5, SplashGap = 0.25;
+
+        public override void Initialize(EntityProperties properties, JsonObject attributes)
+        {
+            base.Initialize(properties, attributes);
+            idleGap = attributes["idleGap"].AsFloat(idleGap);
+            flapSpeed = attributes["flapSpeed"].AsFloat(0);
+            // the game's own roll is off; IdleCalls rolls instead
+            idleChance = properties.IdleSoundChance;
+            entity.IdleSoundChanceModifier = 0;
+        }
+
+        /// <summary>The idle call roll; each behaviour runs it once a tick on the server while the bird is alive.</summary>
+        protected void IdleCalls()
+        {
+            float rate = (float)ResidentGeese.Config.CallRate;
+            if (idleChance <= 0 || rate <= 0 || rand.NextDouble() >= idleChance * rate / 100.0) return;
+            PlaySpaced("idle", idleGap / rate);
+        }
+
+        /// <summary>Plays one of the entity's sounds unless a bird of its kind within BirdCalls.Radius played the same
+        /// sound less than gapSeconds ago (so a flock taking off gives a few calls, not one per bird).</summary>
+        protected bool PlaySpaced(string sound, double gapSeconds)
+        {
+            if (!BirdCalls.TryCall(entity, sound, gapSeconds)) return false;
+            entity.PlayEntitySound(sound);
+            return true;
+        }
+
         private float spearCheck;
         private static readonly System.Collections.Generic.Dictionary<Type, System.Reflection.FieldInfo> hitListFields = new();
 
@@ -305,7 +344,7 @@ namespace Flocks
             if (anim == code) return;
             if (anim != null) entity.AnimManager?.StopAnimation(anim);
             anim = code;
-            float speedMul = AnimSpeed(code);
+            float speedMul = code == "fly-flap" && flapSpeed > 0 ? flapSpeed : AnimSpeed(code);
             entity.AnimManager?.StartAnimation(new AnimationMetaData { Code = code, Animation = code, AnimationSpeed = speedMul }.Init());
         }
 

@@ -41,7 +41,7 @@
 			{ code: "repulseagents" },
 			{ code: "controlledphysics", stepHeight: 1.1 },
 			// perch, soar on thermals, stoop on prey (Raptor.cs). Before "health": it zeroes thrown spear damage.
-			{ code: "flocks.raptor", territory: 200, fleeRange: 26, takeoffRange: 16, soarSpeed: 10,
+			{ code: "flocks.raptor", territory: 200, fleeRange: 26, takeoffRange: 16, soarSpeed: 10, flapSpeed: 1.8,
 			  soarAltitudeMin: 35, soarAltitudeMax: 65, stoopSpeed: 38,
 			  // after a meal it doesn't hunt for 20 minutes, like vanilla's foxes, wolves and bears ("saturated")
 			  saturatedSeconds: 1200, preyCodes: ["game:hare-*", "flocks:mallard"] },
@@ -83,7 +83,7 @@
 		hurt: "flocks:eagle/hurt",
 		death: "flocks:eagle/death",
 		// golden eagles are mostly quiet: thin yelps now and then
-		idle: { path: "flocks:eagle/call*", pitch: { avg: 1, var: 0.06 }, range: 64 },
+		idle: { path: "flocks:eagle/call*", pitch: { avg: 1, var: 0.06 }, range: 48 },
 		call: { path: "flocks:eagle/call*", pitch: { avg: 1, var: 0.06 }, range: 80, volume: { avg: 0.9 } },
 		// the goose wingbeats, pitched well down: big, heavy wings
 		takeoffwings: { path: "flocks:wings/flap*", pitch: { avg: 0.7, var: 0.05 }, range: 32, volume: { avg: 1 } }

@@ -49,6 +49,12 @@ namespace Flocks
             ["greylag"] = true, ["mallard"] = true, ["heron"] = true, ["eagle"] = true, ["gull"] = true,
             ["crow"] = true, ["owl"] = true, ["mouse"] = true, ["crane"] = true,
         };
+        /// <summary>How often the birds call while at rest (1 = default, 0.5 = half as often, 0 = only when flushed).</summary>
+        public double CallRate = 1;
+        /// <summary>How many of the mod's animals spawn on their own (1 = default, 0.5 = half): scales each one's spawn
+        /// cap (spawnconditions.runtime.maxQuantity) and its worldgen spawning. Landing flocks are not affected.</summary>
+        public double Numbers = 1;
+
         /// <summary>Golden eagles hunt chickens as well as hares and mallards. They only stoop on prey in the open, so a
         /// roofed run keeps chickens safe.</summary>
         public bool EaglesHuntChickens = false;

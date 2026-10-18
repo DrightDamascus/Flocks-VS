@@ -1,0 +1,12 @@
+{
+  "type": "code",
+  "modid": "flocksbench",
+  "name": "Flocks client benchmark",
+  "description": "Frame-time benchmark for Flocks (test tool, not shipped).",
+  "authors": ["Dright"],
+  "version": "1.0.0",
+  "side": "Universal",
+  "requiredOnClient": false,
+  "requiredOnServer": false,
+  "dependencies": { "game": "" }
+}

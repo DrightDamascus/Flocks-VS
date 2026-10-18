@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.21.2
+Quieter birds, and fewer of them (a player: so many birds you can't hear the game, everywhere, and the real
+recordings sounded like a zoo).
+- Every sound cleaned (tools/clean_sounds.py): the recordings' background (other birds, wind, traffic, hiss) taken
+  out, the gaps between calls made silent, and the level brought down about 10 dB, near vanilla's sheep and goats.
+- Nearby birds of a kind take turns calling (BirdCalls): a lone bird calls as before, but a flock of twenty no longer
+  calls twenty times as often; at most one call per 10-15 s (gulls, ducks, geese, crows) within 32 blocks. A flock
+  taking off gives a couple of alarm calls and a few wingbeats, not one of each per bird; the splashes are spaced too.
+- Calls at rest less often: gulls half as often, ducks and crows about a third less. Heard over shorter distances
+  (crow and gull calls 48 -> 32 blocks, alarms 56-64 -> 40, the owl's hoot 96 -> 64), passing flocks' calls 220 -> 160
+  blocks, and passing flocks call about half as often.
+- Passing geese call with the greylag's own honks (the Canada geese flyover clips, mostly road and wind noise, are
+  gone); passing gulls give single calls instead of a colony's din.
+- Fewer birds: spawn caps halved for geese (24 -> 12), mallards (20 -> 10) and gulls (24 -> 12); crows 12 -> 8,
+  herons 6 -> 4. They come back half as fast after being hunted or leaving, and worldgen places half as many.
+- Server config (flocks-server.json): `CallRate` (how often birds call at rest; 0 = only when flushed) and `Numbers`
+  (scales every animal's spawn cap and worldgen spawning), both 1 by default.
+- Birds flap properly in flight (a player: they don't really flap, they just float). After the takeoff the cruising
+  wingbeat was slow and shallow (about 1.5 beats a second over a 66 degree arc for every waterbird and the crow).
+  Now each bird has its own rate (entity attribute flapSpeed, beats per second): geese and gulls 2.6, mallards 3.6,
+  herons 2, crows 3, the owl 2.2, the eagle 1.8; and the stroke is about 90 degrees (fly-flap in every generator).
+- Fix: a goose on a pond could show its wings swung forward under its head (a player's screenshot). The behaviours
+  started every animation with the engine's default blend mode (Add), so two animations running at once added up and
+  the wing fold doubled. They now start with the entity file's settings (Average blend, weights, easing).
+
 ## 0.21.1
 - Scarecrow mod support (Mandikor's, modid scarecrow): its scarecrow and little scarecrow keep crows off like the straw
   dummy, within the same ScarecrowRadius (15). The straw dummy already worked with it installed (it keeps the

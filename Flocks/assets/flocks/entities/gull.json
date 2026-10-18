@@ -46,7 +46,7 @@
 			// further along; every 1.5-4 game hours it goes up of its own accord; and it glides half the time it flies.
 			{ code: "flocks.waterfowl", species: "gull", fleeRange: 9, takeoffRange: 4.5, lifeHours: 6, sink: 0.1,
 			  cruiseSpeedMin: 10, cruiseSpeedMax: 13, takeoffRunSeconds: 0.3, takeoffRunSpeed: 4,
-			  takeoffWingsChance: 0.5, takeoffCallChance: 0.3,
+			  takeoffWingsChance: 0.5, takeoffCallChance: 0.3, idleGap: 10, flapSpeed: 2.6,
 			  wheelSecondsMin: 8, wheelSecondsMax: 20, loafHoursMin: 1.5, loafHoursMax: 4, soarShare: 0.5 },
 			{ code: "health", currenthealth: 4, maxhealth: 4 },
 			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
@@ -60,7 +60,7 @@
 		// surface, near the shore (Residents.cs: ShoreDistance), on a stretch of sea (species minLakeSize). All year.
 		spawnconditions: {
 			worldgen: {
-				TriesPerChunk: { avg: 0.05, var: 0 },
+				TriesPerChunk: { avg: 0.025, var: 0 },
 				tryOnlySurface: true,
 				groupSize: { dist: "verynarrowgaussian", avg: 9, var: 5 },
 				insideBlockCodes: ["game:saltwater-still-7"],
@@ -70,8 +70,8 @@
 			runtime: {
 				group: "passive",
 				MinDistanceToPlayer: 32,
-				chance: 0.01,
-				maxQuantity: 24,
+				chance: 0.005,
+				maxQuantity: 12,
 				tryOnlySurface: true,
 				groupSize: { dist: "verynarrowgaussian", avg: 9, var: 5 },
 				insideBlockCodes: ["game:saltwater-still-7"],
@@ -84,12 +84,12 @@
 		hurt: "flocks:gull/hurt",
 		death: "flocks:gull/death",
 		// gulls are noisy: single "kyow" calls
-		idle: { path: "flocks:gull/idle/*", pitch: { avg: 1, var: 0.1 }, range: 48 },
+		idle: { path: "flocks:gull/idle/*", pitch: { avg: 1, var: 0.1 }, range: 32 },
 		takeoffsplash: { path: "game:environment/smallsplash", pitch: { avg: 1.1, var: 0.1 }, range: 24, volume: { avg: 0.4 } },
 		takeoffwings: { path: "flocks:wings/flap*", pitch: { avg: 1.2, var: 0.1 }, range: 28, volume: { avg: 0.7 } },
 		// the laughing long call
-		takeoffcall: { path: "flocks:gull/laugh*", pitch: { avg: 1, var: 0.06 }, range: 64, volume: { avg: 0.8 } },
+		takeoffcall: { path: "flocks:gull/laugh*", pitch: { avg: 1, var: 0.06 }, range: 40, volume: { avg: 0.8 } },
 		landsplash: { path: "game:environment/mediumsplash", pitch: { avg: 1.1, var: 0.1 }, range: 24, volume: { avg: 0.35 } }
 	},
-	idleSoundChance: 0.06
+	idleSoundChance: 0.03
 }

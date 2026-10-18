@@ -48,7 +48,7 @@
 			// Wading (rest, stalk, strike) comes from the species' habitat "wade" (config/flocks-species/heron.json).
 			{ code: "flocks.waterfowl", species: "heron", fleeRange: 22, takeoffRange: 14, lifeHours: 6, sink: 0,
 			  cruiseSpeedMin: 9, cruiseSpeedMax: 11, takeoffRunSeconds: 0.3, takeoffRunSpeed: 3, wadeHitboxHeight: 1.7,
-			  takeoffWingsChance: 0.8, takeoffCallChance: 0.8 },
+			  takeoffWingsChance: 0.8, takeoffCallChance: 0.8, idleGap: 30, flapSpeed: 2 },
 			{ code: "health", currenthealth: 6, maxhealth: 6 },
 			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
 			{ code: "harvestable", drops: [
@@ -72,8 +72,8 @@
 			runtime: {
 				group: "passive",
 				MinDistanceToPlayer: 40,
-				chance: 0.008,
-				maxQuantity: 6,
+				chance: 0.004,
+				maxQuantity: 4,
 				tryOnlySurface: true,
 				groupSize: { dist: "verynarrowgaussian", avg: 1.2, var: 0.5 },
 				insideBlockCodes: ["game:water-still-7"],
@@ -87,11 +87,11 @@
 		hurt: "flocks:heron/hurt",
 		death: "flocks:heron/death",
 		// mostly silent while hunting; a croak now and then
-		idle: { path: "flocks:heron/croak*", pitch: { avg: 1, var: 0.1 }, range: 40 },
+		idle: { path: "flocks:heron/croak*", pitch: { avg: 1, var: 0.1 }, range: 32 },
 		takeoffsplash: { path: "game:environment/smallsplash", pitch: { avg: 0.9, var: 0.1 }, range: 24, volume: { avg: 0.5 } },
 		// the goose wingbeats, pitched down: bigger, slower wings
 		takeoffwings: { path: "flocks:wings/flap*", pitch: { avg: 0.8, var: 0.05 }, range: 32, volume: { avg: 0.9 } },
-		takeoffcall: { path: "flocks:heron/croak*", pitch: { avg: 1, var: 0.08 }, range: 56, volume: { avg: 0.9 } },
+		takeoffcall: { path: "flocks:heron/croak*", pitch: { avg: 1, var: 0.08 }, range: 40, volume: { avg: 0.9 } },
 		landsplash: { path: "game:environment/smallsplash", pitch: { avg: 0.9, var: 0.1 }, range: 24, volume: { avg: 0.4 } }
 	},
 	idleSoundChance: 0.006

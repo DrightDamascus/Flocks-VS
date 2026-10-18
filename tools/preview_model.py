@@ -25,7 +25,8 @@ def rot(axis, deg):
     return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
 
 
-CHANNELS = ("rotationX", "rotationY", "rotationZ", "offsetX", "offsetY", "offsetZ")
+CHANNELS = ("rotationX", "rotationY", "rotationZ", "offsetX", "offsetY", "offsetZ", "stretchX", "stretchY", "stretchZ")
+REST = {"stretchX": 1, "stretchY": 1, "stretchZ": 1}      # a channel a keyframe leaves out
 
 
 def pose(anim, frame):
@@ -39,7 +40,7 @@ def pose(anim, frame):
             if k[0] <= frame: a, b = k, ks[(i + 1) % len(ks)]
         span = (b[0] - a[0]) % n or n
         t = ((frame - a[0]) % n) / span
-        out[name] = [a[1].get(r, 0) + (b[1].get(r, 0) - a[1].get(r, 0)) * t for r in CHANNELS]
+        out[name] = [a[1].get(r, REST.get(r, 0)) + (b[1].get(r, REST.get(r, 0)) - a[1].get(r, REST.get(r, 0))) * t for r in CHANNELS]
     return out
 
 
@@ -48,16 +49,19 @@ def quads(mg, root, p):
 
     def walk(el, parent_tf):
         r = list(el.rot); off = np.zeros(3)
+        S = np.eye(3)
         if el.name in p:
             r = [a + b for a, b in zip(r, p[el.name][:3])]
-            off = np.array(p[el.name][3:])
-        R = rot(0, r[0]) @ rot(1, r[1]) @ rot(2, r[2])
+            off = np.array(p[el.name][3:6])
+            S = np.diag(p[el.name][6:9])        # stretch: scales the element along its own axes about its origin
+        R = rot(0, r[0]) @ rot(1, r[1]) @ rot(2, r[2]) @ S
         o = np.array(el.origin, float)
         tf = lambda v, R=R, o=o, off=off: parent_tf(o + off + R @ (np.asarray(v, float) - o))
         src = el.uv_from or el
         for f in el.faces:
             x0, y0, pw, ph = src.px[f]
             w, h = src.face_size(f)
+            w, h = w * getattr(src, "res", 1), h * getattr(src, "res", 1)     # denser elements span more texture
             corners, uvs = [], []
             for fu, fv in ((0, 0), (1, 0), (1, 1), (0, 1)):
                 corners.append(tf(el.point(f, fu, fv)))
@@ -121,8 +125,11 @@ def main():
     mg = importlib.import_module(mod)
     root = mg.shape(); (mg.g.pack if hasattr(mg, "g") else mg.pack)(root)
     sub = getattr(mg, "SUBDIR", "bird")
-    tex = np.array(Image.open(os.path.join(mg.ROOT, "textures", "entity", sub, mg.TEX + ".png")).convert("RGBA"), float)
-    anims = {a["code"]: a for a in mg.animations()}
+    # PREVIEW_TEX picks another texture for the same model (the mallard's are mallard-drake and mallard-hen)
+    texname = os.environ.get("PREVIEW_TEX", mg.TEX)
+    tex = np.array(Image.open(os.path.join(mg.ROOT, "textures", "entity", sub, texname + ".png")).convert("RGBA"), float)
+    # the mallard and gull have no animations of their own: they fly on the greylag's
+    anims = {a["code"]: a for a in (mg.animations() if hasattr(mg, "animations") else mg.g.animations())}
     views = [("side", (0, 6)), ("3/4 front", (-40, 18)), ("front", (-90, 6)), ("above", (0, 80))]
     zoom = float(os.environ.get("ZOOM", "34"))
     sheet = Image.new("RGB", (CELL * len(views), CELL * len(rows)), SKY)

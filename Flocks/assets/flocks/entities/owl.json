@@ -43,7 +43,7 @@
 			{ code: "controlledphysics", stepHeight: 1.1 },
 			// roost in a tree by day, hunt mice from branches at night (Owl.cs). Before "health": it zeroes thrown
 			// spear damage. Tawny owls sit tight by day (4 blocks) and are warier at night (9).
-			{ code: "flocks.owl", roostTakeoffRange: 4, nightTakeoffRange: 9, territory: 48, flySpeed: 7, pounceSpeed: 9,
+			{ code: "flocks.owl", roostTakeoffRange: 4, nightTakeoffRange: 9, territory: 48, flySpeed: 7, pounceSpeed: 9, flapSpeed: 2.2,
 			  huntRange: 18, perchSecondsMin: 60, perchSecondsMax: 180,
 			  // after a meal it doesn't hunt for 20 minutes, like vanilla's foxes, wolves and bears ("saturated")
 			  saturatedSeconds: 1200, preyCodes: ["flocks:mouse"] },
@@ -87,7 +87,7 @@
 		hurt: "flocks:owl/hurt",
 		death: "flocks:owl/death",
 		// the male's song: a long hoot, a pause, then a quavering one; carries a long way through the woods at night
-		hoot: { path: "flocks:owl/hoot*", pitch: { avg: 1, var: 0.04 }, range: 96, volume: { avg: 1 } },
+		hoot: { path: "flocks:owl/hoot*", pitch: { avg: 1, var: 0.04 }, range: 64, volume: { avg: 1 } },
 		// the sharp "ke-wick" contact call
 		kewick: { path: "flocks:owl/kewick*", pitch: { avg: 1, var: 0.05 }, range: 64, volume: { avg: 0.9 } },
 		// "kek-kek" when flushed

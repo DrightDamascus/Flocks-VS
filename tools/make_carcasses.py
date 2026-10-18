@@ -81,6 +81,12 @@ def build(mod, pose, drop=(), two_sided=False):
         p = pose.get(el.name)
         if not p: continue
         el.rot = tuple(r + p.get("rotation" + a, 0) for r, a in zip(el.rot, "XYZ"))
+        st = [p.get("stretch" + a, 1) for a in "XYZ"]
+        if any(v != 1 for v in st):     # a stretch (the heron's folded arm) scales the element and its children about
+            o = list(el.origin)         # its origin; baked into their geometry (close enough for children turned too)
+            sc = lambda v: [oo + (vv - oo) * k for vv, oo, k in zip(v, o, st)]
+            for e in el.walk():
+                e.frm, e.to, e.origin = sc(e.frm), sc(e.to), sc(e.origin)
         off = [p.get("offset" + a, 0) for a in "XYZ"]
         if any(off):                    # an offset moves the element and everything hanging off it (the ground stance's lift)
             for e in el.walk():

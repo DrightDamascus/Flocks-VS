@@ -153,6 +153,7 @@ namespace Flocks
             if (!restored) { restored = true; Restore(); FlockRegistry.Instance?.Adopt(entity, species); }
             LetSpearsPass(dt);
             TrackPosition(dt);
+            IdleCalls();
             entity.SimulationRange = phase == Phase.Water ? GlobalConstants.DefaultSimulationRange : FlightRange;
             if (Wade)
             {
@@ -331,10 +332,11 @@ namespace Flocks
                     {
                         runStarted = true;
                         flyHeading = ClearestHeading(flyHeading);
-                        // entity sounds (the entity file's sounds: takeoffsplash, takeoffwings, takeoffcall)
-                        entity.PlayEntitySound("takeoffsplash");
-                        if (rand.NextDouble() < takeoffWingsChance) entity.PlayEntitySound("takeoffwings");
-                        if (rand.NextDouble() < takeoffCallChance) entity.PlayEntitySound("takeoffcall");
+                        // entity sounds (the entity file's sounds: takeoffsplash, takeoffwings, takeoffcall), spaced
+                        // out across the flock (TakeoffCallGap, WingsGap, SplashGap) so a big flock going up isn't a wall of noise
+                        PlaySpaced("takeoffsplash", SplashGap);
+                        if (rand.NextDouble() < takeoffWingsChance) PlaySpaced("takeoffwings", WingsGap);
+                        if (rand.NextDouble() < takeoffCallChance) PlaySpaced("takeoffcall", TakeoffCallGap);
                     }
                     SetAnim("takeoff");
                     // pattering along the surface, wings thrashing, then the feet leave the water
@@ -434,7 +436,7 @@ namespace Flocks
                     }
                     if (Wade ? (entity.OnGround || pos.Y <= target.Y + 0.15) : (entity.Swimming || entity.FeetInLiquid || pos.Y <= target.Y + 0.15))
                     {
-                        entity.PlayEntitySound("landsplash");
+                        PlaySpaced("landsplash", SplashGap);
                         SetPhase(Phase.Splash);
                     }
                     else if ((d < 1.5 && pos.Y - target.Y > 1.5) || phaseTime > 15) GoAround(phaseTime > 15 ? "glide too long" : $"overshot {pos.Y - target.Y:0.0} high"); // go round

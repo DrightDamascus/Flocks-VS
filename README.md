@@ -53,7 +53,8 @@ frozen row in front of you, for pictures.
 `ModConfig/flocks.json` (client): automatic migration, flocks per day, storm thresholds, call volume, species on/off.
 `ModConfig/flocks-server.json` (server): resident spawning, lake size and shore distance, crowding caps, lake wariness,
 crop raiding (on/off, how often) and the scarecrow's radius, every animal on or off (`Animals`), and whether eagles
-hunt chickens (`EaglesHuntChickens`, off by default).
+hunt chickens (`EaglesHuntChickens`, off by default). `CallRate` sets how often the birds call at rest (1 = default,
+0.5 = half, 0 = only when flushed); `Numbers` scales how many of the animals spawn (1 = default, 0.5 = half).
 
 ## Birds are data
 Each bird is a file in `assets/<domain>/config/flocks-species/` (any mod can add one): its drawn-flock shapes, size,

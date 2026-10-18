@@ -101,6 +101,7 @@ namespace Flocks
             if (!restored) { restored = true; Restore(); FlockRegistry.Instance?.Adopt(entity, species); }
             LetSpearsPass(dt);
             TrackPosition(dt);
+            IdleCalls();
             bool grounded = state == State.Forage || state == State.Perch;
             entity.SimulationRange = grounded ? GlobalConstants.DefaultSimulationRange : FlightRange;
             stateTime += dt;
@@ -389,7 +390,7 @@ namespace Flocks
             for (int i = 0; i < group.Count; i++)
                 if (group[i].state == State.Forage)
                     group[i].TakeOff(spots[i % spots.Count].Clone(), perch, false, dummy.X, dummy.Z, i == 0 ? 0 : (float)(0.1 + rand.NextDouble() * 0.6));
-            if (rand.NextDouble() < 0.5) entity.PlayEntitySound("takeoffcall");
+            if (rand.NextDouble() < 0.5) PlaySpaced("takeoffcall", TakeoffCallGap);
             return true;
         }
 
@@ -444,8 +445,8 @@ namespace Flocks
                     if (!sounded)
                     {
                         sounded = true;
-                        if (rand.NextDouble() < 0.6) entity.PlayEntitySound("takeoffwings");
-                        if (rand.NextDouble() < 0.4) entity.PlayEntitySound("takeoffcall");
+                        if (rand.NextDouble() < 0.6) PlaySpaced("takeoffwings", WingsGap);
+                        if (rand.NextDouble() < 0.4) PlaySpaced("takeoffcall", TakeoffCallGap);
                     }
                     SetAnim("takeoff");
                     speed = Math.Min(5, speed + 8 * dt);

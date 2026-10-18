@@ -71,6 +71,7 @@ namespace Flocks
         public override void StartServerSide(ICoreServerAPI sapi)
         {
             residents = new ResidentGeese(sapi, LoadServerConfig(sapi), species);
+            ScaleNumbers(sapi, residents.Cfg.Numbers);
             var ch = sapi.Network.GetChannel("flocks");
             registry = new FlockRegistry(sapi, residents.Cfg);
             landings = new LandingFlocks(sapi, species);
@@ -278,6 +279,22 @@ namespace Flocks
 
         public const string ServerConfigFile = "flocks-server.json";
 
+        /// <summary>Server config Numbers: scales every flocks animal's spawn cap and worldgen tries (the spawner reads both
+        /// live from the entity types). The tries are replaced, not changed in place: the default is the shared NatFloat.Zero.</summary>
+        private static void ScaleNumbers(ICoreServerAPI sapi, double k)
+        {
+            if (k == 1 || k < 0) return;
+            foreach (var type in sapi.World.EntityTypes)
+            {
+                var sc = type.Code.Domain == "flocks" ? type.Server?.SpawnConditions : null;
+                if (sc == null) continue;
+                if (sc.Runtime != null) sc.Runtime.MaxQuantity = (int)Math.Round(sc.Runtime.MaxQuantity * k);
+                var tries = sc.Worldgen?.TriesPerChunk;
+                if (tries != null) sc.Worldgen.TriesPerChunk = new NatFloat(tries.avg * (float)k, tries.var * (float)k, tries.dist) { offset = tries.offset };
+            }
+            sapi.Logger.Notification("[Flocks] Numbers {0}: spawn caps and worldgen spawning scaled", k);
+        }
+
         private static FlocksServerConfig LoadServerConfig(ICoreServerAPI api)
         {
             FlocksServerConfig cfg;
@@ -309,6 +326,9 @@ namespace Flocks
             return cfg;
         }
 
-        public override void Dispose() { foreach (var sp in species.Values) sp.Meshes?.Dispose(); } // no meshes on the server
+        public override void Dispose()   // no meshes on the server
+        {
+            foreach (var sp in species.Values) sp.Meshes?.Dispose();
+        }
     }
 }

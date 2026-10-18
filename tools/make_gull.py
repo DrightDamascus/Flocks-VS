@@ -15,7 +15,7 @@ takeoff, landing, death) works unchanged.
 import json, math, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import make_greylag as g
-from make_greylag import El, mul, mix, frac
+from make_greylag import El, mul, mix, frac, plumage, feathered, rough, lift, grain, clamp01, round_eye
 
 HERE = g.HERE
 ROOT = g.ROOT
@@ -32,42 +32,67 @@ EYE = (34, 30, 26)
 
 
 # ---------------------------------------------------------------- materials (see make_greylag for the convention)
+# Painted with make_greylag's texture toolkit (plumage, feathered, rough...): soft, low-contrast feathering in vanilla's
+# manner. A gull is mostly clean white and silver-grey, so its feathering is kept faint.
+def white(x, y, z, s=1.4):
+    return grain(plumage(x, y, z, WHITE, mix(WHITE, WHITE_SH, 0.45), (250, 250, 248), s), x, y, z, 0.02)
+
+
+def mantle(x, y, z, a, b):
+    return feathered(plumage(x, y, z, MANTLE, MANTLE_DK, MANTLE_LT, 1.4), a, b, MANTLE_LT, 1.4, 1.2, 0.5, shadow=0.88)
+
+
 def m_body(x, y, z, face, fu, fv):
-    if face == "up": return MANTLE if 0.15 < frac(x / 1.5) else MANTLE_DK          # faint feather rows on the back
-    if face == "down": return WHITE_SH
-    if face in ("east", "west"): return WHITE
-    return MANTLE if y > 5.3 else WHITE                                             # grey back over white flanks
+    if face == "up": return mantle(x, y, z, x, z)
+    if face == "down": return mul(white(x, y, z), 0.92)
+    if face in ("east", "west"): return white(x, y, z)
+    c = mix(white(x, y, z), mantle(x, y, z, x, y), rough((y - 5.2) / 0.4, x, y, z, 0.5))   # grey back over white flanks
+    return lift(c, y, 2.2, 6.0)
 
 
 def m_breast(x, y, z, face, fu, fv):
-    return WHITE if face != "down" else WHITE_SH
+    return mul(white(x, y, z), 0.92) if face == "down" else white(x, y, z)
 
 
 def m_rump(x, y, z, face, fu, fv):
-    return WHITE
+    return white(x, y, z)
 
 
 def m_neck(x, y, z, face, fu, fv):
-    return WHITE
+    return white(x, y, z, 1.0)
+
+
+EYE_C = (-2.75, 6.25)          # on a pixel corner, so the pupil is a clean 2x2
+IRIS = (232, 210, 110)         # a herring gull's pale yellow eye
+EYE_RING = (214, 140, 96)      # and its thin orange-red orbital ring
 
 
 def m_head(x, y, z, face, fu, fv):
-    if face in ("north", "south") and -3.15 < x < -2.55 and 6.05 < y < 6.65: return EYE
-    return WHITE
+    if face in ("north", "south"):
+        e = round_eye(x - EYE_C[0], y - EYE_C[1], 0.45, IRIS, EYE_RING, 0.1, pupil=0.2)
+        if e: return e
+        if abs(x - EYE_C[0]) < 0.6 and 0.0 < y - EYE_C[1] < 0.5: return mul(white(x, y, z, 1.0), 0.9)   # a slight brow
+    return white(x, y, z, 1.0)
 
 
 def m_bill(x, y, z, face, fu, fv):
-    # the red spot on the lower mandible, near the tip
-    if x < -5.4 and x > -6.4 and y < 5.25 and face in ("north", "south", "down"): return GONYS
-    return BILL_DK if face == "down" else BILL
+    # yellow, a little paler at the base; the red spot on the lower mandible near the tip
+    if x < -5.4 and x > -6.4 and y < 5.25 and face in ("north", "south", "down"): return grain(GONYS, x, y, z, 0.03)
+    c = mix(BILL, mix(BILL, (240, 226, 150), 0.5), clamp01((x + 4.8) / 0.8))
+    if x < -6.3: c = mul(c, 0.9)                                                  # the hooked tip
+    if face == "up": c = mul(c, 1.06)
+    elif face == "down": c = BILL_DK
+    elif -5.1 < x < -4.6 and 5.3 < y < 5.45: c = mul(c, 0.55)                     # nostril
+    return grain(c, x, y, z, 0.03)
 
 
 def m_feet(x, y, z, face, fu, fv):
-    return mul(LEGS, 0.85) if face == "down" else LEGS
+    c = mul(LEGS, 0.85) if face == "down" else LEGS
+    return grain(mul(c, 0.92) if frac(x * 2.5) < 0.2 else c, x, y, z, 0.04)
 
 
 def m_edge(x, y, z, face, fu, fv):
-    return MANTLE_DK
+    return plumage(x, y, z, MANTLE_DK, mul(MANTLE_DK, 0.9), MANTLE, 1.0)
 
 
 def m_tail(x, y, z, face, fu, fv):
@@ -75,7 +100,8 @@ def m_tail(x, y, z, face, fu, fv):
     end = 15.0 - x
     edge = abs(z - 8.0) / 1.7
     if end < 0.5 * edge ** 4 - 0.05: return None
-    return WHITE if frac((z - 6.3) / 0.85) > 0.12 else WHITE_SH
+    c = white(x, y, z)
+    return mul(c, 0.9) if frac((z - 6.3) / 0.85) < 0.12 else c
 
 
 def m_arm(x, y, z, face, fu, fv):
@@ -83,11 +109,14 @@ def m_arm(x, y, z, face, fu, fv):
     c, s = g.wing_coords(x, z, ARM_X[0], ARM_X[1], ARM_ROOT, ARM_LEN)
     lz = frac(abs(z - 8.0) / 1.3)
     if c > 0.96 and (lz < 0.12 or lz > 0.88): return None             # notches between the secondary tips
-    if c > 0.8: return WHITE                                          # the white trailing edge
-    if s < 0.12 and c > 0.6: return WHITE                             # tertial crescent
-    if c < 0.08: return MANTLE_DK
-    if c > 0.45: return MANTLE if 0.1 < lz < 0.9 else MANTLE_DK       # secondaries
-    return MANTLE_LT if frac(c * 6) > 0.8 else MANTLE                 # rows of coverts
+    grey = mantle(x, y, z, x, abs(z - 8.0))
+    sec = plumage(x, y, z, MANTLE, MANTLE_DK, MANTLE_LT, 1.0, (2.6, 1, 0.5))
+    if min(lz, 1 - lz) < 0.1: sec = mul(sec, 0.88)
+    grey = mix(grey, sec, rough((c - 0.45) / 0.1, x, y, z, 0.5))
+    grey = mix(grey, plumage(x, y, z, MANTLE_DK, mul(MANTLE_DK, 0.9), MANTLE, 1.0), clamp01((0.12 - c) / 0.06))
+    w = rough((c - 0.78) / 0.06, x, y, z, 0.4)                        # the white trailing edge
+    if s < 0.12: w = max(w, rough((c - 0.58) / 0.06, x, y, z, 0.4))   # tertial crescent
+    return mix(grey, white(x, y, z), w)
 
 
 def m_hand(x, y, z, face, fu, fv):
@@ -98,13 +127,37 @@ def m_hand(x, y, z, face, fu, fv):
     trail = 1.0 - 0.82 * s ** 1.2
     if s > 0.99 or c < lead or c > trail: return None
     k = (c - lead) / (trail - lead)                                    # 0..1 across what is left of the chord
-    black = s > 0.62 - 0.25 * (1 - k)                                  # the black wedge reaches further in at the front
-    if not black:
-        if k > 0.82 and s < 0.5: return WHITE                          # the trailing edge carries on a little
-        return MANTLE if frac(k * 5) > 0.12 else MANTLE_DK
-    if s > 0.965: return WHITE                                         # white tips
-    if 0.84 < s < 0.93 and 0.25 < k < 0.75: return WHITE               # the mirror on the outermost primaries
-    return BLACK if frac(k * 5) > 0.14 else BLACK_LT
+    lf = frac(k * 5)
+    grey = mantle(x, y, z, x, abs(z - 8.0)) if k < 0.3 else plumage(x, y, z, MANTLE, MANTLE_DK, MANTLE_LT, 1.0, (0.6, 1, 2.6))
+    if k >= 0.3 and lf < 0.12: grey = mul(grey, 0.88)
+    if k > 0.82 and s < 0.5: grey = mix(grey, white(x, y, z), 0.9)     # the trailing edge carries on a little
+    black = plumage(x, y, z, BLACK, mul(BLACK, 0.8), BLACK_LT, 1.0, (0.6, 1, 2.6))
+    if lf < 0.14: black = mul(black, 0.75)
+    elif 0.45 < lf < 0.55: black = mul(black, 1.4)                     # shafts
+    if s > 0.965: black = white(x, y, z)                               # white tips
+    elif 0.84 < s < 0.93 and 0.25 < k < 0.75: black = white(x, y, z)  # the mirror on the outermost primaries
+    t = rough((s - (0.62 - 0.25 * (1 - k))) / 0.05, x, y, z, 0.3)      # the black wedge reaches further in at the front
+    return mix(grey, black, t)
+
+
+def m_web(x, y, z, face, fu, fv):
+    return grain(mul(LEGS, 0.9 if face == "up" else 0.78), x, y, z, 0.05)
+
+
+def m_claw(x, y, z, face, fu, fv):
+    return grain((70, 62, 58), x, y, z, 0.05)
+
+
+SCAP_X = (3.4, 8.6)
+
+
+def m_scapulars(x, y, z, face, fu, fv):
+    """Silver-grey scapulars over the wing root, with the white "scapular crescent" along their tips."""
+    end = SCAP_X[1] - x
+    lz = frac(abs(z - 8.0) / 1.1)
+    if end < 0.9 * (2 * lz - 1) ** 2: return None
+    c = mantle(x, y, z, x, abs(z - 8.0))
+    return mix(c, white(x, y, z), rough((0.9 - end) / 0.4, x, y, z, 0.4))
 
 
 # ---------------------------------------------------------------- geometry (same conventions as the greylag)
@@ -137,17 +190,21 @@ def wing(side):
 def shape():
     body = El("Body", [2.0, 2.2, 5.7], [11.0, 6.0, 10.3], m_body)
     breast = El("Breast", [0.8, 2.7, 6.1], [2.0, 5.8, 9.9], m_breast)
+    belly = El("Belly", [3.0, 1.75, 6.3], [10.0, 2.2, 9.7], m_breast)       # rounds the underside (0.22.0)
     rump = El("Rump", [11.0, 3.2, 6.4], [12.6, 5.6, 9.6], m_rump)
     neck = El("Neck", [-1.2, 4.4, 7.0], [1.2, 6.2, 9.0], m_neck, origin=[1.2, 5.3, 8], rot=(0, 0, -4))
-    head = El("Head", [-4.0, 4.6, 6.8], [-1.2, 7.0, 9.2], m_head, origin=[-1.2, 5.7, 8], rot=(0, 0, 6))
-    bill = El("Bill", [-6.8, 4.9, 7.45], [-4.0, 5.65, 8.55], m_bill)
-    tail = El("Tail", [11.6, 5.0, 6.3], [15.0, 5.0, 9.7], m_tail, faces=("up",), origin=[11.6, 5.0, 8], rot=(0, 0, 4))
-    feet_l = El("FootL", [10.6, 2.4, 8.2], [12.2, 2.8, 9.2], m_feet)
-    feet_r = El("FootR", [10.6, 2.4, 6.8], [12.2, 2.8, 7.8], m_feet)
-    leg_l = El("LegL", [8.6, 2.4, 8.45], [10.6, 2.8, 8.95], m_feet, origin=[8.6, 2.6, 8.7], uv_from=feet_l)
-    leg_r = El("LegR", [8.6, 2.4, 7.05], [10.6, 2.8, 7.55], m_feet, origin=[8.6, 2.6, 7.3], uv_from=feet_r)
-    leg_l.add(feet_l); leg_r.add(feet_r)
-    body.add(breast, rump, neck.add(head.add(bill)), tail, leg_l, leg_r, wing("L"), wing("R"))
+    neck_base = El("NeckBase", [0.2, 4.0, 6.6], [1.6, 6.3, 9.4], m_neck)   # the neck thickens into the breast
+    head = El("Head", [-4.0, 4.6, 6.8], [-1.2, 7.0, 9.2], m_head, origin=[-1.2, 5.7, 8], rot=(0, 0, 6), res=2)
+    bill = El("Bill", [-6.8, 4.9, 7.45], [-4.0, 5.65, 8.55], m_bill, res=2)
+    # the gull's bill deepens toward the tip: a gonys angle on the lower mandible
+    gonys = El("BillGonys", [-6.5, 4.6, 7.55], [-5.4, 4.9, 8.45], m_bill, res=2)
+    tail = g.split_tail(El("Tail", [11.6, 5.0, 6.3], [15.0, 5.0, 9.7], m_tail, faces=("up",), origin=[11.6, 5.0, 8], rot=(0, 0, 4)), m_tail, fan=5)
+    legs = []
+    for side, zc in (("L", 8.7), ("R", 7.3)):
+        leg = El("Leg" + side, [8.6, 2.4, zc - 0.25], [11.2, 2.8, zc + 0.25], m_feet, origin=[8.6, 2.6, zc])
+        legs.append(leg.add(g.webbed_foot(side, 10.6, 2.6, zc, m_feet, m_web, m_claw, length=1.6, centre=0.8)))
+    scaps = [g.scapulars(s, SCAP_X[0], SCAP_X[1], 6.12, 8 + ARM_ROOT, 1.6, 0.6, m_scapulars) for s in "LR"]
+    body.add(breast, belly, rump, neck.add(neck_base, head.add(bill.add(gonys))), tail, *legs, *scaps, wing("L"), wing("R"))
     return body
 
 

@@ -15,7 +15,7 @@ standing and looking round (also on a perch), walking, pecking at the ground, an
 import json, math, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import make_greylag as g
-from make_greylag import El, mul, mix, frac
+from make_greylag import El, mul, mix, frac, plumage, feathered, rough, lift, grain, clamp01, round_eye, cloud
 
 HERE = g.HERE
 ROOT = g.ROOT
@@ -31,50 +31,74 @@ EYE = (78, 60, 50)
 LEGS = (30, 30, 32)
 
 
-def gloss(x, y, z, scale=1.2):
-    """Feather rows with a glossy edge on each, so the black reads as feathers and catches a little blue."""
-    row = math.floor(x / scale)
-    lx, lz = frac(x / scale), frac((z + y + row * scale / 2) / scale)
-    if lx > 0.72: return SHEEN_LT if 0.2 < lz < 0.8 else SHEEN
-    if lx < 0.25 and 0.3 < lz < 0.7: return BLACK_DK
-    return BLACK
-
-
 # ---------------------------------------------------------------- materials
+# Painted with make_greylag's texture toolkit (plumage, feathered, rough...): black feathering in vanilla's soft manner,
+# each feather's edge catching a little of the blue-purple gloss, more of it on the upper surfaces.
+def gloss(x, y, z, a, b, amount=1.0, size=1.0):
+    c = plumage(x, y, z, BLACK, BLACK_DK, BLACK_LT, 1.2)
+    c = mix(c, SHEEN, 0.5 * amount * cloud(x, y, z, 1.0))                       # the sheen comes and goes
+    return feathered(c, a, b, mix(SHEEN_LT, BLACK_LT, 0.3), size, size * 0.9, 0.55 * amount + 0.15, shadow=0.7)
+
+
 def m_body(x, y, z, face, fu, fv):
-    if face == "up": return gloss(x, 0, z)
-    if face == "down": return UNDER
-    return gloss(x, y, z) if y > 4.6 else BLACK
+    if face == "up": return gloss(x, y, z, x, z)
+    if face == "down": return plumage(x, y, z, UNDER, BLACK_DK, BLACK_LT, 1.2)
+    if face in ("east", "west"): return plumage(x, y, z, BLACK, BLACK_DK, BLACK_LT, 1.2)
+    return lift(gloss(x, y, z, x, y, clamp01((y - 3.6) / 2.0)), y, 2.8, 6.2)
 
 
 def m_breast(x, y, z, face, fu, fv):
-    return BLACK_LT if face != "down" else UNDER
+    if face == "down": return plumage(x, y, z, UNDER, BLACK_DK, BLACK_LT, 1.2)
+    return gloss(x, y, z, -y, z + x, 0.3, 0.8)
+
+
+def m_belly(x, y, z, face, fu, fv):
+    return plumage(x, y, z, UNDER, BLACK_DK, BLACK_LT, 1.2)
 
 
 def m_neck(x, y, z, face, fu, fv):
-    return gloss(x, y, z, 0.9) if face == "up" else BLACK
+    if face == "up": return gloss(x, y, z, x, z, 0.8, 0.7)
+    return gloss(x, y, z, x, y, 0.35, 0.6)
+
+
+EYE_C = (-2.2, 6.25)
 
 
 def m_head(x, y, z, face, fu, fv):
-    if face in ("north", "south") and -2.45 < x < -1.85 and 5.95 < y < 6.55: return EYE
-    if face == "up": return SHEEN if frac(x * 1.4) > 0.6 else BLACK
-    return BLACK
+    if face in ("north", "south"):
+        e = round_eye(x - EYE_C[0], y - EYE_C[1], 0.3, EYE)
+        if e: return e
+    if face == "up": return gloss(x, y, z, x, z, 0.9, 0.6)
+    return lift(gloss(x, y, z, x, y, 0.4, 0.5), y, 4.5, 7.0)
 
 
 def m_bill(x, y, z, face, fu, fv):
-    return BILL_LT if face == "up" and x > -4.4 else BILL
+    c = BILL
+    if face == "up": c = mix(BILL_LT, BILL, clamp01((-4.2 - x) / 1.5))           # the culmen catches the light
+    elif face in ("north", "south"): c = mix(BILL, BILL_LT, 0.35 * clamp01((y - 5.4) / 0.6))
+    return grain(c, x, y, z, 0.04)
+
+
+def m_bristles(x, y, z, face, fu, fv):
+    """The stiff feathers lying forward over the nostrils at the bill's base."""
+    return feathered(plumage(x, y, z, BLACK, BLACK_DK, BLACK_LT, 0.6), -x, z, BLACK_LT, 0.35, 0.3, 0.4, shadow=0.75)
 
 
 def m_legs(x, y, z, face, fu, fv):
-    return LEGS
+    return grain(mul(LEGS, 0.85) if frac(x * 2.5) < 0.2 else LEGS, x, y, z, 0.06)
 
 
-def m_feet(x, y, z, face, fu, fv):
-    return mul(LEGS, 0.8) if face == "down" else LEGS
+def m_toe(x, y, z, face, fu, fv):
+    c = mul(LEGS, 0.8) if face == "down" else LEGS
+    return grain(mul(c, 0.82) if frac(x * 3) < 0.2 else c, x, y, z, 0.06)
+
+
+def m_claw(x, y, z, face, fu, fv):
+    return grain(BLACK_DK, x, y, z, 0.05)
 
 
 def m_edge(x, y, z, face, fu, fv):
-    return BLACK_DK
+    return plumage(x, y, z, BLACK_DK, mul(BLACK_DK, 0.8), BLACK, 1.0)
 
 
 def m_tail(x, y, z, face, fu, fv):
@@ -83,7 +107,18 @@ def m_tail(x, y, z, face, fu, fv):
     edge = abs(z - 8.0) / 1.6
     if end < 1.2 * edge ** 2 - 0.05: return None
     lz = frac((z - 6.4) / 0.8)
-    return BLACK if 0.12 < lz < 0.88 else BLACK_LT
+    c = mix(plumage(x, y, z, BLACK, BLACK_DK, BLACK_LT, 1.0, (2.0, 1, 0.6)), SHEEN, 0.3 * cloud(x, y, z, 1.0))
+    return mul(c, 0.7) if min(lz, 1 - lz) < 0.1 else c
+
+
+SCAP_X = (2.8, 7.4)
+
+
+def m_scapulars(x, y, z, face, fu, fv):
+    end = SCAP_X[1] - x
+    lz = frac(abs(z - 8.0) / 0.9)
+    if end < 0.8 * (2 * lz - 1) ** 2: return None
+    return gloss(x, y, z, x, abs(z - 8.0))
 
 
 def m_arm(x, y, z, face, fu, fv):
@@ -91,9 +126,11 @@ def m_arm(x, y, z, face, fu, fv):
     c, s = g.wing_coords(x, z, ARM_X[0], ARM_X[1], ARM_ROOT, ARM_LEN)
     lz = frac(abs(z - 8.0) / 1.3)
     if c > 0.95 and (lz < 0.14 or lz > 0.86): return None
-    if c < 0.08: return BLACK_DK
-    if c < 0.5: return gloss(c * 8, 0, abs(z - 8.0), 1.0)
-    return BLACK if 0.12 < lz < 0.88 else BLACK_DK
+    coverts = gloss(x, y, z, x, abs(z - 8.0), 1.0, 0.9)
+    coverts = mix(coverts, plumage(x, y, z, BLACK_DK, mul(BLACK_DK, 0.8), BLACK, 1.0), clamp01((0.12 - c) / 0.05))
+    sec = mix(plumage(x, y, z, BLACK, BLACK_DK, BLACK_LT, 1.0, (2.6, 1, 0.5)), SHEEN, 0.25 * cloud(x, y, z, 1.0))
+    if min(lz, 1 - lz) < 0.12: sec = mul(sec, 0.7)
+    return mix(coverts, sec, rough((c - 0.5) / 0.08, x, y, z, 0.5))
 
 
 FINGERS = 5
@@ -106,12 +143,15 @@ def m_hand(x, y, z, face, fu, fv):
     trail = 1.0 - 0.35 * s ** 2
     if s > 0.99 or c < lead or c > trail: return None
     k = (c - lead) / (trail - lead)
-    if s < 0.55 and k < 0.3: return gloss(k * 8, 0, abs(z - 8.0), 1.0)
+    f = frac(k * FINGERS)
     if s > 0.65:
-        f = frac(k * FINGERS)
         gap = 0.1 + 0.5 * (s - 0.65) / 0.35
         if f < gap / 2 or f > 1 - gap / 2: return None
-    return BLACK if frac(k * FINGERS) > 0.1 else BLACK_DK
+    prim = mix(plumage(x, y, z, BLACK, BLACK_DK, BLACK_LT, 1.0, (0.6, 1, 2.6)), SHEEN, 0.2 * cloud(x, y, z, 1.0))
+    if f < 0.1: prim = mul(prim, 0.7)
+    elif abs(f - 0.5) < 0.06: prim = mul(prim, 1.25)                   # shafts
+    coverts = gloss(x, y, z, x, abs(z - 8.0), 1.0, 0.9)
+    return mix(prim, coverts, rough((0.3 - k) / 0.08, x, y, z, 0.5) * clamp01((0.6 - s) / 0.1))
 
 
 # ---------------------------------------------------------------- geometry
@@ -147,17 +187,22 @@ def wing(side):
 def shape():
     body = El("Body", [2.0, 2.8, 5.9], [9.6, 6.2, 10.1], m_body)
     breast = El("Breast", [1.0, 3.2, 6.2], [2.0, 6.0, 9.8], m_breast)
+    belly = El("Belly", [2.8, 2.35, 6.4], [8.4, 2.8, 9.6], m_belly)        # rounds the underside (0.22.0)
     neck = El("Neck", [-0.6, 4.6, 6.8], [1.2, 6.4, 9.2], m_neck, origin=[1.2, 5.5, 8])
-    head = El("Head", [-3.2, 4.5, 6.75], [-0.6, 7.0, 9.25], m_head, origin=[-0.6, 5.7, 8])
-    bill = El("Bill", [-5.4, 4.95, 7.35], [-3.2, 6.05, 8.65], m_bill)
-    tip = El("BillTip", [-5.9, 4.75, 7.6], [-5.2, 5.6, 8.4], m_bill)
-    tail = El("Tail", [9.2, 5.3, 6.4], [14.2, 5.3, 9.6], m_tail, faces=("up",), origin=[9.2, 5.3, 8], rot=(0, 0, 3))
-    leg_l = El("LegL", [HIP[0], 3.1, 8.5], [HIP[0] + LEG, 3.6, 9.0], m_legs, origin=[HIP[0], HIP[1], 8.75])
-    leg_r = El("LegR", [HIP[0], 3.1, 7.0], [HIP[0] + LEG, 3.6, 7.5], m_legs, origin=[HIP[0], HIP[1], 7.25])
-    foot_l = El("FootL", [HIP[0] + LEG, 2.9, 8.2], [HIP[0] + LEG + 1.4, 3.3, 9.3], m_feet)
-    foot_r = El("FootR", [HIP[0] + LEG, 2.9, 6.7], [HIP[0] + LEG + 1.4, 3.3, 7.8], m_feet)
-    leg_l.add(foot_l); leg_r.add(foot_r)
-    body.add(breast, neck.add(head.add(bill.add(tip))), tail, leg_l, leg_r, wing("L"), wing("R"))
+    neck_base = El("NeckBase", [0.4, 4.2, 6.5], [1.6, 6.5, 9.5], m_neck)   # the shaggy throat and neck into the breast
+    head = El("Head", [-3.2, 4.5, 6.75], [-0.6, 7.0, 9.25], m_head, origin=[-0.6, 5.7, 8], res=2)
+    bill = El("Bill", [-5.4, 4.95, 7.35], [-3.2, 6.05, 8.65], m_bill, res=2)
+    tip = El("BillTip", [-5.9, 4.75, 7.6], [-5.2, 5.6, 8.4], m_bill, res=2)
+    # the nasal bristles: stiff feathers lying forward over the bill's base, a crow's mark
+    bristles = El("Bristles", [-4.1, 5.55, 7.25], [-3.1, 6.25, 8.75], m_bristles, res=2)
+    tail = g.split_tail(El("Tail", [9.2, 5.3, 6.4], [14.2, 5.3, 9.6], m_tail, faces=("up",), origin=[9.2, 5.3, 8], rot=(0, 0, 3)), m_tail, fan=7)
+    legs = []
+    for side, zc in (("L", 8.75), ("R", 7.25)):
+        leg = El("Leg" + side, [HIP[0], 3.1, zc - 0.25], [HIP[0] + LEG, 3.6, zc + 0.25], m_legs, origin=[HIP[0], HIP[1], zc])
+        legs.append(leg.add(g.perching_foot(side, HIP[0] + LEG, 3.35, zc, m_toe, m_claw, toes=(1.0, 1.2, 1.0), hind=0.8,
+                                            t=0.32, w=0.28, claw=0.4)))
+    scaps = [g.scapulars(s, SCAP_X[0], SCAP_X[1], 6.32, 8 + ARM_ROOT, 1.4, 0.5, m_scapulars) for s in "LR"]
+    body.add(breast, belly, neck.add(neck_base, head.add(bill.add(tip), bristles)), tail, *legs, *scaps, wing("L"), wing("R"))
     return body
 
 
@@ -195,8 +240,8 @@ def air(frame, arm, hand, extra=None):
 
 def animations():
     # rowing flight: steady, fairly deep beats
-    flap = [air(0, 0, -16, {"Body": {"rotationZ": 1}}), air(7, 38, 8, {"Body": {"rotationZ": 0}}),
-            air(15, 0, 20, {"Body": {"rotationZ": -1}}), air(22, -32, -8, {"Body": {"rotationZ": 0}})]
+    flap = [air(0, 0, -20, {"Body": {"rotationZ": 1}}), air(7, 50, 10, {"Body": {"rotationZ": 0}}),
+            air(15, 0, 24, {"Body": {"rotationZ": -1}}), air(22, -42, -10, {"Body": {"rotationZ": 0}})]   # deeper in 0.21.2
     glide = [air(0, 4, 2), air(20, 2, 4), air(40, 4, 2)]
     dangle = {"LegL": {"rotationZ": -55}, "LegR": {"rotationZ": -65}, "FootL": {"rotationZ": -30}, "FootR": {"rotationZ": -30}}
 

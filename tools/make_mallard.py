@@ -15,7 +15,7 @@ has the black curled feathers over its tail (TailCurl, not animated).
 import json, math, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import make_greylag as g
-from make_greylag import El, mul, mix, frac
+from make_greylag import El, mul, mix, frac, plumage, feathered, rough, lift, grain, clamp01, round_eye, cloud
 
 HERE = g.HERE
 ROOT = g.ROOT
@@ -51,69 +51,117 @@ EYE = (24, 22, 20)
 def drake(): return SEX == DRAKE
 
 
-def scallop(x, z, base, fringe, dark, size=1.2):
-    """Hen feathering and the drake's back: offset rows of feathers with pale fringes and dark centres."""
-    row = math.floor(x / size)
-    lx, lz = frac(x / size), frac((z + row * size / 2) / size)
-    if lx > 0.66: return fringe if 0.15 < lz < 0.85 else base
-    if lx < 0.32 and 0.3 < lz < 0.7: return dark
-    return base
-
-
 # ---------------------------------------------------------------- materials (see make_greylag for the convention)
+# Painted with make_greylag's texture toolkit (plumage, feathered, rough...): soft feathering in vanilla's manner.
+def hen_feathers(x, y, z, a, b, size=1.0):
+    """The hen's (and the drake's back's) pattern: brown feathers with dark centres and broad buff fringes."""
+    base = plumage(x, y, z, BROWN, BROWN_DK, mix(BROWN, BUFF, 0.4), 1.0)
+    return feathered(base, a, b, BUFF, size * 1.3, size * 1.15, 0.6, shadow=0.8)
+
+
+def vermiculated(x, y, z):
+    """The drake's grey flanks: fine, wavy dark lines on pale grey."""
+    c = plumage(x, y, z, VERM, VERM_DK, mix(VERM, BELLY_D, 0.5), 1.4)
+    wave = frac((y + 0.18 * math.sin(x * 2.2 + z)) * 2.6)
+    return mul(c, 0.86) if wave < 0.22 else c
+
+
 def m_body(x, y, z, face, fu, fv):
     if not drake():
-        if face == "down": return BUFF if frac(x * 0.8 + z * 0.4) > 0.2 else mix(BUFF, BROWN, 0.4)
-        return scallop(x, z if face in ("up", "down") else y + 3, BROWN, BUFF, BROWN_DK)
-    if x > 10.0 and face != "up": return STERN                      # black stern
-    if face == "up": return scallop(x, z, BACK_D, mix(BACK_D, BELLY_D, 0.4), BACK_D_DK, 1.0)
-    if face == "down": return BELLY_D
-    if face == "west": return CHESTNUT
-    if face == "east": return STERN
-    if y > 5.3: return scallop(x, y + 4, BACK_D, mix(BACK_D, BELLY_D, 0.4), BACK_D_DK, 1.0)
-    return VERM_DK if frac((y + x * 0.15) * 2.6) < 0.18 else VERM  # fine wavy barring
+        if face == "down": return plumage(x, y, z, BUFF, mix(BUFF, BROWN, 0.35), mix(BUFF, (230, 210, 180), 0.5), 1.2)
+        return lift(hen_feathers(x, y, z, x, z if face in ("up", "down") else y), y, 2.0, 6.0)
+    stern = rough((x - 10.0) / 0.4, x, y, z, 0.4) if face != "up" else 0.0
+    if face == "up": c = feathered(plumage(x, y, z, BACK_D, BACK_D_DK, mix(BACK_D, BELLY_D, 0.3)), x, z, mix(BACK_D, BELLY_D, 0.4), 1.0, 0.9, 0.5, shadow=0.8)
+    elif face == "down": c = plumage(x, y, z, BELLY_D, VERM, (226, 226, 220), 1.4)
+    elif face == "west": c = plumage(x, y, z, CHESTNUT, CHESTNUT_DK, mix(CHESTNUT, BELLY_D, 0.2), 1.0)
+    elif face == "east": c = grain(STERN, x, y, z)
+    else:
+        back = feathered(plumage(x, y, z, BACK_D, BACK_D_DK, mix(BACK_D, BELLY_D, 0.3)), x, y, mix(BACK_D, BELLY_D, 0.4), 1.0, 0.9, 0.5, shadow=0.8)
+        c = lift(mix(vermiculated(x, y, z), back, rough((y - 5.2) / 0.4, x, y, z, 0.5)), y, 2.0, 6.0)
+    return mix(c, plumage(x, y, z, STERN, (16, 16, 20), (44, 44, 50), 1.0), stern)
 
 
 def m_breast(x, y, z, face, fu, fv):
-    if not drake(): return scallop(x + 3, y if face not in ("up", "down") else z, BROWN, BUFF, BROWN_DK, 0.9)
-    return CHESTNUT_DK if face == "down" else CHESTNUT
+    if not drake(): return hen_feathers(x, y, z, -y, z + x, 0.8)
+    c = feathered(plumage(x, y, z, CHESTNUT, CHESTNUT_DK, mix(CHESTNUT, (150, 90, 66), 0.6), 1.0), -y, z + x, mix(CHESTNUT, (160, 100, 76), 0.5), 0.7, 0.7, 0.4)
+    return mul(c, 0.85) if face == "down" else c
+
+
+def m_belly(x, y, z, face, fu, fv):
+    if not drake(): return plumage(x, y, z, BUFF, mix(BUFF, BROWN, 0.35), mix(BUFF, (230, 210, 180), 0.5), 1.2)
+    return plumage(x, y, z, BELLY_D, VERM, (226, 226, 220), 1.4)
 
 
 def m_rump(x, y, z, face, fu, fv):
-    if not drake(): return scallop(x, z if face == "up" else y, BROWN, BUFF, BROWN_DK, 0.9)
-    return STERN
+    if not drake(): return hen_feathers(x, y, z, x, z if face == "up" else y, 0.8)
+    return plumage(x, y, z, STERN, (16, 16, 20), (44, 44, 50), 1.0)
 
 
 def m_neck(x, y, z, face, fu, fv):
-    if not drake(): return scallop(x, y if face not in ("up", "down") else z, HEAD_H, BUFF, BROWN, 0.7)
-    if 0.35 < x < 0.95: return COLLAR                             # the white ring
-    if x > 0.95: return CHESTNUT
-    return GREEN_LT if frac(y * 1.3) > 0.5 else GREEN
+    if not drake(): return plumage(x, y, z, HEAD_H, mix(HEAD_H, BROWN, 0.4), BUFF, 0.8, (0.8, 2.0, 0.8))
+    collar = clamp01(1 - abs(x - 0.65) / 0.3)                          # the white ring
+    if x > 0.95: c = plumage(x, y, z, CHESTNUT, CHESTNUT_DK, mix(CHESTNUT, BELLY_D, 0.2), 0.8)
+    else: c = green(x, y, z, face)
+    return mix(c, grain(COLLAR, x, y, z, 0.03), collar)
+
+
+def green(x, y, z, face):
+    """The drake's head: bottle green with a glossy sheen that catches the light high on the head."""
+    c = plumage(x, y, z, GREEN, GREEN_DK, GREEN_LT, 0.9)
+    sheen = clamp01((y - 5.6) / 1.2) * (0.8 if face != "up" else 0.5)
+    return mix(c, mix(GREEN_LT, (90, 170, 120), 0.4), 0.55 * sheen * cloud(x, y, z, 0.7))
+
+
+EYE_C = (-2.75, 6.35)
 
 
 def m_head(x, y, z, face, fu, fv):
-    if face in ("north", "south") and -3.05 < x < -2.45 and 6.0 < y < 6.6: return EYE
+    if face in ("north", "south"):
+        e = round_eye(x - EYE_C[0], y - EYE_C[1], 0.3, (34, 26, 20))
+        if e: return e
     if not drake():
-        if face in ("north", "south") and 5.9 < y < 6.25 and x < -1.6: return STRIPE   # dark eye stripe
-        if face == "up": return BROWN                                                     # dark crown
-        return HEAD_H
-    if face == "up": return GREEN_DK
-    return GREEN_LT if y > 6.3 else GREEN
+        c = plumage(x, y, z, HEAD_H, mix(HEAD_H, BROWN, 0.3), mix(HEAD_H, BUFF, 0.6), 0.7)
+        if face == "up": return plumage(x, y, z, BROWN, BROWN_DK, HEAD_H, 0.7)                  # dark crown
+        if face in ("north", "south"):
+            stripe = clamp01(1 - abs(y - EYE_C[1] - 0.02) / 0.16) * clamp01((x + 1.0) / -0.6)   # dark eye stripe
+            return mix(c, STRIPE, 0.85 * stripe)
+        return c
+    return green(x, y, z, face)
 
 
 def m_bill(x, y, z, face, fu, fv):
-    if x < -6.0 or face == "west": return NAIL
-    if drake(): return mul(BILL_D, 0.88) if face == "down" else BILL_D
-    if face == "up" and -5.7 < x < -4.4: return SADDLE                                  # hen's dark saddle
-    return mul(BILL_H, 0.88) if face == "down" else BILL_H
+    if x < -6.0 or face == "west": return grain(NAIL, x, y, z, 0.04)
+    if drake(): c = BILL_D
+    else:
+        c = BILL_H
+        if face == "up": c = mix(c, SADDLE, rough(1 - abs(x + 5.05) / 0.7, x, y, z, 0.6))      # hen's dark saddle
+    if face == "up": c = mul(c, 1.06)
+    elif face == "down": c = mul(c, 0.84)
+    elif -4.85 < x < -4.5 and 5.4 < y < 5.55: c = mul(c, 0.55)                                 # nostril
+    return grain(c, x, y, z, 0.03)
+
+
+def m_bill_base(x, y, z, face, fu, fv):
+    """Where the bill rises into the forehead: bill colour all round (no nail)."""
+    if face == "west": face = "up"
+    return m_bill(-4.4, y, z, face, fu, fv) if face != "up" else m_bill(x, y, z, face, fu, fv)
 
 
 def m_feet(x, y, z, face, fu, fv):
-    return mul(FEET, 0.85) if face == "down" else FEET
+    c = mul(FEET, 0.84) if face == "down" else FEET
+    return grain(mul(c, 0.9) if frac(x * 2.5) < 0.2 else c, x, y, z, 0.04)
+
+
+def m_web(x, y, z, face, fu, fv):
+    return grain(mul(FEET, 0.9 if face == "up" else 0.76), x, y, z, 0.05)
+
+
+def m_claw(x, y, z, face, fu, fv):
+    return grain((60, 50, 44), x, y, z, 0.05)
 
 
 def m_edge(x, y, z, face, fu, fv):
-    return WING_G_DK if drake() else BROWN_DK
+    return plumage(x, y, z, WING_G_DK if drake() else BROWN_DK, mul(WING_G_DK, 0.85), WING_G, 1.0)
 
 
 def m_tail(x, y, z, face, fu, fv):
@@ -122,12 +170,28 @@ def m_tail(x, y, z, face, fu, fv):
     edge = abs(z - 8.0) / 1.6                # 0 centre .. 1 outer edge
     if end < 1.6 * edge ** 1.5 - 0.1: return None                   # pointed shape
     lz = frac((z - 6.4) / 0.8)
-    if drake(): return TAIL_D if edge > 0.35 else mix(TAIL_D, VERM_DK, 0.5)
-    return BUFF if lz < 0.2 or lz > 0.8 else BROWN
+    if drake():
+        c = mix(plumage(x, y, z, TAIL_D, VERM, (236, 236, 230), 1.0), vermiculated(x, y, z), rough(0.6 - edge, x, y, z, 0.4))
+    else:
+        c = plumage(x, y, z, BROWN, BROWN_DK, mix(BROWN, BUFF, 0.4), 1.0, (2.0, 1, 0.6))
+        if min(lz, 1 - lz) < 0.18: c = mix(c, BUFF, 0.7)
+    return mul(c, 0.86) if min(lz, 1 - lz) < 0.06 else c
 
 
 def m_curl(x, y, z, face, fu, fv):
-    return STERN if drake() else BROWN
+    return plumage(x, y, z, STERN, (16, 16, 20), (50, 50, 60), 0.6) if drake() else plumage(x, y, z, BROWN, BROWN_DK, BUFF, 0.6)
+
+
+SCAP_X = (3.2, 8.4)
+
+
+def m_scapulars(x, y, z, face, fu, fv):
+    end = SCAP_X[1] - x
+    lz = frac(abs(z - 8.0) / 1.0)
+    if end < 0.8 * (2 * lz - 1) ** 2: return None
+    if not drake(): return hen_feathers(x, y, z, x, abs(z - 8.0))
+    c = feathered(plumage(x, y, z, BACK_D, BACK_D_DK, mix(BACK_D, BELLY_D, 0.3)), x, abs(z - 8.0), mix(BACK_D, BELLY_D, 0.5), 1.0, 0.9, 0.5, shadow=0.8)
+    return mix(c, mix(BACK_D, BELLY_D, 0.35), 0.4 * rough((x - 6.5) / 1.0, x, y, z, 0.4))     # paler grey scapulars
 
 
 def m_arm(x, y, z, face, fu, fv):
@@ -135,10 +199,18 @@ def m_arm(x, y, z, face, fu, fv):
     c, s = g.wing_coords(x, z, ARM_X[0], ARM_X[1], ARM_ROOT, ARM_LEN)
     lz = frac(abs(z - 8.0) / 1.2)
     if c > 0.95 and (lz < 0.15 or lz > 0.85): return None
-    if s < 0.18: return (BROWN if not drake() else BACK_D) if 0.15 < lz < 0.85 else (BROWN_DK if not drake() else BACK_D_DK)
-    if c < 0.5: return scallop(c * 6, abs(z - 8.0), WING_G, mix(WING_G, BAR, 0.3), WING_G_DK, 0.8) if not drake() else WING_G
-    if c < 0.56 or c > 0.9: return BAR
-    return SPEC_LT if frac(abs(z - 8.0) * 0.8) > 0.5 else SPEC
+    if s < 0.18:                                                       # tertials
+        t = plumage(x, y, z, BROWN if not drake() else BACK_D, BROWN_DK if not drake() else BACK_D_DK, BUFF if not drake() else BELLY_D, 1.0, (2.6, 1, 0.5))
+        return mul(t, 0.82) if min(lz, 1 - lz) < 0.12 else t
+    coverts = plumage(x, y, z, WING_G, WING_G_DK, mix(WING_G, BAR, 0.25), 1.2)
+    coverts = feathered(coverts, x, abs(z - 8.0), mix(WING_G, BAR, 0.35), 0.8, 0.8, 0.45 if not drake() else 0.3, shadow=0.84)
+    spec = mix(SPEC, SPEC_LT, clamp01(cloud(x, y, z, 0.6) * 1.4 - 0.2))   # iridescent
+    if min(lz, 1 - lz) < 0.1: spec = mul(spec, 0.8)
+    bar = grain(BAR, x, y, z, 0.03)
+    col = coverts
+    col = mix(col, bar, rough((c - 0.49) / 0.04, x, y, z, 0.2))
+    col = mix(col, spec, clamp01((c - 0.56) / 0.03))
+    return mix(col, bar, clamp01((c - 0.89) / 0.03))
 
 
 def m_hand(x, y, z, face, fu, fv):
@@ -148,10 +220,12 @@ def m_hand(x, y, z, face, fu, fv):
     trail = 1.0 - 0.75 * s ** 1.3
     if s > 0.985 or c < lead or c > trail: return None
     k = (c - lead) / (trail - lead)
-    if k < 0.3: return WING_G
+    coverts = feathered(plumage(x, y, z, WING_G, WING_G_DK, mix(WING_G, BAR, 0.25), 1.2), x, abs(z - 8.0), mix(WING_G, BAR, 0.3), 0.8, 0.8, 0.3, shadow=0.86)
+    prim = plumage(x, y, z, PRIM, mul(PRIM, 0.8), WING_G, 1.0, (0.6, 1, 2.6))
     lf = frac((k - 0.3) / 0.7 * 5.0)
-    if lf < 0.14: return mul(PRIM, 0.8)
-    return PRIM
+    if lf < 0.14: prim = mul(prim, 0.8)
+    elif 0.46 < lf < 0.56: prim = mul(prim, 1.12)
+    return mix(prim, coverts, rough((0.3 - k) / 0.08, x, y, z, 0.5))
 
 
 # ---------------------------------------------------------------- geometry (same conventions as the greylag)
@@ -184,18 +258,22 @@ def wing(side):
 def shape():
     body = El("Body", [2.0, 2.0, 5.5], [11.0, 6.0, 10.5], m_body)
     breast = El("Breast", [0.8, 2.6, 6.0], [2.0, 5.8, 10.0], m_breast)
+    belly = El("Belly", [3.0, 1.55, 6.1], [10.0, 2.0, 9.9], m_belly)        # rounds the underside (0.22.0)
     rump = El("Rump", [11.0, 3.0, 6.3], [12.4, 5.6, 9.7], m_rump)
     neck = El("Neck", [-1.2, 4.6, 7.0], [1.2, 6.4, 9.0], m_neck, origin=[1.2, 5.5, 8], rot=(0, 0, -4))
-    head = El("Head", [-4.0, 4.6, 6.8], [-1.2, 7.0, 9.2], m_head, origin=[-1.2, 5.7, 8], rot=(0, 0, 6))
-    bill = El("Bill", [-6.4, 5.0, 7.15], [-4.0, 5.7, 8.85], m_bill)
-    tail = El("Tail", [12.0, 5.0, 6.4], [14.6, 5.0, 9.6], m_tail, faces=("up",), origin=[12.0, 5.0, 8], rot=(0, 0, 6))
+    neck_base = El("NeckBase", [0.4, 4.2, 6.6], [1.6, 6.4, 9.4], m_neck)   # the neck thickens into the breast
+    head = El("Head", [-4.0, 4.6, 6.8], [-1.2, 7.0, 9.2], m_head, origin=[-1.2, 5.7, 8], rot=(0, 0, 6), res=2)
+    bill = El("Bill", [-6.4, 5.0, 7.15], [-4.0, 5.7, 8.85], m_bill, res=2)
+    # the bill's raised base where it meets the forehead: a duck's profile slopes into its bill
+    bill_base = El("BillBase", [-4.6, 5.0, 7.3], [-3.9, 6.1, 8.7], m_bill_base, res=2)
+    tail = g.split_tail(El("Tail", [12.0, 5.0, 6.4], [14.6, 5.0, 9.6], m_tail, faces=("up",), origin=[12.0, 5.0, 8], rot=(0, 0, 6)), m_tail, fan=7)
     curl = El("TailCurl", [11.5, 5.6, 7.6], [12.3, 6.6, 8.4], m_curl, origin=[11.5, 5.6, 8], rot=(0, 0, -20))
-    feet_l = El("FootL", [10.8, 2.4, 8.2], [12.4, 2.8, 9.2], m_feet)
-    feet_r = El("FootR", [10.8, 2.4, 6.8], [12.4, 2.8, 7.8], m_feet)
-    leg_l = El("LegL", [8.8, 2.4, 8.45], [10.8, 2.8, 8.95], m_feet, origin=[8.8, 2.6, 8.7], uv_from=feet_l)
-    leg_r = El("LegR", [8.8, 2.4, 7.05], [10.8, 2.8, 7.55], m_feet, origin=[8.8, 2.6, 7.3], uv_from=feet_r)
-    leg_l.add(feet_l); leg_r.add(feet_r)
-    body.add(breast, rump, neck.add(head.add(bill)), tail, curl, leg_l, leg_r, wing("L"), wing("R"))
+    legs = []
+    for side, zc in (("L", 8.7), ("R", 7.3)):
+        leg = El("Leg" + side, [8.8, 2.4, zc - 0.25], [11.4, 2.8, zc + 0.25], m_feet, origin=[8.8, 2.6, zc])
+        legs.append(leg.add(g.webbed_foot(side, 10.8, 2.6, zc, m_feet, m_web, m_claw, length=1.5, centre=0.8)))
+    scaps = [g.scapulars(s, SCAP_X[0], SCAP_X[1], 6.12, 8 + ARM_ROOT, 1.6, 0.6, m_scapulars) for s in "LR"]
+    body.add(breast, belly, rump, neck.add(neck_base, head.add(bill, bill_base)), tail, curl, *legs, *scaps, wing("L"), wing("R"))
     return body
 
 

@@ -258,6 +258,37 @@ Decisions (Dright, 0.13.0), Phase 1 AI:
   range they fly there, with none they stay and wander (a bird in a pen keeps to it).
 - Localisation scope (Dright): everything a player sees goes through the lang file, including creature names alive and
   dead and the command help and replies; the long admin/debug reports stay English (technical, mostly numbers).
+- Sound and numbers (0.21.2, after a player's report on the ModDB release: birds everywhere, so loud you can't hear
+  the game, the recordings like a zoo). Measured: our clips were 10-25 dB louder than vanilla's animals (hens -41 to
+  -50 dB RMS, sheep and goats about -31; ours -19), with field-recording background 15-35 dB under the call where
+  vanilla's is silent; idle rolls per bird meant 24 gulls gave a call every 2-3 s; spawn caps were 3-6 times vanilla's
+  (chickens 4, hares 3) at 10 times the refill chance. Answer: every clip cleaned and about 10 dB quieter
+  (tools/clean_sounds.py); a shared spacing for calls (BirdCalls) so a flock calls about as often as a few birds,
+  vanilla's idleSoundChance roll still used per bird but skipped while a neighbour of the kind called within idleGap
+  seconds; shorter ranges; caps halved; CallRate and Numbers in the server config for servers that want other
+  levels. Vanilla's own rule (idleSoundChance per tick) is kept for the single bird; the spacing is ours, since vanilla
+  has no flocks of twenty.
+- Wingbeats (0.21.2, a player: birds float rather than flap). Cruising flaps are now near real rates, a little slower
+  for the bigger-than-life size (beats a second: goose and gull 2.6, mallard 3.6, heron 2, crow 3, owl 2.2, eagle 1.8;
+  fly-flap is one beat of 30 frames, so flapSpeed is the animation speed), over a stroke of about 90 degrees. Takeoff
+  stays the faster, deeper beat.
+- Planned for 0.22.0 (Dright: something new, young birds following their parents about on the water and on land):
+  goslings first, then ducklings on the same work. Not built yet beyond the gosling model; the plan:
+  - Season: geese and mallards are resident from springStart to autumnStart, their breeding season. Some resident
+    pairs bring a brood some days into it; the young grow up over the summer and are grown (adults, as vanilla's
+    chicks become hens) by the time the residents leave in autumn. No eggs or nests yet (a later step).
+  - Families: geese 4-6 goslings, both parents, the goose leading and the gander at the back; mallards 6-10
+    ducklings with the hen only (drakes take no part, as in life). The young keep close in a line behind the leader.
+  - Escape without flying: the whole waterfowl AI gets away by taking off, which young can't. A family with young
+    stays down: on the water it swims off to open water, ashore it walks back to the water; the gander may stand his
+    ground and hiss at a player who comes close. Open question: a lake's wariness makes flocks leave it, which a
+    family can't; likely the family keeps its lake until the young can fly, and the wariness waits until then.
+  - Ashore: a new state for the family, walking and grazing on grass next to its water and going back to it. Today
+    waterbirds ashore only head for water (Waterfowl.Ashore). The same state is what gulls standing on beaches need.
+  - Models: tools/make_gosling.py (own small shape: big head, short bill, round downy body, wing stubs, legs standing
+    in the rest pose; own animations: swim, idle-stand, walk, graze, death). Half again life size like every bird.
+    A peeping call (a free-licence recording, credited in CREDITS.md).
+  - Left for later: caging and drops for the young, the eagle taking ducklings (off at first).
 
 Next steps:
 - Hand-off from the sky: when a planned goose flock passes a suitable lake (fresh water, 36+ surface blocks, 64+

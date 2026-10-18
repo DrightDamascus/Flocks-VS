@@ -1289,12 +1289,12 @@
        "rotationZ": 0
       },
       "WingL": {
-       "rotationX": 16,
+       "rotationX": 20,
        "rotationY": 0,
        "rotationZ": 0
       },
       "WingR": {
-       "rotationX": -16,
+       "rotationX": -20,
        "rotationY": 0,
        "rotationZ": 0
       },
@@ -1329,22 +1329,22 @@
      "frame": 7,
      "elements": {
       "ArmL": {
-       "rotationX": -38,
+       "rotationX": -50,
        "rotationY": 0,
        "rotationZ": 0
       },
       "ArmR": {
-       "rotationX": 38,
+       "rotationX": 50,
        "rotationY": 0,
        "rotationZ": 0
       },
       "WingL": {
-       "rotationX": -8,
+       "rotationX": -10,
        "rotationY": 0,
        "rotationZ": 0
       },
       "WingR": {
-       "rotationX": 8,
+       "rotationX": 10,
        "rotationY": 0,
        "rotationZ": 0
       },
@@ -1389,12 +1389,12 @@
        "rotationZ": 0
       },
       "WingL": {
-       "rotationX": -20,
+       "rotationX": -24,
        "rotationY": 0,
        "rotationZ": 0
       },
       "WingR": {
-       "rotationX": 20,
+       "rotationX": 24,
        "rotationY": 0,
        "rotationZ": 0
       },
@@ -1429,22 +1429,22 @@
      "frame": 22,
      "elements": {
       "ArmL": {
-       "rotationX": 32,
+       "rotationX": 42,
        "rotationY": 0,
        "rotationZ": 0
       },
       "ArmR": {
-       "rotationX": -32,
+       "rotationX": -42,
        "rotationY": 0,
        "rotationZ": 0
       },
       "WingL": {
-       "rotationX": 8,
+       "rotationX": 10,
        "rotationY": 0,
        "rotationZ": 0
       },
       "WingR": {
-       "rotationX": -8,
+       "rotationX": -10,
        "rotationY": 0,
        "rotationZ": 0
       },

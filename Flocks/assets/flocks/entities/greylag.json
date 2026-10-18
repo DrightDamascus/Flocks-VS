@@ -43,7 +43,7 @@
 			{ code: "controlledphysics", stepHeight: 0.6 },
 			// before "health": it zeroes thrown spear damage before health applies it
 			{ code: "flocks.waterfowl", species: "goose", fleeRange: 14, takeoffRange: 7, lifeHours: 6, sink: 0.22, cruiseSpeedMin: 11, cruiseSpeedMax: 13.5,
-			  takeoffWingsChance: 0.6, takeoffCallChance: 0.4 },
+			  takeoffWingsChance: 0.6, takeoffCallChance: 0.4, idleGap: 15, flapSpeed: 2.6 },
 			{ code: "health", currenthealth: 4, maxhealth: 4 },
 			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
 			{ code: "harvestable", drops: [
@@ -58,7 +58,7 @@
 		// vetoed in Residents.cs (after vanilla has found the spots).
 		spawnconditions: {
 			worldgen: {
-				TriesPerChunk: { avg: 0.03, var: 0 },
+				TriesPerChunk: { avg: 0.015, var: 0 },
 				tryOnlySurface: true,
 				groupSize: { dist: "verynarrowgaussian", avg: 9.5, var: 2.5 },
 				insideBlockCodes: ["game:water-still-7"],
@@ -70,10 +70,11 @@
 				group: "passive",
 				MinDistanceToPlayer: 32,
 				// Rolled once per entity type every 0.5 s to decide whether geese are considered at all that round (not
-				// per chunk). 0.0003 meant about once every 28 minutes, so they almost never appeared; 0.01 is ~50 s.
-				chance: 0.01,
-				// all loaded geese on the server (scaled up for extra players), not per area: about two groups of 7-12
-				maxQuantity: 24,
+				// per chunk). 0.0003 meant about once every 28 minutes, so they almost never appeared; 0.005 is ~100 s
+				// (0.01 filled the lakes too fast).
+				chance: 0.005,
+				// all loaded geese on the server (scaled up for extra players), not per area: about one group of 7-12
+				maxQuantity: 12,
 				tryOnlySurface: true,
 				groupSize: { dist: "verynarrowgaussian", avg: 9.5, var: 2.5 },
 				insideBlockCodes: ["game:water-still-7"],
@@ -86,14 +87,14 @@
 	sounds: {
 		hurt: "flocks:goose/hurt",
 		death: "flocks:goose/death",
-		idle: { path: "flocks:goose/honk*", pitch: { avg: 1, var: 0.15 }, range: 32 },
+		idle: { path: "flocks:goose/honk*", pitch: { avg: 1, var: 0.15 }, range: 24 },
 		// played by flocks.waterfowl: a splash as each bird runs off the water, wingbeats and an alarm call from some
 		// of them (takeoffWingsChance / takeoffCallChance), and a splash as each comes down
 		takeoffsplash: { path: "game:environment/smallsplash", pitch: { avg: 1, var: 0.1 }, range: 24, volume: { avg: 0.5 } },
 		takeoffwings: { path: "flocks:wings/flap*", pitch: { avg: 1, var: 0.1 }, range: 32, volume: { avg: 0.9 } },
-		takeoffcall: { path: "flocks:goose/flight*", pitch: { avg: 1, var: 0.1 }, range: 48, volume: { avg: 0.7 } },
+		takeoffcall: { path: "flocks:goose/honk*", pitch: { avg: 1.05, var: 0.1 }, range: 40, volume: { avg: 0.7 } },
 		landsplash: { path: "game:environment/mediumsplash", pitch: { avg: 1, var: 0.1 }, range: 24, volume: { avg: 0.45 } }
 	},
-	// vanilla's idle sound roll (chickens use 0.05); geese on the water call now and then
+	// rolled as vanilla does (chickens use 0.05), but nearby geese take turns (idleGap, EntityBehaviorBird.IdleCalls)
 	idleSoundChance: 0.02
 }

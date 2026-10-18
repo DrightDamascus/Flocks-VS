@@ -18,7 +18,7 @@
 	yearRound: true,
 	hours: [6, 8, 17.5, 19.5],
 	maxFlocksPerDay: 1.5, countMin: 4, countMax: 20,
-	callSound: "crow/call", callVariants: 3, callGapMin: 6, callGapMax: 16,
+	callSound: "crow/call", callVariants: 3, callGapMin: 10, callGapMax: 25,
 	landedEntity: "flocks:crow",
 	habitat: "ground",
 	arriveInFlocks: false,
