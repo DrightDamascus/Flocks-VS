@@ -268,6 +268,10 @@ Decisions (Dright, 0.13.0), Phase 1 AI:
   seconds; shorter ranges; caps halved; CallRate and Numbers in the server config for servers that want other
   levels. Vanilla's own rule (idleSoundChance per tick) is kept for the single bird; the spacing is ours, since vanilla
   has no flocks of twenty.
+- No fall damage for birds (0.21.3, a player found an eagle dead from a fall). A bird left to physics in the air (a
+  perched one whose height is taken away, a stoop ending on the ground) fell like a player and could die of it. Birds
+  fly; a fall that kills one is never what the player should see, so fallDamageMultiplier is 0 for every bird, which
+  is how the game switches fall damage off (EntityProperties.FallDamage is multiplier > 0). The mouse keeps vanilla's.
 - Wingbeats (0.21.2, a player: birds float rather than flap). Cruising flaps are now near real rates, a little slower
   for the bigger-than-life size (beats a second: goose and gull 2.6, mallard 3.6, heron 2, crow 3, owl 2.2, eagle 1.8;
   fly-flap is one beat of 30 frames, so flapSpeed is the animation speed), over a stroke of about 90 degrees. Takeoff

@@ -30,6 +30,8 @@ namespace Flocks
         private readonly Random rand = new();
         /// <summary>Today's planned landing hours, per player and species.</summary>
         private readonly Dictionary<(string player, string species), (int day, List<double> hours)> plans = new();
+        /// <summary>Today's landings that came due, per player and species: the hour and how it went (/flocks schedule).</summary>
+        private readonly Dictionary<(string player, string species), (int day, List<string> done)> results = new();
 
         public LandingFlocks(ICoreServerAPI sapi, Dictionary<string, Species> species)
         {
@@ -45,6 +47,7 @@ namespace Flocks
             foreach (IServerPlayer plr in sapi.World.AllOnlinePlayers)
             {
                 if (plr.Entity == null || plr.ConnectionState != EnumClientState.Playing) continue;
+                if (FlockCamera.Instance?.Watching(plr) == true) continue;   // off following a flock (FlockCamera)
                 foreach (var sp in species.Values)
                 {
                     if (!sp.Lands || !sp.ArriveInFlocks || !ResidentGeese.Config.SpeciesEnabled(sp)) continue;
@@ -57,8 +60,11 @@ namespace Flocks
                     for (int i = plan.hours.Count - 1; i >= 0; i--)
                     {
                         if (hour < plan.hours[i]) continue;
+                        double due = plan.hours[i];
                         plan.hours.RemoveAt(i);
-                        Arrive(plr, sp, false, out _);
+                        bool ok = Arrive(plr, sp, false, out string msg);
+                        if (!results.TryGetValue(key, out var res) || res.day != day) results[key] = res = (day, new List<string>());
+                        res.done.Add($"{MigrationScheduler.HourText(due)} {(ok ? "came in" : "didn't come: " + msg)}");
                     }
                 }
             }
@@ -80,6 +86,25 @@ namespace Flocks
             }
             return hours;
         }
+
+        /// <summary>Today's landing flocks of this species for the player, for /flocks schedule: still to come, and those
+        /// already due with how they went. Null when the species doesn't come in landing flocks at all.</summary>
+        public string TodayFor(IServerPlayer plr, Species sp)
+        {
+            if (!sp.Lands || !sp.ArriveInFlocks) return null;
+            if (!ResidentGeese.Config.SpeciesEnabled(sp)) return "arrivals: off in flocks-server.json";
+            int day = (int)sapi.World.Calendar.TotalDays;
+            var key = (plr.PlayerUID, sp.Code);
+            var parts = new List<string>();
+            if (plans.TryGetValue(key, out var plan) && plan.day == day)
+                foreach (double h in plan.hours) parts.Add($"{MigrationScheduler.HourText(h)} planned");
+            if (results.TryGetValue(key, out var res) && res.day == day) parts.AddRange(res.done);
+            return "arrivals today: " + (parts.Count == 0 ? "none" : string.Join("; ", parts));
+        }
+
+        /// <summary>The last flock Arrive started, and where it appeared (for the flock camera).</summary>
+        public long LastFlockId { get; private set; }
+        public Vec3d LastEntry { get; private set; }
 
         /// <summary>Starts a landing flock for this player now. force (the /flocks arrive command) skips the season check,
         /// and the realm check when the Biomes mod is installed.</summary>
@@ -138,6 +163,7 @@ namespace Flocks
                 e.Pos.SetPos(ex + dx * along + dz * across, ey + rank * 0.15 + (rand.NextDouble() - 0.5) * 0.4, ez + dz * along - dx * across);
                 sapi.World.SpawnEntity(e);
             }
+            LastFlockId = flock.Id; LastEntry = new Vec3d(ex, ey, ez);
             msg = Lang.Get("flocks:arrive-started", n, name, flock.Id, entry, centre.X.ToString("0"), centre.Y.ToString("0"), centre.Z.ToString("0"));
             sapi.Logger.Notification("[Flocks] landing: {0}", msg);
             return true;

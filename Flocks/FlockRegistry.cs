@@ -72,6 +72,9 @@ namespace Flocks
         private List<AbandonedLake> abandoned = new();
         private long nextId = 1;
         private readonly Dictionary<long, double> lastDepartCheck = new();
+        /// <summary>Flushes of one flock this close together (real ms) are one incident (Disturb).</summary>
+        private const long FlushMergeMs = 3000;
+        private readonly Dictionary<long, long> lastFlush = new();
 
         public FlockRegistry(ICoreServerAPI sapi, FlocksServerConfig cfg)
         {
@@ -142,6 +145,14 @@ namespace Flocks
             return f;
         }
 
+        /// <summary>The flock is away on migration (a journey cut short): an ordinary spring landing brings it back.</summary>
+        public void SendAway(long id, Vec3d at)
+        {
+            var f = Get(id);
+            if (f == null || f.State == FlockState.Lost) return;
+            f.State = FlockState.Away; f.X = at.X; f.Y = at.Y; f.Z = at.Z; f.SinceHours = sapi.World.Calendar.TotalHours;
+        }
+
         /// <summary>A landing that couldn't complete (its lake unloaded): the flock is away again.</summary>
         public void LandingFailed(FlockRecord f) { f.State = FlockState.Away; f.SinceHours = sapi.World.Calendar.TotalHours; }
 
@@ -167,6 +178,14 @@ namespace Flocks
         {
             var f = Get(id);
             if (f == null || !cfg.LakeWariness) return false;
+            if (mayLeave)
+            {
+                // one incident, one flush: a group alarmed twice in quick succession (an eagle spotted, then its kill)
+                // was only disturbed once
+                long ms = sapi.World.ElapsedMilliseconds;
+                if (lastFlush.TryGetValue(id, out long last) && ms - last < FlushMergeMs) return false;
+                lastFlush[id] = ms;
+            }
             f.Wariness = Wariness(id) + amount; f.WaryHours = Hours;
             if (!mayLeave || f.Wariness < cfg.LeaveAt) return false;
             f.Wariness = 0;   // the next lake is a fresh start
@@ -209,6 +228,7 @@ namespace Flocks
         public void TryDepart(Entity goose)
         {
             long id = goose.WatchedAttributes.GetLong(FlockIdKey, 0);
+            if (FlockJourney.Has(id)) return;   // followed on its whole migration: it stays in the world
             double now = sapi.World.ElapsedMilliseconds / 1000.0;
             if (lastDepartCheck.TryGetValue(id, out double last) && now - last < 0.5) return;
             lastDepartCheck[id] = now;
@@ -224,8 +244,9 @@ namespace Flocks
             if (members.Count == 0) return;
             double cx = members.Average(m => m.e.Pos.X), cy = members.Average(m => m.e.Pos.Y), cz = members.Average(m => m.e.Pos.Z);
             var centre = new Vec3d(cx, cy, cz);
+            // a player watching a flock (FlockCamera) counts as being where they will be put back
             var players = sapi.World.AllOnlinePlayers.Where(p => p.Entity != null).ToList();
-            if (players.Any(p => p.Entity.Pos.HorDistanceTo(centre) < DepartRange)) return;
+            if (players.Any(p => FlockCamera.Where(p).HorizontalSquareDistanceTo(centre.X, centre.Z) < DepartRange * DepartRange)) return;
 
             var f = Get(id);
             if (f != null) { f.State = FlockState.Away; f.X = cx; f.Y = cy; f.Z = cz; f.SinceHours = sapi.World.Calendar.TotalHours; }
@@ -239,6 +260,35 @@ namespace Flocks
             if (flocks.Count <= MaxRecords) return;
             foreach (var f in flocks.Values.Where(f => f.State != FlockState.Landed).OrderBy(f => f.State == FlockState.Lost ? 0 : 1).ThenBy(f => f.SinceHours).Take(flocks.Count - MaxRecords).ToList())
                 flocks.Remove(f.Id);
+        }
+
+        /// <summary>
+        /// The species' landed flocks within range of pos, nearest first, for /flocks schedule: size, distance, whether
+        /// its loaded birds are flying off for good right now, and how near it is to abandoning its lake (wariness).
+        /// </summary>
+        public List<string> LocalFlocks(string species, Vec3d pos, double range)
+        {
+            // the loaded birds of each flock, and how many of them are leaving
+            var loaded = new Dictionary<long, (int birds, int leaving)>();
+            foreach (var e in sapi.World.LoadedEntities.Values)
+            {
+                long id = e.Alive ? e.WatchedAttributes.GetLong(FlockIdKey, 0) : 0;
+                if (id == 0) continue;
+                loaded.TryGetValue(id, out var c);
+                loaded[id] = (c.birds + 1, c.leaving + (e.GetBehavior<EntityBehaviorBird>()?.DepartingInFlight == true ? 1 : 0));
+            }
+            var lines = new List<string>();
+            foreach (var f in flocks.Values.Where(f => f.Species == species && f.State == FlockState.Landed)
+                .Select(f => (f, d: Math.Sqrt((f.X - pos.X) * (f.X - pos.X) + (f.Z - pos.Z) * (f.Z - pos.Z))))
+                .Where(t => t.d <= range).OrderBy(t => t.d))
+            {
+                loaded.TryGetValue(f.f.Id, out var c);
+                string state = c.birds == 0 ? "not loaded"
+                    : c.leaving > 0 ? $"LEAVING ({c.leaving} of {c.birds} flying off)"
+                    : cfg.LakeWariness ? $"wariness {Wariness(f.f.Id):0.0}, leaves the lake at {cfg.LeaveAt:0.0}" : "settled";
+                lines.Add($"#{f.f.Id} x{f.f.Count}, {f.d:0} blocks away: {state}");
+            }
+            return lines;
         }
 
         public string Report()

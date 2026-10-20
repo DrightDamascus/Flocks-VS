@@ -43,8 +43,16 @@ DESIGN.md. Version history: CHANGELOG.md.
 - **Scarecrow**: its scarecrow and little scarecrow keep crows off like the straw dummy (the same radius).
 
 ## Commands
-`/flocks send [count] [species]` sends a passing flock over you. `/flocks schedule` shows today's migration plan.
-Admin (controlserver): `/flocks arrive [species]` sends a landing flock to a lake near you now; `/flocks land [count]
+`/flocks send [count] [species] [watch]` sends a passing flock over you (`watch`, admin: follow it). `/flocks schedule` shows today's migration plan, and
+for the waterbirds near you whether they stay or are leaving, how many days until that changes, and today's landing
+flocks.
+Admin (controlserver): `/flocks season spring|autumn [species] [days]` moves time forward to the first morning of that
+migration where you are (default goose); `/flocks depart [species] [watch]` sends the nearest group on the water off
+on migration now; `/flocks arrive [species] [watch]` sends a landing flock to a lake near you now. With `watch` you
+follow the flock as a spectator from above and behind until it is gone or down, then you are put back where you were
+(Sneak or `/flocks unwatch` stops early); `/flocks journey [species]` follows the nearest flock on the water through
+its whole migration: the real flight to the tropics, its winter there, the clock on to spring, and the flight home to
+its own lake (often 20-30 minutes each way, terrain generating as you go); `/flocks land [count]
 [species]` puts a group straight onto nearby water; `/flocks calm` resets lake wariness; `/flocks residents` shows
 spawning, loaded birds, flocks and abandoned lakes; `/flocks lineup [stand|fly|clear]` puts one of each animal in a
 frozen row in front of you, for pictures.

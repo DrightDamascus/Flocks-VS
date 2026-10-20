@@ -1,6 +1,12 @@
 # Handoff
 
 Where Flocks stands and what comes next, for whoever picks it up (a new session, or Dright after a break).
+0.21.3 (2026-10-20, branch release/0.21.3 from tag v0.21.2): a player found an eagle killed by a fall, so birds no
+longer take fall damage (fallDamageMultiplier 0 in every bird's entity file); plus the debug commands /flocks season,
+/flocks depart, /flocks journey, watch mode, V formation on departure, the double-alarm fix and floating-island
+flight (CHANGELOG). Tests at release: eagle steps only (FLOCKS_TEST_ONLY=eagle), 44 of 44 passed, including the new
+"eagle takes no fall damage" step (a real 50-block drop, unhurt). The same fix is in the main tree for 0.23.0.
+
 Last updated 2026-10-17. Committed through 0.21.1 (on the ModDB): Scarecrow mod support, asked for by a player; its
 scarecrows keep crows off like the straw dummy, and its texts get our line about crows (checked in game by Dright).
 Before that, 0.21.0 was the first public release (on the ModDB; Dright's own page text).

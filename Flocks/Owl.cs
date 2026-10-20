@@ -53,6 +53,7 @@ namespace Flocks
 
         public EntityBehaviorOwl(Entity entity) : base(entity) { }
         public override string PropertyName() => Code;
+        protected override Vec3d Destination => target;
         protected override float AnimSpeed(string code) => code switch { "takeoff" => 1.8f, "fly-flap" => 1.1f, "land" => 1.2f, _ => 1f };
 
         // ---- for diagnostics and the in-engine tests

@@ -661,6 +661,26 @@ namespace FlocksTest
                 Check(eagleHits == 0, $"no collisions on the way ({eagleHits})");
             }, 70));
 
+            // ---- no fall damage (0.21.3: a player found an eagle killed by a fall). The engine's own fall-damage path with
+            // a 60-block drop (10 hp at the old 0.3 multiplier: dead), then a real one: perched 50 up in the air, it falls
+            double fellFrom = 0; float hpBefore = 0;
+            steps.Enqueue(("eagle takes no fall damage", () =>
+            {
+                hpBefore = Hp(eagle);
+                Check(!eagle.Properties.FallDamage, $"fall damage is off for the eagle (multiplier {eagle.Properties.FallDamageMultiplier})");
+                eagle.PositionBeforeFalling.Set(eagle.Pos.X, eagle.Pos.Y + 60, eagle.Pos.Z);
+                eagle.OnFallToGround(-1.5);
+                Check(eagle.Alive && Hp(eagle) >= hpBefore, $"a 60-block fall does nothing (health {hpBefore:0.0} -> {Hp(eagle):0.0}, alive {eagle.Alive})");
+                fellFrom = eagle.Pos.Y + 50;
+                Place(eagle, eagle.Pos.X, fellFrom, eagle.Pos.Z);
+            }, () => (Elapsed > 1 && eagle.OnGround) || !eagle.Alive || Elapsed > 15, () =>
+            {
+                float hp = Hp(eagle);
+                Log($"eagle drop: {RState(eagle)}, {fellFrom - eagle.Pos.Y:0.0} blocks below where it was put, on ground {eagle.OnGround}");
+                Check(eagle.Alive && hp >= hpBefore, $"dropped from 50 blocks up it lives, unhurt (health {hpBefore:0.0} -> {hp:0.0}, alive {eagle.Alive}, " +
+                    $"came down {fellFrom - eagle.Pos.Y:0.0} blocks, {RState(eagle)})");
+            }, 20));
+
             // ---- the eagle hunts mallards on pond A: they may see it coming; either way the flock is disturbed
             FlockRecord hunted = null;
             var huntedDucks = new List<Entity>();
@@ -1000,6 +1020,8 @@ namespace FlocksTest
         /// comes back from another thread, and the entity isn't ticked meanwhile. With the harness stepping physics, a bird
         /// put high up then falls (and the fall can kill it) whenever the callback is slow, which made the eagle steps
         /// flaky. The fall start is reset too, so a later landing isn't counted as a fall from where it was before.</summary>
+        private static float Hp(Entity e) => e.WatchedAttributes.GetTreeAttribute("health")?.GetFloat("currenthealth") ?? -1;
+
         private static void Place(Entity e, double x, double y, double z)
         {
             e.Pos.SetPos(x, y, z);

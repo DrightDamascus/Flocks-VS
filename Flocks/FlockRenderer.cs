@@ -67,7 +67,7 @@ namespace Flocks
         public int Count => flocks.Count;
 
         /// <summary>heading: radians, dir = (sin, 0, cos), so 0 = south (+Z), pi = north. altitude: blocks above ground.</summary>
-        public void Send(Species sp, int count, double? heading = null, double? altitude = null)
+        public Flock Send(Species sp, int count, double? heading = null, double? altitude = null)
         {
             var plr = capi.World.Player.Entity.Pos;
             double ang = heading ?? rand.NextDouble() * Math.PI * 2;
@@ -108,7 +108,11 @@ namespace Flocks
             SampleTerrain(f);
             f.Pos.Y = Math.Max(f.Pos.Y, f.TargetY);
             flocks.Add(f);
+            return f;
         }
+
+        /// <summary>Whether the flock is still in the sky (the flock camera follows it until it isn't).</summary>
+        public bool Has(Flock f) => flocks.Contains(f);
 
         /// <summary>
         /// Formation slot i of count, relative to the leader (X along, Y up, Z across). V slots scale with wingspan:

@@ -151,6 +151,20 @@ namespace Flocks
             return rel >= springStart + shift && rel < autumnStart - shift;
         }
 
+        /// <summary>Within ~10 deg of the equator, where nothing migrates.</summary>
+        public static bool Tropical(double lat) => Math.Abs(lat) < 0.11;
+
+        /// <summary>The seasonRel at which the species' spring (arrival) or autumn (departure) migration opens here, with
+        /// the same latitude shift as Strength().</summary>
+        public static float SeasonStart(Species sp, bool spring, double lat)
+        {
+            float shift = (float)((Math.Abs(lat) - 0.5) * 0.06);
+            return spring ? sp.SpringStart + shift : sp.AutumnStart - shift;
+        }
+
+        /// <summary>In-game days from seasonRel 'rel' forward to seasonRel 'target' (wrapping round the year).</summary>
+        public static double DaysUntil(float target, float rel, int daysPerYear) => GameMath.Mod(target - rel, 1f) * daysPerYear;
+
         /// <summary>Sea (salt water at the surface) within 96 blocks of pos, sampled every 8 blocks in loaded chunks.</summary>
         private bool SeaNear(BlockPos pos)
         {
@@ -205,7 +219,7 @@ namespace Flocks
         }
 
         /// <summary>Today's plan and the conditions behind it, for /flocks schedule.</summary>
-        public string Report()
+        public string Report(string local = null)
         {
             var player = capi.World?.Player?.Entity;
             if (player == null) return "No player.";
@@ -227,6 +241,7 @@ namespace Flocks
                 sb.Append($"\n{sp.Code}: " + (s > 0 ? $"{(spring ? "spring" : "autumn")} migration, strength {s:0.00}" : "not migrating today"));
             }
             sb.Append("\nToday: " + (plan.Count == 0 ? "no flocks" : Describe().Replace("; ", "\n  ")));
+            if (!string.IsNullOrEmpty(local)) sb.Append("\n" + local);   // the server's part: landed flocks
             return sb.ToString();
         }
 
@@ -238,7 +253,7 @@ namespace Flocks
             return names[i];
         }
 
-        private static string HourText(double hour)
+        internal static string HourText(double hour)
         {
             int h = (int)hour, m = (int)((hour - h) * 60);
             return $"{h:00}:{m:00}";

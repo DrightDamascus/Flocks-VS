@@ -63,6 +63,7 @@ namespace Flocks
 
         public EntityBehaviorCorvid(Entity entity) : base(entity) { }
         public override string PropertyName() => Code;
+        protected override Vec3d Destination => target;
         protected override float AnimSpeed(string code) => code switch { "takeoff" => 2.2f, "fly-flap" => 1.5f, "land" => 1.3f, _ => 1f };
         public override bool DepartingInFlight => departing && (state == State.Fly || state == State.Takeoff);
 

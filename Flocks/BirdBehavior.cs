@@ -204,7 +204,7 @@ namespace Flocks
                 for (int side = -1; side <= 1; side++)
                 {
                     int x = (int)Math.Floor(pos.X + sx * d + sz * side * HalfSpan), z = (int)Math.Floor(pos.Z + sz * d - sx * side * HalfSpan);
-                    int h = ba.GetRainMapHeightAt(x, z);
+                    int h = FloorAt(ba, x, z, pos.Y);
                     if (h <= 0 || h + 1 + Clearance <= pos.Y) continue;                       // unloaded, or well below
                     tmp.Set(x, h, z);
                     if (ba.GetBlock(tmp, BlockLayersAccess.Fluid)?.IsLiquid() == true) continue;
@@ -226,7 +226,9 @@ namespace Flocks
         {
             var pos = entity.Pos; var ba = entity.World.BlockAccessor;
             int x = (int)Math.Floor(pos.X), z = (int)Math.Floor(pos.Z), above = ba.GetRainMapHeightAt(x, z);
-            if (above + 1 > pos.Y + 1.2 && ba.GetBlock(new BlockPos(x, above, z), BlockLayersAccess.Fluid)?.IsLiquid() != true)
+            // under a crown: something solid just overhead (high overhead, like a floating island, is open sky to fly under)
+            if (above + 1 > pos.Y + 1.2 && SolidIn(ba, x, z, (int)Math.Floor(pos.Y) + 1, (int)Math.Floor(pos.Y) + Headroom)
+                && ba.GetBlock(new BlockPos(x, above, z), BlockLayersAccess.Fluid)?.IsLiquid() != true)
             {
                 Steer(MostOpenHeading(), TurnRate * 2.5, dt);
                 vy = Math.Min(vy, 0.5); cap = Math.Min(cap, 4);
@@ -244,6 +246,131 @@ namespace Flocks
             }
             vy = Math.Max(vy, Math.Min(slope * Math.Max(speed, MinPullSpeed) * 1.35 + 0.6, SteepClimb));
             cap = Math.Min(cap, Math.Max(MinPullSpeed, SteepClimb / (slope * 1.35)));
+        }
+
+        /// <summary>Blocks of open air a bird wants over its feet to pass under something (a floating island, an arch).</summary>
+        protected const int Headroom = 3;
+        /// <summary>The course planner looks this far ahead, every PlanSeconds.</summary>
+        protected const double PlanLength = 100, PlanSeconds = 0.5;
+
+        private readonly BlockPos probe = new BlockPos(0, 0, 0);
+
+        protected bool Solid(IBlockAccessor ba, int x, int y, int z)
+        {
+            probe.Set(x, y, z);
+            var cb = ba.GetBlock(probe)?.CollisionBoxes;
+            return cb != null && cb.Length > 0;
+        }
+
+        protected bool SolidIn(IBlockAccessor ba, int x, int z, int y0, int y1)
+        {
+            for (int y = y0; y <= y1; y++) if (Solid(ba, x, y, z)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// What a bird flying with its feet at y has to stay above in this column: the top of the column (the rain map),
+        /// unless the column is open at the bird's height with room to pass, as under a floating island. Then it is the
+        /// ground below that gap, and the island overhead doesn't count. A gap too low to fly through counts as solid.
+        /// </summary>
+        protected int FloorAt(IBlockAccessor ba, int x, int z, double y)
+        {
+            int top = ba.GetRainMapHeightAt(x, z);
+            int yi = (int)Math.Floor(y);
+            if (top <= yi + Headroom) return top;                     // nothing over the bird's height: the usual case
+            if (SolidIn(ba, x, z, yi - 1, yi + Headroom)) return top; // something at its height: all of it is in the way
+            int floor = yi - 2;
+            while (floor > 0 && floor > yi - 96 && !Solid(ba, x, floor, z)) floor--;
+            if (floor + 1 + Clearance > yi) return top;                // just a slot
+            // where it is going is up on top of this (a roost on a floating island): over it, not under
+            var dest = Destination;
+            if (dest != null)
+            {
+                int underside = yi + Headroom + 1;
+                while (underside < top && !Solid(ba, x, underside, z)) underside++;
+                if (dest.Y >= underside) return top;
+            }
+            return floor;
+        }
+
+        /// <summary>Where the bird is flying to (a landing spot, a perch, a roost, prey), or null: the way to it may only
+        /// pass under an overhang it isn't going up onto (FloorAt).</summary>
+        protected virtual Vec3d Destination => null;
+
+        /// <summary>The lowest solid block above the feet within dist straight ahead (and here), at least Headroom up;
+        /// int.MaxValue when nothing is overhead. Flying under something, the bird keeps below it.</summary>
+        protected int CeilingAhead(double dist)
+        {
+            var pos = entity.Pos; var ba = entity.World.BlockAccessor;
+            int yi = (int)Math.Floor(pos.Y), ceiling = int.MaxValue;
+            for (double d = 0; d <= dist; d += 4)
+            {
+                int x = (int)Math.Floor(pos.X + Math.Sin(flyHeading) * d), z = (int)Math.Floor(pos.Z + Math.Cos(flyHeading) * d);
+                int top = ba.GetRainMapHeightAt(x, z);
+                if (top <= yi + Headroom) continue;
+                for (int y = yi + 1; y <= top && y < ceiling; y++) if (Solid(ba, x, y, z)) { ceiling = y; break; }
+            }
+            return ceiling;
+        }
+
+        private double detour = double.NaN, climbFloor, climbUntil;
+        private float planTimer;
+
+        /// <summary>The height a planned climb over something far ahead wants the feet at (0 when none is planned).</summary>
+        protected double PlannedClimb => entity.World.ElapsedMilliseconds / 1000.0 < climbUntil ? climbFloor : 0;
+
+        /// <summary>
+        /// The long look-ahead, PlanLength out: the heading to fly instead of course, or course itself. Something at the
+        /// bird's height on the way (a floating island, a mountain) is passed the gentler way, decided early: a turn to
+        /// the nearest clear heading (side by side, the one it already leans to, else by flock, so a flock keeps
+        /// together), or a steady climb over it (PlannedClimb), whichever costs less (a turn of 4 degrees against a
+        /// block of climb). Under something with room to spare (FloorAt) the way counts as clear: they fly under.
+        /// </summary>
+        protected double PlanCourse(double course, float dt)
+        {
+            if ((planTimer -= dt) > 0) return double.IsNaN(detour) ? course : detour;
+            planTimer = (float)PlanSeconds;
+            var pos = entity.Pos; var ba = entity.World.BlockAccessor;
+            if (WayClear(ba, course, out double dist, out int top)) { detour = double.NaN; return course; }
+            double rise = top + 1 + Clearance + 2 - pos.Y;
+            // the nearest clear heading, on the side it leans to first
+            double lean = GameMath.AngleRadDistance((float)course, (float)flyHeading);
+            int first = Math.Abs(lean) > 0.05 ? Math.Sign(lean) : (entity.WatchedAttributes.GetLong(FlockRegistry.FlockIdKey, 0) % 2 == 0 ? 1 : -1);
+            double turnTo = double.NaN, turnDeg = 0;
+            for (int step = 1; step <= 6 && double.IsNaN(turnTo); step++)
+                foreach (int side in new[] { first, -first })
+                {
+                    double h = course + side * step * 15 * GameMath.DEG2RAD;
+                    if (WayClear(ba, h, out _, out _)) { turnTo = h; turnDeg = step * 15; break; }
+                }
+            if (!double.IsNaN(turnTo) && turnDeg / 4 < rise) { detour = turnTo; return detour; }
+            // over it: climb steadily from here, until well past it
+            detour = double.NaN;
+            climbFloor = top + 1 + Clearance + 2;
+            climbUntil = entity.World.ElapsedMilliseconds / 1000.0 + (dist + 40) / Math.Max(speed, 4);
+            return course;
+        }
+
+        /// <summary>True when the way along heading is clear at the bird's height for PlanLength (across a flock's width);
+        /// else false with the distance to the first thing in the way and its top.</summary>
+        private bool WayClear(IBlockAccessor ba, double heading, out double dist, out int top)
+        {
+            var pos = entity.Pos;
+            double sx = Math.Sin(heading), sz = Math.Cos(heading);
+            dist = 0; top = 0;
+            for (double d = 8; d <= PlanLength; d += 4)
+                for (int side = -1; side <= 1; side++)
+                {
+                    int x = (int)Math.Floor(pos.X + sx * d + sz * side * 2.5), z = (int)Math.Floor(pos.Z + sz * d - sx * side * 2.5);
+                    if (ba.GetChunkAtBlockPos(x, (int)pos.Y, z) == null) continue;   // unloaded: nothing known
+                    int h = FloorAt(ba, x, z, pos.Y);
+                    if (h <= 0 || h + 1 + Clearance <= pos.Y) continue;
+                    probe.Set(x, h, z);
+                    if (ba.GetBlock(probe, BlockLayersAccess.Fluid)?.IsLiquid() == true) continue;
+                    dist = d; top = h;
+                    return false;
+                }
+            return true;
         }
 
         /// <summary>Of straight on, 45 and 90 degrees either way, and back, the direction whose next 6 blocks need the

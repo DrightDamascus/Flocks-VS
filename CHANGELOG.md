@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.21.3
+A fix for eagles killed by falls, and debug tools for players testing migration (all also in 0.23.0).
+- Fix: birds took fall damage, so an eagle could be killed by a fall (one was found dead). Birds no longer take fall
+  damage at all.
+- `/flocks season spring|autumn [species] [days]` (admin): moves time forward to the first morning of that migration
+  where you stand (default goose; the latitude shifts it as it does the birds), plus any days further in.
+- `/flocks depart [species]` (admin): the nearest group on the water leaves now and rejoins the migration, as at the
+  end of its season.
+- Add `watch` to `/flocks depart` or `/flocks arrive` to follow the flock: you become a spectator flying behind and
+  above it until it has gone or come down, then you are put back where you were, in your own game mode (even after a
+  crash or a disconnect mid-watch, on your next join). Sneak or `/flocks unwatch` stops early. `/flocks send ...
+  watch` (admin) follows a passing flock the same way.
+- `/flocks journey [species]` (admin): follow the nearest flock on the water through its whole migration. It
+  flies the real way to the tropics (within 23.4 degrees of the equator) over terrain generated as you go, settles on
+  water there, the clock moves on to the start of spring migration at home, and the same flock flies the whole way
+  back to land on its own lake. Often 20-30 minutes of real time each way (the world's polar-equator distance decides);
+  the flock slows where the land ahead hasn't loaded yet. Stopping early is safe: the flock carries on, or comes back
+  in an ordinary spring landing.
+- Departing flocks fly in a V: the bird with the lowest id leads at its slowest cruise and the rest keep slots behind
+  it (they used to string out, each on its own heading and speed).
+- Fix: a flock alarmed twice in quick succession (an eagle's attack, then its kill) counted as two disturbances and
+  could abandon its lake after a single attack; alarms within 3 seconds are now one incident.
+- Flying birds pass floating islands sensibly: under one when there is room at their height (unless they are
+  going up onto it, as an owl to its roost), else round it or over
+  it, whichever is gentler, decided about 100 blocks out (they used to read an island as a mountain from the ground
+  up, climb at the last moment, and crawl when underneath one).
+- `/flocks schedule` also covers the waterbirds near you: whether their season keeps them or sends them off (with the
+  days until that changes), today's landing flocks and how each went, and which flocks nearby are leaving.
+
 ## 0.21.2
 Quieter birds, and fewer of them (a player: so many birds you can't hear the game, everywhere, and the real
 recordings sounded like a zoo).

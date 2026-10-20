@@ -55,6 +55,7 @@ namespace Flocks
 
         public EntityBehaviorRaptor(Entity entity) : base(entity) { }
         public override string PropertyName() => Code;
+        protected override Vec3d Destination => perchSpot ?? prey?.Pos.XYZ;
         protected override float AnimSpeed(string code) => code switch { "takeoff" => 1.6f, "fly-flap" => 1.1f, "land" => 1.2f, _ => 1f };
 
         /// <summary>For diagnostics and the in-engine tests.</summary>

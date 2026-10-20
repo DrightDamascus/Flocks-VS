@@ -7,7 +7,7 @@
 	hitboxSize: { x: 0.9, y: 0.9 },
 	deadHitboxSize: { x: 1.0, y: 0.5 },
 	eyeHeight: 1.75,
-	fallDamageMultiplier: 0.5,
+	fallDamageMultiplier: 0, // no fall damage: a bird never dies of a fall (a stooping eagle was killed by one)
 	drops: [],
 	attributes: {
 		handbook: { exclude: true }

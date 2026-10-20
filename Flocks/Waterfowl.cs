@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Common.Entities;
@@ -27,7 +28,9 @@ namespace Flocks
     public class EntityBehaviorWaterfowl : EntityBehaviorBird
     {
         public const string Code = "flocks.waterfowl";
-        private const string SpawnKey = "flocksSpawnHours", FlightKey = "flocksFlight";
+        private const string SpawnKey = "flocksSpawnHours";
+        /// <summary>The flight state, kept while it is off the water (the flock camera reads it to see a flock is down).</summary>
+        public const string FlightKey = "flocksFlight";
         /// <summary>Set by /flocks land on its test geese: they leave after lifeHours. Every other goose is a resident
         /// (spawned by vanilla's spawner) and stays until its resident season ends.</summary>
         public const string TestKey = "flocksTestGoose";
@@ -113,6 +116,8 @@ namespace Flocks
         private readonly List<Vec3d> badSpots = new();
         private bool departing;
         private double cruise, travel, threatX, threatZ;
+        /// <summary>The heading a bird without a spot set off on, held past obstacles (NaN until it is airborne).</summary>
+        private double course = double.NaN;
 
         private Entity scarer;
         private float nextCheck;
@@ -122,6 +127,7 @@ namespace Flocks
 
         protected override float AnimSpeed(string code) => code switch { "takeoff" => 2.6f, "fly-flap" => 1.6f, "land" => 1.3f, _ => 1f };
         public override string PropertyName() => Code;
+        protected override Vec3d Destination => target;
 
         public override void Initialize(EntityProperties properties, JsonObject attributes)
         {
@@ -262,6 +268,99 @@ namespace Flocks
                     (float)(0.08 + rand.NextDouble() * 0.5));
         }
 
+        /// <summary>/flocks depart: this bird's group leaves the lake now and rejoins the migration, as at the end of its
+        /// season (toward the equator: 0 = south, pi = north). False unless it is on the water.</summary>
+        public bool Depart()
+        {
+            if (phase != Phase.Water || !entity.Alive) return false;
+            bool northern = entity.World.Calendar.OnGetLatitude(entity.Pos.AsBlockPos.Z) >= 0;
+            TakeoffGroup((northern ? 0 : Math.PI) + (rand.NextDouble() - 0.5) * 0.5, null, true);
+            return true;
+        }
+
+        // the V a departing flock flies in: this bird's leader and slot (rank back, side), refreshed every second, and
+        // the speed cap and height the slot asks for this tick (NaN: no formation)
+        private Entity leader;
+        private int rank, side;
+        private float formCheck;
+        private double formCap = double.NaN, formY = double.NaN;
+
+        /// <summary>
+        /// A departing flock flies in a V. The member with the lowest entity id leads: it holds the course (true is not
+        /// returned, so the caller steers it) at its slowest cruise, so the rest can close up. Each of the others keeps a
+        /// slot behind it, rank by rank, alternating sides, with the spacing landing flocks start in (LandingFlocks.FormBack,
+        /// FormOut): it steers for a point a little ahead of its slot and speeds up or eases off to hold it. Terrain
+        /// avoidance still has the last word. True when this bird is following its slot (steering done).
+        /// </summary>
+        private bool Formation(float dt)
+        {
+            formCap = formY = double.NaN;
+            if ((formCheck -= dt) <= 0) { formCheck = 1; FindPlace(); }
+            if (leader == null) return false;
+            if (leader == entity) { formCap = cruiseMin; return false; }
+            var lb = leader.Alive ? leader.GetBehavior<EntityBehaviorWaterfowl>() : null;
+            if (lb == null || !lb.DepartingInFlight) { leader = null; return false; }
+            var pos = entity.Pos; var lp = leader.Pos;
+            double dx = Math.Sin(lb.flyHeading), dz = Math.Cos(lb.flyHeading);
+            double back = rank * LandingFlocks.FormBack, across = side * rank * LandingFlocks.FormOut;
+            // X along the heading, across = (cos, -sin), as for the landing flocks' V
+            double sx = lp.X - dx * back + dz * across, sz = lp.Z - dz * back - dx * across;
+            double ex = sx - pos.X, ez = sz - pos.Z, along = ex * dx + ez * dz;
+            Steer(Math.Atan2(sx + dx * 8 - pos.X, sz + dz * 8 - pos.Z), TurnRate * 1.5, dt);
+            formCap = GameMath.Clamp(lb.speed + along * 0.8, lb.speed * 0.6, cruiseMax * 1.3);
+            formY = lp.Y + rank * 0.15;
+            return true;
+        }
+
+        /// <summary>This bird's place in its flock's V: the departing members in flight nearby, by entity id.</summary>
+        private void FindPlace()
+        {
+            leader = null;
+            long id = FlockId;
+            if (id == 0) return;
+            var members = entity.World.GetEntitiesAround(entity.Pos.XYZ, 64, 48, e => e.Alive && e.Code.Equals(entity.Code)
+                    && e.WatchedAttributes.GetLong(FlockRegistry.FlockIdKey, 0) == id && e.GetBehavior<EntityBehaviorWaterfowl>()?.DepartingInFlight == true)
+                .OrderBy(e => e.EntityId).ToList();
+            int i = members.IndexOf(entity);
+            if (i < 0 || members.Count < 2) return;
+            leader = members[0];
+            rank = (i + 1) / 2; side = i == 0 ? 0 : (i % 2 == 0 ? 1 : -1);
+        }
+
+        /// <summary>On the water (not flying, landing or taking off).</summary>
+        public bool OnWater => phase == Phase.Water;
+        public bool Flying => phase == Phase.Fly;
+        public bool HasSpot => target != null;
+
+        /// <summary>/flocks journey (FlockJourney): fly on along this heading, for good, setting off from the water first
+        /// if it is on it. Called again as the heading changes; a bird coming in to land is left to it.</summary>
+        public void JourneyCourse(double h)
+        {
+            if (!entity.Alive) return;
+            if (phase == Phase.Water) Takeoff(h, null, true, entity.Pos.X, entity.Pos.Z, (float)(rand.NextDouble() * 0.5));
+            else if (phase != Phase.Fly) return;
+            if (target != null) NewTarget(null);
+            departing = true;
+            course = h;
+        }
+
+        /// <summary>A journey's bird looks for water to come down on (it flies on along its course if there is none).</summary>
+        public void JourneySeekWater()
+        {
+            if (phase != Phase.Fly || target != null) return;
+            departing = false; searchTimer = 0;
+        }
+
+        /// <summary>A journey's bird comes down on this spot (its home lake).</summary>
+        public void JourneyLand(Vec3d spot)
+        {
+            if (phase != Phase.Fly) return;
+            badSpots.Clear(); spotChanges = 0;
+            NewTarget(spot.Clone()); target.Y -= sink;
+            departing = false;
+            Persist();
+        }
+
         /// <summary>Go up for a loafing flight now (tests). False unless it is on the water and its species loafs.</summary>
         public bool Loaf()
         {
@@ -305,7 +404,7 @@ namespace Flocks
         {
             if (phase != Phase.Water || !entity.Alive) return;
             phase = Phase.Run; phaseTime = -delay; runStarted = false;
-            flyHeading = towards; speed = 0; travel = 0; searchTimer = 3;
+            flyHeading = towards; speed = 0; travel = 0; searchTimer = 3; course = double.NaN;
             cruise = cruiseMin + rand.NextDouble() * (cruiseMax - cruiseMin);
             badSpots.Clear(); spotChanges = 0;
             NewTarget(spot); if (target != null) target.Y -= sink;
@@ -374,15 +473,30 @@ namespace Flocks
                     {
                         LaneAim(out double ax, out double az, out bool laneEnd);
                         double want = Math.Atan2(ax - pos.X, az - pos.Z);
+                        // something big in the way further out (a floating island, a mountain): round it, if that's gentler
+                        double planned = PlanCourse(want, dt);
+                        if (planned != want) laneEnd = false;
+                        want = planned;
                         // the fly-on-before-turning rule only for the lane's fixed outer end: the point pursued along the
                         // lane moves with the goose, and flying on from it would only lead off the lane
                         bool tooClose = laneEnd && Math.Sqrt((ax - pos.X) * (ax - pos.X) + (az - pos.Z) * (az - pos.Z)) < 2.2 * speed / TurnRate
                             && Math.Abs(GameMath.AngleRadDistance((float)flyHeading, (float)want)) > 1.2;
                         if (!tooClose) Steer(want, TurnRate, dt);
                     }
-                    vy = ClimbRate(wheeling ? Math.Max(wheelY + wheelAlt, GroundAhead() + GroundClear) : CruiseY());
-                    double cap = wheeling ? cruise * 0.85 : cruise;
+                    else if (target == null && phaseTime > 0.8 && !(departing && Formation(dt)))
+                    {
+                        // on its way (departing, or searching): hold the course it set off on, rounding what's in the way
+                        if (double.IsNaN(course)) course = flyHeading;
+                        Steer(PlanCourse(course, dt), TurnRate, dt);
+                    }
+                    bool inVee = departing && target == null && !wheeling && phaseTime > 0.8 && !double.IsNaN(formCap);
+                    vy = ClimbRate(wheeling ? Math.Max(wheelY + wheelAlt, GroundAhead() + GroundClear)
+                        : inVee && !double.IsNaN(formY) ? Math.Max(formY, GroundAhead() + GroundClear) : CruiseY());
+                    double cap = wheeling ? cruise * 0.85 : inVee ? formCap : cruise;
                     AvoidTerrain(ref vy, ref cap, dt);
+                    // on a journey the camera's player loads the land as they go: where it isn't there yet, slow down for it
+                    if (FlockJourney.Has(FlockId) && entity.World.BlockAccessor.GetChunkAtBlockPos(
+                        (int)(pos.X + Math.Sin(flyHeading) * 48), (int)pos.Y, (int)(pos.Z + Math.Cos(flyHeading) * 48)) == null) cap = Math.Min(cap, 3);
                     speed = speed < cap ? Math.Min(cap, speed + Accel * dt) : Math.Max(cap, speed - PullDecel * dt);
                     // beat hard while climbing out or pulling up, cruise-flap otherwise (with some hysteresis); a bird
                     // that glides a lot (soarShare) holds its wings out for stretches of level flight
@@ -485,17 +599,23 @@ namespace Flocks
             if (target != null) { double d = HorDist(target); alt = Math.Min(40, Math.Max(GameMath.Clamp(d * 0.25, 6, 22), approachSlope * Math.Min(d, LaneLength + 8) + 2)); }
             double ground = GroundAhead();
             if (target == null && ground > 0) baseY = ground;
-            return Math.Max(baseY + alt, ground + GroundClear);
+            double want = Math.Max(baseY + alt, ground + GroundClear);
+            // under a floating island: stay below it, with headroom (FloorAt already judged the gap wide enough)
+            int ceiling = CeilingAhead(24);
+            if (ceiling != int.MaxValue) want = Math.Max(Math.Min(want, ceiling - Headroom - 1), ground + Clearance);
+            // a climb planned over something far ahead (PlanCourse) starts now, steadily
+            return Math.Max(want, PlannedClimb);
         }
 
-        /// <summary>The highest ground or tree top within 24 blocks straight ahead (0 if none is loaded).</summary>
+        /// <summary>The highest ground or tree top within 24 blocks straight ahead (0 if none is loaded); what it can fly
+        /// under (FloorAt) doesn't count.</summary>
         private double GroundAhead()
         {
             var pos = entity.Pos; var ba = entity.World.BlockAccessor;
             double ground = 0;
             for (int d = 0; d <= 24; d += 6)
             {
-                int h = ba.GetRainMapHeightAt((int)Math.Floor(pos.X + Math.Sin(flyHeading) * d), (int)Math.Floor(pos.Z + Math.Cos(flyHeading) * d));
+                int h = FloorAt(ba, (int)Math.Floor(pos.X + Math.Sin(flyHeading) * d), (int)Math.Floor(pos.Z + Math.Cos(flyHeading) * d), pos.Y);
                 if (h > 0) ground = Math.Max(ground, h + 1);
             }
             return ground;
