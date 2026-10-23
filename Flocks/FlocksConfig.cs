@@ -2,7 +2,12 @@ using System.Collections.Generic;
 
 namespace Flocks
 {
-    /// <summary>Client config, ModConfig/flocks.json. Written with defaults on first run.</summary>
+    /// <summary>
+    /// ModConfig/flocks.json: the passing flocks. Written with defaults on first run. The server plans and flies them
+    /// (MigrationScheduler, SkyFlocks), so everything here but FlockCallVolume is read from the server's copy: in single
+    /// player that is this same file; on a multiplayer server, the server's, and a player's own copy only sets how loud
+    /// the flocks call for them.
+    /// </summary>
     public class FlocksConfig
     {
         /// <summary>Flocks fly over on their own during the migration seasons. /flocks send works either way.</summary>
@@ -17,27 +22,32 @@ namespace Flocks
         public float MaxDelayHours = 3f;
         /// <summary>Testing: every day is a peak autumn migration day for every species, whatever the season.</summary>
         public bool ForceMigration = false;
-        /// <summary>Write each day's plan to client-main.log.</summary>
+        /// <summary>Write each player's plan for the day, and what came of each flock, to server-main.log.</summary>
         public bool LogSchedule = true;
-        /// <summary>Volume of the distant calls of flying flocks (0 = silent, 1 = default). Landed geese use the game's
-        /// normal entity sounds and volume.</summary>
+        /// <summary>How loud the passing flocks' calls are (1 = as made, 0 = never heard); each player's own setting.
+        /// Birds on the ground nearby are entities and follow the game's own sound settings instead.</summary>
         public float FlockCallVolume = 1f;
-        /// <summary>Species that migrate on their own (false = never scheduled; /flocks send still works).</summary>
+        /// <summary>Switches for the geese and cranes flying over on their own (off: never planned; /flocks send still
+        /// sends one).</summary>
         public bool Geese = true, Cranes = true;
         /// <summary>Deprecated, not read: the hawk was removed in 0.19.1 (it was drawn with the game's own unused hawk
         /// shape, and real hawks rarely pass over in groups). Kept so older flocks.json files still load as they are.</summary>
         public bool Hawks = false;
-        /// <summary>Reserved: enables fantasy creatures (the amphithere). Not read anywhere yet; the amphithere ships as
-        /// assets only (shapes/entity/amphithere.json) with no entity, spawning or AI.</summary>
+        /// <summary>Kept for a fantasy creature that may come later (the amphithere, whose model ships unused in
+        /// shapes/entity/amphithere.json). Nothing reads it yet.</summary>
         public bool FantasyCreatures = false;
 
         /// <summary>Species codes (config/flocks-species/) that never migrate on their own, for birds without a switch
         /// above, e.g. ["gull"]. /flocks send still works.</summary>
         public List<string> DisabledSpecies = new();
 
-        public bool SpeciesEnabled(string code) => code switch
+        /// <summary>Whether the species flies over on its own: the goose and the crane by their switches above, any
+        /// other unless DisabledSpecies lists it.</summary>
+        public bool SpeciesEnabled(string code)
         {
-            "goose" => Geese, "crane" => Cranes, _ => DisabledSpecies == null || !DisabledSpecies.Contains(code),
-        };
+            if (code == "goose") return Geese;
+            if (code == "crane") return Cranes;
+            return DisabledSpecies?.Contains(code) != true;
+        }
     }
 }

@@ -54,11 +54,14 @@ namespace FlocksTest
         public override void StartServerSide(ICoreServerAPI api)
         {
             sapi = api;
+            EntityBehaviorBird.MoveUntracked = false;   // the harness steps untracked birds' physics itself (Physics)
             // nobody is online, so keep every goose ticking (also the ones the mod spawns for a landing flock)
             sapi.Event.OnEntitySpawn += e =>
             {
                 if (e.Code?.Domain != "flocks") return;
                 e.AlwaysActive = true; e.State = EnumEntityState.Active;
+                // a passing flock's bird: physics from its first tick, or it hangs while its slot moves on
+                if (e.Attributes.HasAttribute(EntityBehaviorBird.PassageKey)) extraPhysics.Add(e);
             };
             sapi.Event.OnEntityDeath += (e, ds) =>
             {
@@ -721,10 +724,7 @@ namespace FlocksTest
                     $"prey {(rb.Prey == null ? "none" : $"{rb.Prey.Pos.X - c.X:0.0},{rb.Prey.Pos.Y - y0:0.0},{rb.Prey.Pos.Z - c.Z:0.0}")} " +
                     $"(states {string.Join(", ", eagleStates)}), flock wariness {w:0.0}");
                 Check(eagleStates.Contains("Stoop") && RState(eagle) != "Stoop", $"the stoop ended ({RState(eagle)})");
-                // disturbed enough to leave (spotted the eagle, then lost one), the flock abandons the lake and its wariness
-                // starts again from 0: that counts too
-                bool left = FlockRegistry.Instance.IsAbandoned(c.X - 40, c.Z);
-                Check(w >= 1 || left, $"the attack disturbed the flock (wariness {w:0.0}{(left ? ", and they abandoned the lake" : "")}; they leave the lake at {new FlocksServerConfig().LeaveAt})");
+                Check(w >= 1, $"the attack disturbed the flock (wariness {w:0.0}; they leave the lake at {new FlocksServerConfig().LeaveAt})");
                 Check(dead == 0 || RState(eagle) == "ToPerch" || RState(eagle) == "Feed" || RState(eagle) == "Takeoff",
                     "a duck caught on the water is carried off, not left floating");
             }, 50));
@@ -973,6 +973,7 @@ namespace FlocksTest
             QueueButcheringSteps();
             QueueLandAndCageSteps();
             QueueConfigSteps();
+            QueuePassingSteps();
             QueuePerfSteps();
 
             steps.Enqueue(("memory", () => { }, () => true, () =>
@@ -1467,6 +1468,7 @@ namespace FlocksTest
             if (eagle != null && eagle.Alive) tick.Add(eagle);
             if (owl != null && owl.Alive) tick.Add(owl);
             tick.AddRange(extraPhysics.Where(e => e.Alive));
+            tick.AddRange(bodies.Where(e => e.State != EnumEntityState.Despawned));
             foreach (var e in tick)
             {
                 if (e.IsTracked != 0) continue; // a player sees it: the server does it

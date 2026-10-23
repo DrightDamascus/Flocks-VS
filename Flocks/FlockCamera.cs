@@ -25,6 +25,8 @@ namespace Flocks
         [ProtoMember(5)] public bool Stop;
         /// <summary>A whole journey (FlockJourney): no time limit, and the server, not the client, says when it's over.</summary>
         [ProtoMember(6)] public bool Journey;
+        /// <summary>A passing flock to follow instead (SkyFlocks id; FlockId is then 0).</summary>
+        [ProtoMember(7)] public long SkyId;
     }
 
     /// <summary>
@@ -79,6 +81,10 @@ namespace Flocks
         /// <summary>Tells the client which flock to follow (the player is a spectator already: Begin).</summary>
         public void Follow(IServerPlayer plr, long flockId, Vec3d at, bool journey = false)
             => channel.SendPacket(new FlockCamPacket { FlockId = flockId, X = at.X, Y = at.Y, Z = at.Z, Journey = journey }, plr);
+
+        /// <summary>Tells the client to follow a passing flock (/flocks send ... watch; the player is a spectator already).</summary>
+        public void FollowSky(IServerPlayer plr, long skyId, Vec3d at)
+            => channel.SendPacket(new FlockCamPacket { SkyId = skyId, X = at.X, Y = at.Y, Z = at.Z }, plr);
 
         /// <summary>Makes the player a spectator for a watch, keeping where and how they were; null when done, else why
         /// not. The client is told what to follow separately (Start, or a passing flock's /flocks send).</summary>
@@ -163,12 +169,19 @@ namespace Flocks
         private void OnPacket(FlockCamPacket pkt)
         {
             if (pkt.Stop) { active = false; sky = null; return; }
+            if (pkt.SkyId != 0)
+            {
+                // the flock itself came just before, on the same channel
+                var f = renderer.Get(pkt.SkyId);
+                if (f != null) WatchSky(f); else Cancel();
+                return;
+            }
             Begin(pkt.FlockId, null, new Vec3d(pkt.X, pkt.Y, pkt.Z));
             journey = pkt.Journey;
         }
 
         /// <summary>Follow a passing flock (/flocks send ... watch); the server has already made the player a spectator.</summary>
-        public void WatchSky(Flock f) => Begin(0, f, SkyCentre(f));
+        public void WatchSky(Flock f) => Begin(0, f, f.Centre);
 
         /// <summary>A watch the server began that can't go ahead (no flock was sent): put the player back.</summary>
         public void Cancel() { active = true; Finish(); }
@@ -183,10 +196,6 @@ namespace Flocks
             if (f != null) { dirX = Math.Sin(f.Heading); dirZ = Math.Cos(f.Heading); }
             else if (len > 1) { dirX = dx / len; dirZ = dz / len; }   // until it moves: looking out from where the player was
         }
-
-        /// <summary>The middle of a passing flock: its leader, back half the formation's length.</summary>
-        private static Vec3d SkyCentre(Flock f)
-            => new Vec3d(f.Pos.X - Math.Sin(f.Heading) * f.Tail * 0.5, f.Pos.Y + (f.Rise - f.Drop) * 0.5, f.Pos.Z - Math.Cos(f.Heading) * f.Tail * 0.5);
 
         public void OnRenderFrame(float dt, EnumRenderStage stage)
         {
@@ -219,7 +228,7 @@ namespace Flocks
             else
             {
                 seen = true; missing = 0;
-                var c = sky != null ? SkyCentre(sky)
+                var c = sky != null ? sky.Centre
                     : new Vec3d(members.Average(b => b.Pos.X), members.Average(b => b.Pos.Y), members.Average(b => b.Pos.Z));
                 // the way it's going, from its centre's movement, eased
                 if (lastCentre != null && dt > 0)

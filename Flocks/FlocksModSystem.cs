@@ -12,38 +12,20 @@ using ProtoBuf;
 
 namespace Flocks
 {
-    /// <summary>Server -> client: run a /flocks subcommand on the caller's client, which owns the birds.</summary>
-    [ProtoContract]
-    public class SendFlockPacket
-    {
-        [ProtoMember(1)] public int Count;
-        [ProtoMember(2)] public string Species;
-        [ProtoMember(3)] public string Command; // null or "send" = send a flock, "schedule" = show today's plan
-        /// <summary>schedule: the server's part (landed flocks leaving, landing flocks coming in), shown after the sky's.</summary>
-        [ProtoMember(4)] public string Local;
-        /// <summary>send: follow the flock with the camera (the server has made the player a spectator already).</summary>
-        [ProtoMember(5)] public bool Watch;
-    }
-
-    /// <summary>Server -> client: the species whose passing flocks aren't drawn where the player is, because the Biomes mod
-    /// puts that spot outside their realms (BiomesCompat; Biomes runs on the server only). Sent when it changes.</summary>
-    [ProtoContract]
-    public class SkyRealmsPacket
-    {
-        [ProtoMember(1)] public string[] Absent;
-    }
-
-    /// <summary>Client-side migrating flocks: a renderer, the species, and a scheduler that sends them in season.</summary>
+    /// <summary>
+    /// Flocks' mod system. The server runs the birds: residents, landing flocks, the registry, and the passing flocks
+    /// (SkyFlocks, sent over in season by the MigrationScheduler). The client draws the passing flocks the server reports
+    /// (FlockRenderer) and runs the flock camera.
+    /// </summary>
     public class FlocksModSystem : ModSystem
     {
-        private ICoreClientAPI capi;
         /// <summary>This side's species (config/flocks-species/), filled when assets load; the same dictionary is handed
         /// to everything that needs it, so it is complete before the world runs.</summary>
         private readonly Dictionary<string, Species> species = new();
         public Dictionary<string, Species> SpeciesByCode => species;
         private FlockRenderer renderer;
         private MigrationScheduler scheduler;
-        private FlocksConfig config;
+        private SkyFlocks sky;
         public const string DefaultSpecies = "goose";
         public const string ConfigFile = "flocks.json";
 
@@ -51,12 +33,12 @@ namespace Flocks
 
         public override void Start(ICoreAPI api)
         {
-            api.Network.RegisterChannel("flocks").RegisterMessageType<SendFlockPacket>().RegisterMessageType<SkyRealmsPacket>()
-                .RegisterMessageType<FlockCamPacket>();
-            api.RegisterEntityBehaviorClass(EntityBehaviorWaterfowl.Code, typeof(EntityBehaviorWaterfowl));
-            api.RegisterEntityBehaviorClass(EntityBehaviorRaptor.Code, typeof(EntityBehaviorRaptor));
-            api.RegisterEntityBehaviorClass(EntityBehaviorCorvid.Code, typeof(EntityBehaviorCorvid));
-            api.RegisterEntityBehaviorClass(EntityBehaviorOwl.Code, typeof(EntityBehaviorOwl));
+            api.Network.RegisterChannel("flocks").RegisterMessageType<SkyFlockPacket>().RegisterMessageType<FlockCamPacket>();
+            // the birds' behaviours, by the codes the entity files name them with
+            foreach (var (code, type) in new[] {
+                (EntityBehaviorWaterfowl.Code, typeof(EntityBehaviorWaterfowl)), (EntityBehaviorRaptor.Code, typeof(EntityBehaviorRaptor)),
+                (EntityBehaviorCorvid.Code, typeof(EntityBehaviorCorvid)), (EntityBehaviorOwl.Code, typeof(EntityBehaviorOwl)) })
+                api.RegisterEntityBehaviorClass(code, type);
         }
 
         public override void AssetsLoaded(ICoreAPI api)
@@ -67,7 +49,6 @@ namespace Flocks
 
         public override void AssetsFinalize(ICoreAPI api) => Scarecrows.HandbookText(api);
 
-        /// <summary>/flocks (typed with a slash) goes to the server; it only relays the subcommand to the caller's client.</summary>
         private ResidentGeese residents;
         private FlockRegistry registry;
         private LandingFlocks landings;
@@ -78,53 +59,39 @@ namespace Flocks
 
         public override void StartServerSide(ICoreServerAPI sapi)
         {
-            residents = new ResidentGeese(sapi, LoadServerConfig(sapi), species);
+            residents = new ResidentGeese(sapi, ReadConfig<FlocksServerConfig>(sapi, ServerConfigFile), species);
             ScaleNumbers(sapi, residents.Cfg.Numbers);
-            var ch = sapi.Network.GetChannel("flocks");
-            camera = new FlockCamera(sapi, ch);
+            IServerNetworkChannel channel = sapi.Network.GetChannel("flocks");
+            camera = new FlockCamera(sapi, channel);
             journeys = new FlockJourney(sapi, camera, (sp, spring, at) =>
                 MoveClockToSeason(sapi, sp, spring, at, 0, out double moved) ? $"{moved:0.0} days on, {sapi.World.Calendar.PrettyDate()}" : sapi.World.Calendar.PrettyDate());
             registry = new FlockRegistry(sapi, residents.Cfg);
             landings = new LandingFlocks(sapi, species);
-            // tell each client which species don't fly over its player: switched off in the server config (Animals), or,
-            // with the Biomes mod, not of the realm the player stands in
-            var realmsSent = new Dictionary<string, string>();
-            sapi.Event.RegisterGameTickListener(_ =>
-            {
-                foreach (IServerPlayer plr in sapi.World.AllOnlinePlayers)
-                {
-                    if (plr.Entity == null || plr.ConnectionState != EnumClientState.Playing) continue;
-                    var pos = plr.Entity.Pos.AsBlockPos;
-                    var absent = species.Values.Where(sp => !residents.Cfg.SpeciesEnabled(sp) || !BiomesCompat.Allows(sapi, sp, pos))
-                        .Select(sp => sp.Code).OrderBy(c => c).ToArray();
-                    string key = string.Join(",", absent);
-                    if (realmsSent.TryGetValue(plr.PlayerUID, out var last) && last == key) continue;
-                    realmsSent[plr.PlayerUID] = key;
-                    sapi.Network.GetChannel("flocks").SendPacket(new SkyRealmsPacket { Absent = absent }, plr);
-                }
-            }, 20000, 3000);
-            sapi.Event.PlayerDisconnect += plr => realmsSent.Remove(plr.PlayerUID);
-            var p = sapi.ChatCommands.Parsers;
+            sky = new SkyFlocks(sapi, channel, species);
+            // flocks.json: the passing flocks' schedule settings (in single player the same file the client reads)
+            scheduler = new MigrationScheduler(sapi, sky, species, ReadConfig<FlocksConfig>(sapi, ConfigFile), residents.Cfg);
+            var parsers = sapi.ChatCommands.Parsers;
             sapi.ChatCommands.Create("flocks").WithDescription(Lang.Get("flocks:cmd-flocks")).RequiresPrivilege(Privilege.chat)
                 .BeginSubCommand("send").WithDescription(Lang.Get("flocks:cmd-send")).RequiresPlayer()
-                .WithArgs(p.OptionalInt("count", 12), p.OptionalWord("species"), p.OptionalWord("watch"))
-                .HandleWith(args => SendRelay((IServerPlayer)args.Caller.Player, args, pkt => ch.SendPacket(pkt, (IServerPlayer)args.Caller.Player)))
+                .RequiresPrivilege(Privilege.controlserver)
+                .WithArgs(parsers.OptionalInt("count", 12), parsers.OptionalWord("species"), parsers.OptionalWord("watch"))
+                .HandleWith(args => Send((IServerPlayer)args.Caller.Player, (int)args[0], args[1] as string, args[2] as string))
                 .EndSubCommand()
                 .BeginSubCommand("schedule").WithDescription(Lang.Get("flocks:cmd-schedule")).RequiresPlayer()
                 .HandleWith(args =>
                 {
-                    ch.SendPacket(new SendFlockPacket { Command = "schedule", Local = LocalSchedule(sapi, (IServerPlayer)args.Caller.Player) }, (IServerPlayer)args.Caller.Player);
-                    return TextCommandResult.Success();
+                    var plr = (IServerPlayer)args.Caller.Player;
+                    return TextCommandResult.Success(scheduler.Report(plr, LocalSchedule(sapi, plr)));
                 })
                 .EndSubCommand()
                 .BeginSubCommand("season").WithDescription(Lang.Get("flocks:cmd-season")).RequiresPlayer()
                 .RequiresPrivilege(Privilege.controlserver)
-                .WithArgs(p.Word("season"), p.OptionalWord("species"), p.OptionalDouble("days", 0))
+                .WithArgs(parsers.Word("season"), parsers.OptionalWord("species"), parsers.OptionalDouble("days", 0))
                 .HandleWith(args => JumpToSeason(sapi, args.Caller.Entity, args[0] as string, args[1] as string, (double)args[2]))
                 .EndSubCommand()
                 .BeginSubCommand("depart").WithDescription(Lang.Get("flocks:cmd-depart")).RequiresPlayer()
                 .RequiresPrivilege(Privilege.controlserver)
-                .WithArgs(p.OptionalWord("species"), p.OptionalWord("watch"))
+                .WithArgs(parsers.OptionalWord("species"), parsers.OptionalWord("watch"))
                 .HandleWith(args =>
                 {
                     string code = SpeciesAndWatch(args, out bool watch);
@@ -134,7 +101,7 @@ namespace Flocks
                 .EndSubCommand()
                 .BeginSubCommand("journey").WithDescription(Lang.Get("flocks:cmd-journey")).RequiresPlayer()
                 .RequiresPrivilege(Privilege.controlserver)
-                .WithArgs(p.OptionalWord("species"))
+                .WithArgs(parsers.OptionalWord("species"))
                 .HandleWith(args => StartJourney(sapi, (IServerPlayer)args.Caller.Player, args[0] as string))
                 .EndSubCommand()
                 .BeginSubCommand("unwatch").WithDescription(Lang.Get("flocks:cmd-unwatch")).RequiresPlayer()
@@ -143,7 +110,7 @@ namespace Flocks
                 .EndSubCommand()
                 .BeginSubCommand("land").WithDescription(Lang.Get("flocks:cmd-land")).RequiresPlayer()
                 .RequiresPrivilege(Privilege.controlserver)
-                .WithArgs(p.OptionalInt("count", 0), p.OptionalWord("species"))
+                .WithArgs(parsers.OptionalInt("count", 0), parsers.OptionalWord("species"))
                 .HandleWith(args =>
                 {
                     var sp = LandingSpecies(args[1] as string, out string err);
@@ -152,14 +119,13 @@ namespace Flocks
                 .EndSubCommand()
                 .BeginSubCommand("arrive").WithDescription(Lang.Get("flocks:cmd-arrive")).RequiresPlayer()
                 .RequiresPrivilege(Privilege.controlserver)
-                .WithArgs(p.OptionalWord("species"), p.OptionalWord("watch"))
+                .WithArgs(parsers.OptionalWord("species"), parsers.OptionalWord("watch"))
                 .HandleWith(args =>
                 {
                     var sp = LandingSpecies(SpeciesAndWatch(args, out bool watch), out string err);
                     if (sp == null) return TextCommandResult.Error(err);
                     var plr = (IServerPlayer)args.Caller.Player;
-                    bool ok = landings.Arrive(plr, sp, true, out string msg);
-                    if (!ok) return TextCommandResult.Error(msg);
+                    if (!landings.Arrive(plr, sp, true, out string msg)) return TextCommandResult.Error(msg);
                     return watch ? Watch(TextCommandResult.Success(msg), plr, landings.LastFlockId, landings.LastEntry) : TextCommandResult.Success(msg);
                 })
                 .EndSubCommand()
@@ -182,7 +148,7 @@ namespace Flocks
                 .EndSubCommand()
                 .BeginSubCommand("lineup").WithDescription(Lang.Get("flocks:cmd-lineup")).RequiresPlayer()
                 .RequiresPrivilege(Privilege.controlserver)
-                .WithArgs(p.OptionalWord("pose"), p.OptionalDouble("spacing", 2.5))
+                .WithArgs(parsers.OptionalWord("pose"), parsers.OptionalDouble("spacing", 2.5))
                 .HandleWith(args => Lineup(sapi, args.Caller.Entity, args[0] as string ?? "stand", (double)args[1]))
                 .EndSubCommand()
                 .BeginSubCommand("residents").WithDescription(Lang.Get("flocks:cmd-residents"))
@@ -385,89 +351,64 @@ namespace Flocks
             return null;
         }
 
-        private string TrySend(int count, string code, out bool ok, bool watch = false)
-        {
-            ok = false;
-            if (watch)
-            {
-                // a watch the server began: follow the flock if one went up, else put the player back
-                string msg = TrySend(count, code, out ok);
-                if (ok) camClient.WatchSky(lastSent); else camClient.Cancel();
-                return ok ? msg + " " + Lang.Get("flocks:watch-started") : msg;
-            }
-            int n = GameMath.Clamp(count, 1, 60);
-            ok = false;
-            if (species == null || renderer == null) return Lang.Get("flocks:send-not-running");
-            code = (code ?? DefaultSpecies).ToLowerInvariant();
-            if (!species.TryGetValue(code, out var sp)) return Lang.Get("flocks:send-unknown", code, string.Join(", ", species.Keys));
-            if (sp.Meshes?.Ok != true) return Lang.Get("flocks:send-no-meshes", sp.DisplayName);
-            lastSent = renderer.Send(sp, n); ok = true;
-            return Lang.Get("flocks:send-sent", n, sp.DisplayName, renderer.VisibleRange(sp).ToString("0"), renderer.Count);
-        }
+        /// <summary>A command's answer: shown as a success or as an error.</summary>
+        private static TextCommandResult Reply(bool ok, string msg) => ok ? TextCommandResult.Success(msg) : TextCommandResult.Error(msg);
 
-        private Flock lastSent;
-        private FlockCameraClient camClient;
-
-        /// <summary>/flocks send [count] [species] [watch] on the server: "watch" (admin) makes the player a spectator
-        /// here, then the client sends the flock and follows it.</summary>
-        private TextCommandResult SendRelay(IServerPlayer plr, TextCommandCallingArgs args, Action<SendFlockPacket> relay)
+        /// <summary>
+        /// /flocks send [count] [species] [watch] (admin: the birds are real near players, so huntable): a passing flock of
+        /// 1-60 birds of the species (default goose) sets off toward the player now, from where it is out of sight. With
+        /// "watch" the player becomes a spectator and follows it.
+        /// </summary>
+        private TextCommandResult Send(IServerPlayer plr, int count, string code, string w)
         {
-            string code = args[1] as string, w = args[2] as string;
             bool watch = code == "watch" || w == "watch";
-            if (code == "watch") code = null;
+            if (code == "watch") code = w == "watch" ? null : w;
+            code = (code ?? DefaultSpecies).ToLowerInvariant();
+            if (!species.TryGetValue(code, out var sp)) return TextCommandResult.Error(Lang.Get("flocks:send-unknown", code, string.Join(", ", species.Keys)));
+            if (!residents.Cfg.SpeciesEnabled(sp)) return TextCommandResult.Error(Lang.Get("flocks:animal-off", sp.DisplayName));
             if (watch)
             {
-                if (!args.Caller.HasPrivilege(Privilege.controlserver)) return TextCommandResult.Error(Lang.Get("flocks:watch-privilege"));
                 string err = camera.Begin(plr);
                 if (err != null) return TextCommandResult.Error(err);
             }
-            relay(new SendFlockPacket { Command = "send", Count = (int)args[0], Species = code, Watch = watch });
-            return TextCommandResult.Success();
+            var rand = new Random();
+            int birds = GameMath.Clamp(count, 1, 60);
+            var f = sky.Launch(sp, birds, plr.Entity.Pos.XYZ, rand.NextDouble() * Math.PI * 2, sp.RandomAltitude(rand));
+            string msg = Lang.Get("flocks:send-sent", birds, sp.DisplayName, SkyFlocks.StartRange.ToString("0"), sky.All.Count);
+            if (!watch) return TextCommandResult.Success(msg);
+            camera.FollowSky(plr, f.Id, f.Centre);
+            return TextCommandResult.Success(msg + " " + Lang.Get("flocks:watch-started"));
         }
 
-        private string Schedule(string local = null) => scheduler?.Report(local) ?? "Flocks client part not running.";
+        private FlockCameraClient camClient;
 
         public override void StartClientSide(ICoreClientAPI api)
         {
-            capi = api;
-            config = LoadConfig(api);
-            renderer = new FlockRenderer(api) { CallVolume = Math.Max(0, config.FlockCallVolume) };
-            scheduler = new MigrationScheduler(api, renderer, species, config);
-            api.Event.RegisterGameTickListener(scheduler.Tick, 1000);
-            api.Event.LevelFinalize += () =>
+            var config = ReadConfig<FlocksConfig>(api, ConfigFile);
+            renderer = new FlockRenderer(api, species, config.FlockCallVolume);
+            api.Event.LevelFinalize += () => OnLevelReady(api);
+            var channel = api.Network.GetChannel("flocks");
+            camClient = new FlockCameraClient(api, channel, renderer);
+            channel.SetMessageHandler<SkyFlockPacket>(renderer.Apply);
+            api.Logger.Notification("[Flocks] client loaded");
+        }
+
+        /// <summary>Once the world is loaded on the client: the handbook text, each species' drawn-flock meshes and size,
+        /// and (the first time) the renderer.</summary>
+        private void OnLevelReady(ICoreClientAPI api)
+        {
+            Scarecrows.HandbookText(api);
+            foreach (var sp in species.Values)
             {
-                Scarecrows.HandbookText(api);
-                foreach (var sp in species.Values)
-                {
-                    if (sp.Meshes == null) sp.CreateMeshes(api);
-                    sp.Meshes.Load(); sp.FitScale();
-                    // one size for drawn and landed birds: the entity's client.size, so changing it there resizes both
-                    float size = string.IsNullOrEmpty(sp.SizeFromEntity) ? 0 : api.World.GetEntityType(new AssetLocation(sp.SizeFromEntity))?.Client?.Size ?? 0;
-                    if (size > 0) sp.Scale = size;
-                }
-                if (!rendererRegistered) { api.Event.RegisterRenderer(renderer, EnumRenderStage.Opaque, "flocks"); rendererRegistered = true; }
-            };
-            camClient = new FlockCameraClient(api, api.Network.GetChannel("flocks"), renderer);
-            api.Network.GetChannel("flocks").SetMessageHandler<SkyRealmsPacket>(pkt => scheduler.SetAbsent(pkt.Absent));
-            api.Network.GetChannel("flocks").SetMessageHandler<SendFlockPacket>(pkt =>
-            {
-                string msg = pkt.Command == "schedule" ? Schedule(pkt.Local) : TrySend(pkt.Count, pkt.Species, out _, pkt.Watch);
-                api.ShowChatMessage("[Flocks] " + msg);
-            });
-            var p = api.ChatCommands.Parsers;
-            api.ChatCommands.Create("flocks").WithDescription(Lang.Get("flocks:cmd-flocks"))
-                .BeginSubCommand("send").WithDescription(Lang.Get("flocks:cmd-send"))
-                .WithArgs(p.OptionalInt("count", 12), p.OptionalWord("species"))
-                .HandleWith(args =>
-                {
-                    string msg = TrySend((int)args[0], args[1] as string, out bool ok);
-                    return ok ? TextCommandResult.Success(msg) : TextCommandResult.Error(msg);
-                })
-                .EndSubCommand()
-                .BeginSubCommand("schedule").WithDescription(Lang.Get("flocks:cmd-schedule"))
-                .HandleWith(args => TextCommandResult.Success(Schedule()))
-                .EndSubCommand();
-            api.Logger.Notification("[Flocks] client loaded; automatic migration {0}", config.AutoMigration ? "on" : "off");
+                if (sp.Meshes == null) sp.CreateMeshes(api);
+                sp.Meshes.Load(); sp.FitScale();
+                // one size for drawn and landed birds: the entity's client.size, so changing it there resizes both
+                float size = string.IsNullOrEmpty(sp.SizeFromEntity) ? 0 : api.World.GetEntityType(new AssetLocation(sp.SizeFromEntity))?.Client?.Size ?? 0;
+                if (size > 0) sp.Scale = size;
+            }
+            if (rendererRegistered) return;
+            rendererRegistered = true;
+            api.Event.RegisterRenderer(renderer, EnumRenderStage.Opaque, "flocks");
         }
 
         public const string ServerConfigFile = "flocks-server.json";
@@ -488,40 +429,25 @@ namespace Flocks
             sapi.Logger.Notification("[Flocks] Numbers {0}: spawn caps and worldgen spawning scaled", k);
         }
 
-        private static FlocksServerConfig LoadServerConfig(ICoreServerAPI api)
+        /// <summary>
+        /// A config file from ModConfig, or the defaults when there is none yet. It is written back straight away, which
+        /// creates it on the first run and adds any settings newer than the file. A file that can't be read is left as
+        /// it is, so a typo doesn't cost the player their edits, and this session runs on the defaults.
+        /// </summary>
+        private static T ReadConfig<T>(ICoreAPI api, string file) where T : class, new()
         {
-            FlocksServerConfig cfg;
-            try { cfg = api.LoadModConfig<FlocksServerConfig>(ServerConfigFile); }
+            T settings;
+            try { settings = api.LoadModConfig<T>(file) ?? new T(); }
             catch (Exception ex)
             {
-                api.Logger.Error("[Flocks] {0} is unreadable, using defaults: {1}", ServerConfigFile, ex.Message);
-                return new FlocksServerConfig();
+                api.Logger.Error("[Flocks] {0} is unreadable, using defaults: {1}", file, ex.Message);
+                return new T();
             }
-            cfg ??= new FlocksServerConfig();
-            try { api.StoreModConfig(cfg, ServerConfigFile); }
-            catch (Exception ex) { api.Logger.Warning("[Flocks] could not write {0}: {1}", ServerConfigFile, ex.Message); }
-            return cfg;
+            try { api.StoreModConfig(settings, file); }
+            catch (Exception ex) { api.Logger.Warning("[Flocks] could not write {0}: {1}", file, ex.Message); }
+            return settings;
         }
 
-        private static FlocksConfig LoadConfig(ICoreClientAPI api)
-        {
-            FlocksConfig cfg;
-            try { cfg = api.LoadModConfig<FlocksConfig>(ConfigFile); }
-            catch (Exception ex)
-            {
-                // leave a broken file alone so the player's edits aren't lost; run on defaults this session
-                api.Logger.Error("[Flocks] {0} is unreadable, using defaults: {1}", ConfigFile, ex.Message);
-                return new FlocksConfig();
-            }
-            cfg ??= new FlocksConfig();
-            try { api.StoreModConfig(cfg, ConfigFile); } // writes defaults, and adds new fields to an older file
-            catch (Exception ex) { api.Logger.Warning("[Flocks] could not write {0}: {1}", ConfigFile, ex.Message); }
-            return cfg;
-        }
-
-        public override void Dispose()   // no meshes on the server
-        {
-            foreach (var sp in species.Values) sp.Meshes?.Dispose();
-        }
+        public override void Dispose() { foreach (var sp in species.Values) sp.Meshes?.Dispose(); } // no meshes on the server
     }
 }

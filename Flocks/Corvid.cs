@@ -83,8 +83,8 @@ namespace Flocks
         public override void Initialize(EntityProperties properties, JsonObject attributes)
         {
             base.Initialize(properties, attributes);
-            fleeRange = attributes["fleeRange"].AsFloat(fleeRange);
-            takeoffRange = attributes["takeoffRange"].AsFloat(takeoffRange);
+            ReadAttr(attributes, "fleeRange", ref fleeRange);
+            ReadAttr(attributes, "takeoffRange", ref takeoffRange);
             flySpeed = attributes["flySpeed"].AsDouble(flySpeed);
             walkSpeed = attributes["walkSpeed"].AsDouble(walkSpeed);
             perchMin = attributes["perchSecondsMin"].AsDouble(perchMin);
@@ -96,9 +96,9 @@ namespace Flocks
 
         public override void OnGameTick(float dt)
         {
-            if (entity.World.Side != EnumAppSide.Server) return;
-            if (entity.Alive && HoldIfFrozen()) return;   // /flocks lineup
+            if (!OnServer || entity.Alive && HoldIfFrozen()) return;   // HoldIfFrozen: /flocks lineup
             if (!entity.Alive) { entity.Pos.Roll = 0; return; }
+            if (Passage(dt)) return;   // one of a passing flock's birds (SkyFlocks)
             if (!restored) { restored = true; Restore(); FlockRegistry.Instance?.Adopt(entity, species); }
             LetSpearsPass(dt);
             TrackPosition(dt);
@@ -755,6 +755,7 @@ namespace Flocks
 
         public override void OnEntityLoaded()
         {
+            base.OnEntityLoaded();
             if (entity.WatchedAttributes[StateKey] is ITreeAttribute t)
             {
                 var s = (State)t.GetInt("state");
@@ -766,9 +767,8 @@ namespace Flocks
 
         public override void OnEntityReceiveDamage(DamageSource source, ref float damage)
         {
-            if (entity.World.Side != EnumAppSide.Server || damage <= 0 || source == null) return;
-            var from = source.GetCauseEntity() ?? source.SourceEntity;
-            double away = from != null ? Math.Atan2(entity.Pos.X - from.Pos.X, entity.Pos.Z - from.Pos.Z) : rand.NextDouble() * Math.PI * 2;
+            if (damage <= 0 || source == null || !OnServer || PassageHit(source, ref damage)) return;
+            var from = AttackerAndAway(source, out double away);
             if (Dodges(source))
             {
                 damage = 0;
@@ -777,14 +777,14 @@ namespace Flocks
             }
             if (from == null) return;
             // a real hit: the group flies off (this one too if it survives; health runs after us)
-            var threat = source.GetCauseEntity() ?? from;
+            var threat = from;
             entity.World.RegisterCallback(_ =>
             {
                 if (entity.Alive) { if (state == State.Forage || state == State.Perch) FlushGroup(away, threat, null); return; }
                 foreach (var e in entity.World.GetEntitiesAround(entity.Pos.XYZ, 24, 16, e => e.Code.Equals(entity.Code) && e.Alive))
                 {
                     var b = e.GetBehavior<EntityBehaviorCorvid>();
-                    if (b != null && (b.state == State.Forage || b.state == State.Perch)) { b.FlushGroup(away, threat, null); return; }
+                    if (b != null && !b.Passing && (b.state == State.Forage || b.state == State.Perch)) { b.FlushGroup(away, threat, null); return; }
                 }
             }, 1);
         }

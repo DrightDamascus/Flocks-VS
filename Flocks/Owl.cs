@@ -94,8 +94,7 @@ namespace Flocks
 
         public override void OnGameTick(float dt)
         {
-            if (entity.World.Side != EnumAppSide.Server) return;
-            if (entity.Alive && HoldIfFrozen()) return;   // /flocks lineup
+            if (!OnServer || entity.Alive && HoldIfFrozen()) return;   // HoldIfFrozen: /flocks lineup
             if (!entity.Alive) { entity.Pos.Roll = 0; return; }
             if (!restored) { restored = true; Restore(); }
             LetSpearsPass(dt);
@@ -701,9 +700,8 @@ namespace Flocks
 
         public override void OnEntityReceiveDamage(DamageSource source, ref float damage)
         {
-            if (entity.World.Side != EnumAppSide.Server || damage <= 0 || source == null) return;
-            var from = source.GetCauseEntity() ?? source.SourceEntity;
-            double away = from != null ? Math.Atan2(entity.Pos.X - from.Pos.X, entity.Pos.Z - from.Pos.Z) : rand.NextDouble() * Math.PI * 2;
+            if (damage <= 0 || source == null || !OnServer) return;
+            var from = AttackerAndAway(source, out double away);
             if (Dodges(source)) { damage = 0; Flush(from?.Pos.XYZ, away); return; }
             if (from != null) entity.World.RegisterCallback(_ => { if (entity.Alive) Flush(from.Pos.XYZ, away); }, 1);
         }

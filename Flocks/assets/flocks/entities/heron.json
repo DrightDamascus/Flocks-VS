@@ -49,7 +49,7 @@
 			{ code: "flocks.waterfowl", species: "heron", fleeRange: 22, takeoffRange: 14, lifeHours: 6, sink: 0,
 			  cruiseSpeedMin: 9, cruiseSpeedMax: 11, takeoffRunSeconds: 0.3, takeoffRunSpeed: 3, wadeHitboxHeight: 1.7,
 			  takeoffWingsChance: 0.8, takeoffCallChance: 0.8, idleGap: 30, flapSpeed: 2 },
-			{ code: "health", currenthealth: 6, maxhealth: 6 },
+			{ code: "health", currenthealth: 3, maxhealth: 3 },
 			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
 			{ code: "harvestable", drops: [
 				{ type: "item", code: "game:poultry-raw", quantity: { avg: 1.25, var: 0.25 } },

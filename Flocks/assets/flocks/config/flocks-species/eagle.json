@@ -8,6 +8,9 @@
 		{ name: "eagle", shape: "flocks:shapes/entity/bird/eagle.json", flap: "fly-flap", soar: "fly-soar" }
 	],
 	sizeFromEntity: "flocks:eagle",
+	// across the wings in flight at that size, for the formation spacing (tools/measure_spans.py; rerun it after changing
+	// the size or the wings)
+	wingspan: 3.06,
 	speedMin: 12, speedMax: 16,
 	flapSeconds: 1.0, soarSeconds: 3, blendSeconds: 0.5,
 	flapBeatsMin: 2, flapBeatsMax: 4, soarLoopsMin: 2, soarLoopsMax: 4,

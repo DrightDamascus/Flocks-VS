@@ -88,8 +88,8 @@ namespace Flocks
         {
             base.Initialize(properties, attributes);
             territory = attributes["territory"].AsFloat(territory);
-            fleeRange = attributes["fleeRange"].AsFloat(fleeRange);
-            takeoffRange = attributes["takeoffRange"].AsFloat(takeoffRange);
+            ReadAttr(attributes, "fleeRange", ref fleeRange);
+            ReadAttr(attributes, "takeoffRange", ref takeoffRange);
             soarSpeed = attributes["soarSpeed"].AsDouble(soarSpeed);
             soarAltMin = attributes["soarAltitudeMin"].AsDouble(soarAltMin);
             soarAltMax = attributes["soarAltitudeMax"].AsDouble(soarAltMax);
@@ -101,8 +101,7 @@ namespace Flocks
 
         public override void OnGameTick(float dt)
         {
-            if (entity.World.Side != EnumAppSide.Server) return;
-            if (entity.Alive && HoldIfFrozen()) return;   // /flocks lineup
+            if (!OnServer || entity.Alive && HoldIfFrozen()) return;   // HoldIfFrozen: /flocks lineup
             if (!entity.Alive) { entity.Pos.Roll = 0; return; }
             if (!restored) { restored = true; Restore(); }
             LetSpearsPass(dt);
@@ -425,7 +424,7 @@ namespace Flocks
 
         private bool IsPrey(Entity e)
         {
-            if (e.Code == null) return false;
+            if (e.Code == null || e.GetBehavior<EntityBehaviorBird>()?.Passing == true) return false;   // not out of a passing flock
             if (ResidentGeese.Config.EaglesHuntChickens && WildcardUtil.Match(Chickens, e.Code)) return true;   // server config
             foreach (var c in preyCodes) if (WildcardUtil.Match(new AssetLocation(c), e.Code)) return true;
             return false;
@@ -559,9 +558,8 @@ namespace Flocks
 
         public override void OnEntityReceiveDamage(DamageSource source, ref float damage)
         {
-            if (entity.World.Side != EnumAppSide.Server || damage <= 0 || source == null) return;
-            var from = source.GetCauseEntity() ?? source.SourceEntity;
-            double away = from != null ? Math.Atan2(entity.Pos.X - from.Pos.X, entity.Pos.Z - from.Pos.Z) : rand.NextDouble() * Math.PI * 2;
+            if (damage <= 0 || source == null || !OnServer) return;
+            var from = AttackerAndAway(source, out double away);
             if (Dodges(source)) { damage = 0; Startle(away); return; }
             if (from != null) entity.World.RegisterCallback(_ => { if (entity.Alive) Startle(away); }, 1);
         }

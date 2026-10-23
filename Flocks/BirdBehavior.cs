@@ -51,9 +51,8 @@ namespace Flocks
             base.Initialize(properties, attributes);
             idleGap = attributes["idleGap"].AsFloat(idleGap);
             flapSpeed = attributes["flapSpeed"].AsFloat(0);
-            // the game's own roll is off; IdleCalls rolls instead
             idleChance = properties.IdleSoundChance;
-            entity.IdleSoundChanceModifier = 0;
+            entity.IdleSoundChanceModifier = 0;   // the game's own roll is off; IdleCalls rolls instead
         }
 
         /// <summary>The idle call roll; each behaviour runs it once a tick on the server while the bird is alive.</summary>
@@ -177,6 +176,118 @@ namespace Flocks
                 attrs.SetString("capturedEntityShape", caged);
                 slot.MarkDirty();
             }
+        }
+
+        // ---- a bird of a passing flock (SkyFlocks): it flies its slot in the formation the server moves along
+
+        /// <summary>Marks a bird of a passing flock (saved attributes, not synced); the slot is SkyFlocks' to say.</summary>
+        public const string PassageKey = "flocksPassage";
+        private bool passChecked, passing, passStarted, loadedFromSave, passSoaring;
+        private float passShotCheck, passScatter, passCycle;
+        private double passScatterHeading;
+        private const double PassClimbMax = 5, PassSinkMax = 3, PassAccel = 7;
+        /// <summary>The server runs physics only for entities some player's client tracks, and a real bird can be beyond
+        /// what any client has loaded (a short view distance): it would hang in the air while its flock flies on. So an
+        /// untracked passing bird moves itself (it is high up, with nothing to bump into). The in-engine tests run every
+        /// untracked bird's physics themselves and switch this off.</summary>
+        public static bool MoveUntracked = true;
+
+        /// <summary>One of a passing flock's real birds (SkyFlocks), flying its slot.</summary>
+        public bool Passing => passing;
+
+        /// <summary>
+        /// A passing flock's bird, run first thing each tick; true when it was (the behaviour's own tick stops there). It
+        /// steers for its slot (a point a little ahead of it, so it never turns back for one it has overshot) and speeds
+        /// up or eases off to hold it, at the flock's height; terrain avoidance has the last word. After an alarm it
+        /// bursts out (Scatter) for a few seconds first. Its calls are the drawn flock's, played by the clients, so it
+        /// makes no idle calls of its own. A bird no flock owns was either loaded from a save (the flock is long gone,
+        /// so it goes too) or let out of a cage (it stays, as an ordinary bird of its kind).
+        /// </summary>
+        protected bool Passage(float dt)
+        {
+            if (!passChecked) { passChecked = true; passing = entity.Attributes.HasAttribute(PassageKey); }
+            if (!passing) return false;
+            if (SkyFlocks.Instance == null || !SkyFlocks.Instance.Slot(entity.EntityId, out Flock f, out Bird b))
+            {
+                if (loadedFromSave) { entity.Die(EnumDespawnReason.Expire); return true; }
+                entity.Attributes.RemoveAttribute(PassageKey);
+                passing = false;
+                return false;
+            }
+            entity.SimulationRange = FlightRange;
+            if (!passStarted) { passStarted = true; flyHeading = f.Heading; speed = f.Speed; }
+            LetSpearsPass(dt);
+            if ((passShotCheck -= dt) <= 0)
+            {
+                passShotCheck = 0.1f;
+                if (IncomingShot(out _, out _, out _)) SkyFlocks.Instance.Alarm(f);
+            }
+            var pos = entity.Pos;
+            double vy, cap;
+            bool hard;
+            if (passScatter > 0)
+            {
+                passScatter -= dt;
+                Steer(passScatterHeading, TurnRate * 2, dt);
+                cap = f.Speed * 1.3; vy = 3; hard = true;
+            }
+            else
+            {
+                var slot = f.SlotInWorld(b.Offset);
+                double dx = Math.Sin(f.Heading), dz = Math.Cos(f.Heading);
+                double along = (slot.X - pos.X) * dx + (slot.Z - pos.Z) * dz, lead = 8 + Math.Max(0, -along);
+                Steer(Math.Atan2(slot.X + dx * lead - pos.X, slot.Z + dz * lead - pos.Z), TurnRate * 1.5, dt);
+                cap = GameMath.Clamp(f.Speed + along * 0.8, f.Speed * 0.6, f.Speed * 1.4);
+                vy = GameMath.Clamp((slot.Y - pos.Y) * 0.8 + f.ClimbRate, -PassSinkMax, PassClimbMax);
+                hard = vy > 3.5;
+            }
+            AvoidTerrain(ref vy, ref cap, dt);
+            speed = speed < cap ? Math.Min(cap, speed + PassAccel * dt) : Math.Max(cap, speed - PullDecel * dt);
+            if (entity.CollidedHorizontally) { speed = Math.Min(speed, MinPullSpeed); vy = SteepClimb; }
+            // wingbeats and glides in the species' rhythm, as the drawn flock has them
+            var sp = f.Species;
+            if ((passCycle -= dt) <= 0)
+            {
+                passSoaring = !passSoaring;
+                passCycle = passSoaring ? rand.Next(sp.SoarLoopsMin, sp.SoarLoopsMax + 1) * sp.SoarSeconds
+                                        : rand.Next(sp.FlapBeatsMin, sp.FlapBeatsMax + 1) * sp.FlapSeconds;
+            }
+            SetAnim(hard ? "takeoff" : passSoaring && vy < 1.5 ? "fly-soar" : "fly-flap");
+            pos.Motion.Set(Math.Sin(flyHeading) * speed / 60, vy / 60, Math.Cos(flyHeading) * speed / 60);
+            if (MoveUntracked && entity.IsTracked == 0) pos.Add(pos.Motion.X * dt * 60, pos.Motion.Y * dt * 60, pos.Motion.Z * dt * 60);
+            pos.Yaw = (float)flyHeading;
+            // pitched with the climb, as the other flights do (Roll turns about the wing axis; negative is nose-up)
+            double pitch = Math.Atan2(vy, Math.Max(speed, 0.5));
+            pos.Roll += (float)((-GameMath.Clamp(pitch, -0.45, 1.1) - pos.Roll) * Math.Min(1, dt * 6));
+            return true;
+        }
+
+        /// <summary>The flock was shot at (SkyFlocks.Alarm): burst out ahead and to one side, beating hard and climbing,
+        /// for 2.5-4 s, then close up again.</summary>
+        public void Scatter(double flockHeading)
+        {
+            if (!passing) return;
+            passScatter = 2.5f + (float)rand.NextDouble() * 1.5f;
+            passScatterHeading = flockHeading + (rand.NextDouble() < 0.5 ? -1 : 1) * (0.4 + rand.NextDouble() * 0.5);
+        }
+
+        /// <summary>A passing bird hit: a thrown spear is dodged as always, anything else is taken; either way its flock
+        /// is alarmed. True if it was a passing bird (the behaviour's own handling is skipped).</summary>
+        protected bool PassageHit(DamageSource source, ref float damage)
+        {
+            if (!passing) return false;
+            if (Dodges(source)) damage = 0;
+            if (SkyFlocks.Instance?.Slot(entity.EntityId, out Flock f, out _) == true) SkyFlocks.Instance.Alarm(f);
+            return true;
+        }
+
+        /// <summary>Loaded from a save: a passing bird's flock is gone by then (Passage removes it). One loaded mid-flight
+        /// needs its flight range before its first tick, or it would never tick beyond 128 blocks to be removed.</summary>
+        public override void OnEntityLoaded()
+        {
+            base.OnEntityLoaded();
+            loadedFromSave = true;
+            if (entity.Attributes.HasAttribute(PassageKey)) entity.SimulationRange = FlightRange;
         }
 
         /// <summary>Flying away for good, ready to be removed once far from every player (FlockRegistry.TryDepart).</summary>
@@ -389,7 +500,15 @@ namespace Flocks
         protected void Steer(double want, double rate, float dt)
             => flyHeading += GameMath.Clamp(GameMath.AngleRadDistance((float)flyHeading, (float)want), -rate * dt, rate * dt);
 
-        protected double HorDist(Vec3d p) => Math.Sqrt((p.X - entity.Pos.X) * (p.X - entity.Pos.X) + (p.Z - entity.Pos.Z) * (p.Z - entity.Pos.Z));
+        protected double HorDist(Vec3d p) => HorDist(p.X, p.Z);
+        /// <summary>Distance across the ground (ignoring height) from this bird to (x, z).</summary>
+        protected double HorDist(double x, double z)
+        {
+            double dx = x - entity.Pos.X, dz = z - entity.Pos.Z;
+            return Math.Sqrt(dx * dx + dz * dz);
+        }
+        /// <summary>A heading picked at random, any way round.</summary>
+        protected double RandomHeading() => rand.NextDouble() * 2 * Math.PI;
 
         /// <summary>
         /// A shot coming close: a fast-moving non-creature whose straight path over the next 0.3 s passes within NearMiss.
@@ -457,7 +576,8 @@ namespace Flocks
             var mode = player.WorldData?.CurrentGameMode;
             var sensed = NearestPlayer(64, out double mul);
             string who = sensed == null ? "nobody within 64" : sensed == ep ? $"you (sensing x{mul:0.00})" : "someone else";
-            return $"{entity.Code.ToShortString()} #{entity.EntityId}: {StateText}, {d:0.0} blocks from you ({mode}); senses {who}";
+            string state = passing ? "flying in a passing flock" : StateText;
+            return $"{entity.Code.ToShortString()} #{entity.EntityId}: {state}, {d:0.0} blocks from you ({mode}); senses {who}";
         }
 
         /// <summary>What it is doing, for Diagnose.</summary>
@@ -468,11 +588,19 @@ namespace Flocks
 
         protected void SetAnim(string code)
         {
-            if (anim == code) return;
-            if (anim != null) entity.AnimManager?.StopAnimation(anim);
+            if (code == anim) return;
+            string previous = anim;
             anim = code;
+            if (previous != null) entity.AnimManager?.StopAnimation(previous);
             float speedMul = code == "fly-flap" && flapSpeed > 0 ? flapSpeed : AnimSpeed(code);
-            entity.AnimManager?.StartAnimation(new AnimationMetaData { Code = code, Animation = code, AnimationSpeed = speedMul }.Init());
+            // Start it with the entity file's settings (blendMode Average, weights, easing). Bare metadata blends as Add,
+            // which sums overlapping animations: a stale swim under walk or idle-stand doubled the wing fold, and the
+            // wings swung forward under the head (a player's screenshot, 0.21.1). A client that first sees a bird gets
+            // these settings with it; later changes it looks up in the entity file by name.
+            var meta = entity.Properties.Client?.AnimationsByMetaCode?.TryGetValue(code, out var m) == true ? m.Clone()
+                : new AnimationMetaData { Code = code, Animation = code, BlendMode = EnumAnimationBlendMode.Average };
+            meta.AnimationSpeed = speedMul;
+            entity.AnimManager?.StartAnimation(meta.Init());
         }
 
         /// <summary>
@@ -485,6 +613,25 @@ namespace Flocks
         {
             var src = source.SourceEntity;
             return src != null && src is not EntityAgent && src.Code?.Path?.StartsWith("spear") == true;
+        }
+
+        /// <summary>The birds' AI runs on the server only; clients just draw what it sends.</summary>
+        protected bool OnServer => entity.World.Side == EnumAppSide.Server;
+
+        /// <summary>A number from the entity file's behaviour attributes; the field keeps its default when it isn't set.</summary>
+        protected static void ReadAttr(JsonObject attributes, string key, ref float value) => value = attributes[key].AsFloat(value);
+        protected static void ReadAttr(JsonObject attributes, string key, ref double value) => value = attributes[key].AsDouble(value);
+
+        /// <summary>Heading (radians, 0 = +Z, as for Pos.Yaw) that leads from the point (x, z) straight past this bird.</summary>
+        protected double HeadingAwayFrom(double x, double z) => Math.Atan2(entity.Pos.X - x, entity.Pos.Z - z);
+
+        /// <summary>Whoever is behind a hit (the shooter rather than their arrow when the game knows them; else what
+        /// struck) and the heading away from them; any heading when nothing can be blamed.</summary>
+        protected Entity AttackerAndAway(DamageSource source, out double away)
+        {
+            Entity attacker = source.GetCauseEntity() ?? source.SourceEntity;
+            away = attacker == null ? RandomHeading() : HeadingAwayFrom(attacker.Pos.X, attacker.Pos.Z);
+            return attacker;
         }
     }
 }

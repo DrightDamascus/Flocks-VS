@@ -114,21 +114,45 @@ namespace Flocks
         private static HashSet<long> Flood(IBlockAccessor ba, int sx, int sz, int y, int cap, HashSet<long> seen, string liquid = "water")
         {
             var lake = new HashSet<long>();
-            var q = new Queue<(int x, int z)>();
-            q.Enqueue((sx, sz)); seen.Add(Key(sx, sz));
-            while (q.Count > 0 && lake.Count < cap)
-            {
-                var (x, z) = q.Dequeue();
-                lake.Add(Key(x, z));
-                foreach (var (nx, nz) in new[] { (x + 1, z), (x - 1, z), (x, z + 1), (x, z - 1) })
-                    if (!seen.Contains(Key(nx, nz)) && Surface(ba, nx, nz, out int ny, liquid) && ny == y) { seen.Add(Key(nx, nz)); q.Enqueue((nx, nz)); }
-            }
+            WalkSurface(ba, sx, sz, y, cap, seen, liquid, (x, z) => lake.Add(Key(x, z)));
             return lake;
+        }
+
+        /// <summary>
+        /// Walks a lake's surface outward from (sx, sz): each column whose top is the liquid at level y and that borders
+        /// one already taken, fewest steps from the start first, until cap columns are taken. Every column taken is
+        /// marked in seen, so a caller trying several starts never walks the same lake twice, and is passed to visit.
+        /// Returns how many were taken. Used by the landing search, /flocks land and the spawn checks alike.
+        /// </summary>
+        public static int WalkSurface(IBlockAccessor ba, int sx, int sz, int y, int cap, HashSet<long> seen, string liquid, Action<int, int> visit)
+        {
+            var frontier = new Queue<long>();
+            long start = Key(sx, sz);
+            seen.Add(start);
+            frontier.Enqueue(start);
+            int taken = 0;
+            while (taken < cap && frontier.Count > 0)
+            {
+                long k = frontier.Dequeue();
+                int x = (int)(k >> 32), z = (int)k;
+                visit?.Invoke(x, z);
+                taken++;
+                for (int side = 0; side < 4; side++)   // east, west, south, north
+                {
+                    int nx = x + (side == 0 ? 1 : side == 1 ? -1 : 0), nz = z + (side == 2 ? 1 : side == 3 ? -1 : 0);
+                    long nk = Key(nx, nz);
+                    if (seen.Contains(nk) || !Surface(ba, nx, nz, out int ny, liquid) || ny != y) continue;
+                    seen.Add(nk);
+                    frontier.Enqueue(nk);
+                }
+            }
+            return taken;
         }
 
         private static double Dist(double ax, double az, double bx, double bz) => Math.Sqrt((ax - bx) * (ax - bx) + (az - bz) * (az - bz));
 
-        private static long Key(int x, int z) => ((long)x << 32) | (uint)z;
+        /// <summary>One number per column, x in the high half and z in the low (WalkSurface decodes it).</summary>
+        public static long Key(int x, int z) => ((long)x << 32) | (uint)z;
 
         // ---------------------------------------------------------------- wading (herons)
 

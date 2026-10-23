@@ -8,6 +8,10 @@ Writes:
   Flocks/assets/flocks/shapes/item/carcass/<bird>-dead.json, <bird>-hanging.json
                                                            the bird's own model, lying dead and hanging head down by the
                                                            feet from Butchering's hook, at its in-game size
+  Flocks/assets/flocks/shapes/item/carcass/<bird>-plucked-dead.json, <bird>-plucked-hanging.json
+                                                           the same once plucked: no feathers left (the wing and tail
+                                                           feather planes, scapulars, hackles, plumes and crest gone), the
+                                                           wings bare limbs
   Flocks/assets/flocks/textures/item/carcass/<bird>-plucked.png
                                                            the bird's texture repainted as bare skin, for when it is plucked
   Flocks/assets/flocks/patches/butchering.json             enables the item and makes the four birds butcherable
@@ -16,7 +20,8 @@ Butchering (modid butchering) turns a dead animal with the "butcherable" behavio
 with an empty hand; the carcass carries the animal's own drops (our poultry and feathers) and its weight, and
 Butchering scales those and adds its extras (blood, offal) on the hook and table. Like Butchering's own chicken, the
 carcass is the animal's own model posed (Dright: its generic stand-in made an eagle look like a leg): feathered while
-dead and bled out, bare skin once plucked ("skinned"), the game's rot texture once rotten. Sizes follow Butchering's
+dead and bled out, plucked once "skinned" (its own plucked model, bare skin, no feathers), the game's rot texture once
+rotten. Sizes follow Butchering's
 own animals: chickens, hares and foxes are "small" with mass 0.01, its duck 0.02. The mallard, crow, owl and mouse keep
 vanilla's quick field harvest (Dright).
 """
@@ -27,6 +32,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import make_greylag as g
 import preview_model as pv
+
+# make_greylag's own texture name: module() sets g.TEX for each bird, and g is make_greylag itself, so its TEX would
+# otherwise be whichever bird came last (the goose's carcass item once pointed at "gull" and never showed plucked)
+GREYLAG_TEX = g.TEX
 
 ROOT = os.path.join(HERE, "..", "Flocks", "assets", "flocks")
 
@@ -50,8 +59,36 @@ HANGING = {**{k: dict(v) for k, v in g.FOLDED.items()}, "Body": {"rotationZ": 90
 
 def module(name):
     mod = importlib.import_module(name)
-    g.TEX = mod.TEX                     # El.json names faces' texture "#" + make_greylag.TEX
+    g.TEX = GREYLAG_TEX if mod is g else mod.TEX   # El.json names faces' texture "#" + make_greylag.TEX
     return mod
+
+
+# What a plucked bird has lost: every feather plane (the tail, the scapulars, the eagle's hackles and feathered leg
+# plumes) and the heron's crest. The elements stay, without faces, so the pose still turns what hangs off them.
+FEATHERS = ("Tail", "Scapulars", "Hackles", "LegPlume", "Crest")
+# The feathered wing (feather planes and their leading-edge bars) goes whole: folded, it stands off the body by the
+# feathers' width. In its place each flank gets a bare folded wing lying against it, an upper arm and a forearm, sized
+# from the body box (fractions of its length along x and height in y; thickness out from the side).
+WING = ("ArmL", "ArmR")
+BARE_ARM = dict(x=(0.08, 0.5), y=(0.45, 0.85), t=0.28)
+BARE_FOREARM = dict(x=(0.4, 0.85), y=(0.3, 0.62), t=0.2)
+
+
+def pluck(root):
+    """The feathers off (after packing: the new wing pieces borrow the body's texture rectangle, plain skin)."""
+    body = next(el for el in root.walk() if el.name == "Body")
+    for el in root.walk():
+        if el.name.startswith(FEATHERS): el.faces = ()
+        if el.name in WING:
+            for e in el.walk(): e.faces = ()
+    (x0, y0, z0), (x1, y1, z1) = body.frm, body.to
+    lx, hy = x1 - x0, y1 - y0
+    for side, sign in (("L", 1), ("R", -1)):
+        for name, d in (("BareArm", BARE_ARM), ("BareForearm", BARE_FOREARM)):
+            t = d["t"] * hy
+            za, zb = (z1 - 0.1, z1 - 0.1 + t) if sign > 0 else (z0 + 0.1 - t, z0 + 0.1)
+            body.add(g.El(name + side, [x0 + d["x"][0] * lx, y0 + d["y"][0] * hy, za], [x0 + d["x"][1] * lx, y0 + d["y"][1] * hy, zb],
+                          body.mat, uv_from=body))
 
 
 def death_pose(mod):
@@ -60,13 +97,17 @@ def death_pose(mod):
     return anim["keyframes"][-1]["elements"]
 
 
-def build(mod, pose, drop=(), two_sided=False):
+def build(mod, pose, drop=(), two_sided=False, plucked=False):
     """The bird's model with the pose baked into its elements' rotations (an animation's rotations add to them), less
     the dropped parts (after packing, so the texture layout stays the entity's). two_sided: the feather planes (wings,
     tail: a top face only) get a bottom face too, its texture mirrored so the cut-outs match. The game draws entities
-    from both sides, but blocks and items only from the front, so in a cage the wings vanished from below."""
+    from both sides, but blocks and items only from the front, so in a cage the wings vanished from below.
+    plucked: the feathers off (pluck), after packing, so the plucked texture's layout still fits."""
     root = mod.shape()
     height = g.pack(root)
+    if plucked:
+        for el in root.walk(): el.frm, el.to = list(el.frm), list(el.to)
+        pluck(root)
     if two_sided:
         for el in root.walk():
             if tuple(el.faces) != ("up",): continue
@@ -142,8 +183,10 @@ def item():
         textures[f"deadbird-{code}-1-bledout"] = {tex: {"base": f"flocks:entity/bird/{tex}"}}   # bled, not yet plucked
         textures[f"deadbird-{code}-1-skinned"] = {tex: {"base": f"flocks:item/carcass/{code}-plucked"}}
         textures[f"deadbird-{code}-1-rotten"] = {tex: {"base": ROT}}
+        # the first match wins: plucked first
+        shapes[f"deadbird-{code}-1-skinned"] = {"base": f"flocks:item/carcass/{code}-plucked-dead"}
         shapes[f"deadbird-{code}-1-*"] = {"base": f"flocks:item/carcass/{code}-dead"}
-        attrs[f"deadbird-{code}-1-*"] = {
+        common = {
             "size": 0.5, "mass": mass,
             "bloodType": "butchering:bloodportion",
             "butcheringWorkLoad": "small",
@@ -153,6 +196,8 @@ def item():
             "butcheringRewards": [],      # from the bird's own drops (poultry, feathers), scaled by Butchering
             "skinningRewards": [],
         }
+        attrs[f"deadbird-{code}-1-skinned"] = {**common, "hangingShape": {"base": f"flocks:item/carcass/{code}-plucked-hanging"}}
+        attrs[f"deadbird-{code}-1-*"] = common
     return {
         "enabled": False,
         "code": "deadbird",
@@ -211,8 +256,9 @@ def main():
     built = []
     for code, (modname, size, _) in BIRDS.items():
         mod = module(modname)
-        for kind, pose, anchor in (("dead", death_pose(mod), "ground"), ("hanging", HANGING, "hook")):
-            root, height = build(mod, pose, DROP.get(code, ()))
+        for kind, pose, anchor, bare in (("dead", death_pose(mod), "ground", False), ("hanging", HANGING, "hook", False),
+                                         ("plucked-dead", death_pose(mod), "ground", True), ("plucked-hanging", HANGING, "hook", True)):
+            root, height = build(mod, pose, DROP.get(code, ()), plucked=bare)
             place(mod, root, size, anchor)
             write_json(os.path.join(ROOT, "shapes", "item", "carcass", f"{code}-{kind}.json"), shape_json(mod, root, height, code))
             built.append((code, kind, mod, root))
@@ -239,14 +285,16 @@ def preview(built, out):
     sheet = Image.new("RGB", (cell * 2, cell * len(built)), pv.SKY)
     dr = ImageDraw.Draw(sheet)
     for i, (code, kind, mod, root) in enumerate(built):
-        tex = np.array(Image.open(os.path.join(ROOT, "textures", "entity", "bird", mod.TEX + ".png")).convert("RGBA"), float)
+        module(mod.__name__)
+        path = ("textures", "item", "carcass", f"{code}-plucked.png") if kind.startswith("plucked") else ("textures", "entity", "bird", mod.TEX + ".png")
+        tex = np.array(Image.open(os.path.join(ROOT, *path)).convert("RGBA"), float)
         qs = pv.quads(mod, root, {})
-        y0 = 0.0 if kind == "dead" else -16.0
+        y0 = 0.0 if kind.endswith("dead") else -16.0
         qs2, tex2 = pv.with_plane(qs, tex, y0 - 0.02, np.array([8.0, 0, 8.0]), 30)
-        centre = np.array([8.0, 4.0 if kind == "dead" else -2.0, 8.0])
+        centre = np.array([8.0, 4.0 if kind.endswith("dead") else -2.0, 8.0])
         for j, view in enumerate(((0, 6), (-40, 18))):
             sheet.paste(pv.render(qs2, tex2, view, centre, 40), (j * cell, i * cell))
-        dr.text((4, i * cell + 4), f"{code} {kind}" + (f" (hook at y {HOOK_Y:.0f}, block 0-16)" if kind == "hanging" else ""), fill=(20, 20, 40))
+        dr.text((4, i * cell + 4), f"{code} {kind}" + (f" (hook at y {HOOK_Y:.0f}, block 0-16)" if kind.endswith("hanging") else ""), fill=(20, 20, 40))
     sheet.save(out)
     print("wrote", out)
 

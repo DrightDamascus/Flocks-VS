@@ -9,6 +9,9 @@
 		{ name: "gull", shape: "flocks:shapes/entity/bird/gull.json", flap: "fly-flap", soar: "fly-soar" }
 	],
 	sizeFromEntity: "flocks:gull",
+	// across the wings in flight at that size, for the formation spacing (tools/measure_spans.py; rerun it after changing
+	// the size or the wings)
+	wingspan: 2.12,
 	// unhurried: a few easy beats, then long glides
 	speedMin: 10, speedMax: 14,
 	flapSeconds: 0.55, soarSeconds: 2.5, blendSeconds: 0.4,

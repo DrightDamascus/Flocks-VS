@@ -48,7 +48,7 @@
 			  cruiseSpeedMin: 10, cruiseSpeedMax: 13, takeoffRunSeconds: 0.3, takeoffRunSpeed: 4,
 			  takeoffWingsChance: 0.5, takeoffCallChance: 0.3, idleGap: 10, flapSpeed: 2.6,
 			  wheelSecondsMin: 8, wheelSecondsMax: 20, loafHoursMin: 1.5, loafHoursMax: 4, soarShare: 0.5 },
-			{ code: "health", currenthealth: 4, maxhealth: 4 },
+			{ code: "health", currenthealth: 2.5, maxhealth: 2.5 },
 			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
 			{ code: "harvestable", drops: [
 				{ type: "item", code: "game:poultry-raw", quantity: { avg: 1, var: 0 } },

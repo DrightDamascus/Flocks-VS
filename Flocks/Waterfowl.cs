@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Common;
@@ -10,7 +10,7 @@ using Vintagestory.API.MathTools;
 namespace Flocks
 {
     /// <summary>
-    /// Server-side behaviour for landed waterfowl (flocks:greylag). Keeps the bird floating at the water surface,
+    /// The waterbirds' AI (geese, ducks, gulls, herons; it runs on the server). A bird rests afloat at the surface,
     /// drifts it slowly and paddles away from players that come close. When a player gets very close or it is shot
     /// at, the group takes off in a hurry (a short run across the water), flies to another part of the lake, or to
     /// another lake if there's no safe water left on this one, and glides in to land there.
@@ -20,8 +20,8 @@ namespace Flocks
     /// In flight a goose's simulation range is FlightRange instead of the usual 128 blocks, so it keeps flying, and
     /// stays visible to players out to their view distance, far beyond where resting animals are simulated.
     /// Flight state is kept in WatchedAttributes, so a goose that flies out of the loaded area carries on later.
-    /// Vanilla's land-creature AI tasks are not used: their pathfinder avoids water and getoutofwater would drag
-    /// the birds ashore, so movement is set here directly and the vanilla physics does the rest.
+    /// It steers the bird itself instead of using vanilla's AI tasks, which are made for land animals: their
+    /// pathfinding keeps out of water and getoutofwater would walk a bird onto the bank. The game's physics moves it.
     /// Damage: arrows, other ranged projectiles and melee hurt it normally. A thrown spear does nothing except scare
     /// it off: the goose dodges, like a fish slipping a spear.
     /// </summary>
@@ -31,8 +31,8 @@ namespace Flocks
         private const string SpawnKey = "flocksSpawnHours";
         /// <summary>The flight state, kept while it is off the water (the flock camera reads it to see a flock is down).</summary>
         public const string FlightKey = "flocksFlight";
-        /// <summary>Set by /flocks land on its test geese: they leave after lifeHours. Every other goose is a resident
-        /// (spawned by vanilla's spawner) and stays until its resident season ends.</summary>
+        /// <summary>Marks the birds /flocks land puts down for testing, which leave once lifeHours have passed. Birds
+        /// without it came from the game's spawner and live here until their species' season is over.</summary>
         public const string TestKey = "flocksTestGoose";
 
         public bool Resident => !entity.WatchedAttributes.HasAttribute(TestKey);
@@ -132,10 +132,10 @@ namespace Flocks
         public override void Initialize(EntityProperties properties, JsonObject attributes)
         {
             base.Initialize(properties, attributes);
-            fleeRange = attributes["fleeRange"].AsFloat(fleeRange);
-            takeoffRange = attributes["takeoffRange"].AsFloat(takeoffRange);
-            lifeHours = attributes["lifeHours"].AsFloat(lifeHours);
-            sink = attributes["sink"].AsFloat(sink);
+            ReadAttr(attributes, "fleeRange", ref fleeRange);
+            ReadAttr(attributes, "takeoffRange", ref takeoffRange);
+            ReadAttr(attributes, "lifeHours", ref lifeHours);
+            ReadAttr(attributes, "sink", ref sink);
             cruiseMin = attributes["cruiseSpeedMin"].AsDouble(cruiseMin);
             cruiseMax = attributes["cruiseSpeedMax"].AsDouble(cruiseMax);
             species = attributes["species"].AsString(species);
@@ -147,15 +147,15 @@ namespace Flocks
             wheelMin = attributes["wheelSecondsMin"].AsDouble(0); wheelMax = attributes["wheelSecondsMax"].AsDouble(wheelMin);
             loafMin = attributes["loafHoursMin"].AsDouble(0); loafMax = attributes["loafHoursMax"].AsDouble(loafMin);
             soarShare = GameMath.Clamp(attributes["soarShare"].AsDouble(0), 0, 0.9);
-            heading = rand.NextDouble() * Math.PI * 2;
+            heading = RandomHeading();
         }
 
         public override void OnGameTick(float dt)
         {
-            if (entity.World.Side != EnumAppSide.Server) return;
-            if (entity.Alive && HoldIfFrozen()) return;   // /flocks lineup
-            var pos = entity.Pos;
-            if (!entity.Alive) { pos.Roll = 0; if (entity.Swimming || entity.FeetInLiquid) pos.Motion.Y = SurfaceMotion(); return; }
+            if (!OnServer || entity.Alive && HoldIfFrozen()) return;   // HoldIfFrozen: /flocks lineup
+            EntityPos pos = entity.Pos;
+            if (!entity.Alive) { pos.Roll = 0; if (InWater) pos.Motion.Y = SurfaceMotion(); return; }
+            if (Passage(dt)) return;   // one of a passing flock's birds (SkyFlocks)
             if (!restored) { restored = true; Restore(); FlockRegistry.Instance?.Adopt(entity, species); }
             LetSpearsPass(dt);
             TrackPosition(dt);
@@ -169,23 +169,12 @@ namespace Flocks
             }
             if (phase != Phase.Water) { TickFlight(dt); return; }
 
-            var attrs = entity.WatchedAttributes;
             double now = entity.World.Calendar.TotalHours;
-            if (!attrs.HasAttribute(SpawnKey)) attrs.SetDouble(SpawnKey, now);
+            var watched = entity.WatchedAttributes;
+            if (!watched.HasAttribute(SpawnKey)) watched.SetDouble(SpawnKey, now);   // its first tick on the water
 
-            if (!Resident && now - attrs.GetDouble(SpawnKey) > lifeHours) { TakeoffGroup(rand.NextDouble() * Math.PI * 2, null, true); return; }
-            if (Resident && (seasonCheck -= dt) <= 0)
-            {
-                seasonCheck = 30;
-                var bp = pos.AsBlockPos;
-                double lat = entity.World.Calendar.OnGetLatitude(bp.Z);
-                if (SpeciesData != null && !ResidentGeese.InSeason(entity.World, bp, SpeciesData))
-                {
-                    // autumn: the whole group leaves toward the equator (0 = south, pi = north)
-                    TakeoffGroup((lat >= 0 ? 0 : Math.PI) + (rand.NextDouble() - 0.5) * 0.5, null, true);
-                    return;
-                }
-            }
+            if (!Resident && now - watched.GetDouble(SpawnKey) > lifeHours) { TakeoffGroup(RandomHeading(), null, true); return; }
+            if (Resident && (seasonCheck -= dt) <= 0 && SeasonOver(pos)) return;
 
             if ((shotCheck -= dt) <= 0)
             {
@@ -208,10 +197,9 @@ namespace Flocks
             }
             var player = scarer;
             double speedNow = driftSpeed;
-            if (player != null)
+            if (player is not null)
             {
-                double dx = pos.X - player.Pos.X, dz = pos.Z - player.Pos.Z, d = Math.Sqrt(dx * dx + dz * dz);
-                double away = Math.Atan2(dx, dz);
+                double d = HorDist(player.Pos.X, player.Pos.Z), away = HeadingAwayFrom(player.Pos.X, player.Pos.Z);
                 if (d < takeoffRange * rangeMult * senseMul) { TakeoffGroup(away, player, false); return; }
                 if (d < fleeRange * rangeMult * senseMul) { heading = away; speedNow = paddleSpeed; }
             }
@@ -224,7 +212,7 @@ namespace Flocks
             }
             if ((shoreCheck -= dt) <= 0) { shoreCheck = 3; CheckShore(); }
 
-            bool inWater = entity.Swimming || entity.FeetInLiquid;
+            bool inWater = InWater;
             // A bank flush with the water is only ~0.3 blocks above a floating goose, well within stepHeight, so it
             // would never collide and could paddle ashore and wander inland. Look ahead and turn back at the edge
             // instead (a goose already ashore just heads back toward water).
@@ -246,35 +234,30 @@ namespace Flocks
             SetAnim(inWater ? "swim" : (speedNow > driftSpeed ? "walk" : "idle-stand"));
         }
 
-        // ------------------------------------------------------------------------------------------------ flight
+        /// <summary>Afloat (or at least paddling): the game counts the bird as swimming, or its feet are in liquid.</summary>
+        private bool InWater => entity.Swimming || entity.FeetInLiquid;
 
-        /// <summary>
-        /// This bird and the rest of its group on the lake take off together, each a moment apart. Unless they are
-        /// departing for good, one search picks where the group comes down, and each bird gets its own spot there.
-        /// threat: what scared them (null = nothing in particular; the search then just avoids their own spot).
-        /// </summary>
-        private void TakeoffGroup(double away, Entity threat, bool depart, Vec3d threatAt = null, bool disturb = true)
+        /// <summary>A resident's season check, every 30 s. Once its species' season here is over (autumn) the whole group
+        /// sets off toward the equator (heading 0 runs south, pi north) and this returns true.</summary>
+        private bool SeasonOver(EntityPos pos)
         {
-            var pos = entity.Pos;
-            double tx = threat?.Pos.X ?? threatAt?.X ?? pos.X, tz = threat?.Pos.Z ?? threatAt?.Z ?? pos.Z;
-            // every flush disturbs the flock (bold species less: WarinessFactor); disturbed often enough, it leaves this
-            // lake and rejoins the migration. A loafing flight is no disturbance.
-            if (!depart && disturb && FlockRegistry.Instance?.Disturb(FlockId, SpeciesData?.WarinessFactor ?? 1, pos.XYZ) == true) depart = true;
-            List<Vec3d> spots = depart ? null : FindSpots(pos.XYZ, tx, tz);
-            if (spots == null || spots.Count == 0) depart = true; // nowhere to land nearby: they rejoin the migration
-            Takeoff(away, Pick(spots), depart, tx, tz, 0);
-            foreach (var e in entity.World.GetEntitiesAround(pos.XYZ, 16, 8, e => e.Code == entity.Code && e.Alive && e != entity))
-                e.GetBehavior<EntityBehaviorWaterfowl>()?.Takeoff(away + (rand.NextDouble() - 0.5) * 0.6, Pick(spots), depart, tx, tz,
-                    (float)(0.08 + rand.NextDouble() * 0.5));
+            seasonCheck = 30;
+            var at = pos.AsBlockPos;
+            if (SpeciesData == null || ResidentGeese.InSeason(entity.World, at, SpeciesData)) return false;
+            TakeoffGroup(EquatorHeading(at), null, true);
+            return true;
         }
 
+        /// <summary>Toward the equator (autumn's way; heading 0 runs south, pi north), give or take 15 deg.</summary>
+        private double EquatorHeading(BlockPos at)
+            => (entity.World.Calendar.OnGetLatitude(at.Z) >= 0 ? 0 : Math.PI) + (rand.NextDouble() - 0.5) * 0.5;
+
         /// <summary>/flocks depart: this bird's group leaves the lake now and rejoins the migration, as at the end of its
-        /// season (toward the equator: 0 = south, pi = north). False unless it is on the water.</summary>
+        /// season. False unless it is on the water.</summary>
         public bool Depart()
         {
             if (phase != Phase.Water || !entity.Alive) return false;
-            bool northern = entity.World.Calendar.OnGetLatitude(entity.Pos.AsBlockPos.Z) >= 0;
-            TakeoffGroup((northern ? 0 : Math.PI) + (rand.NextDouble() - 0.5) * 0.5, null, true);
+            TakeoffGroup(EquatorHeading(entity.Pos.AsBlockPos), null, true);
             return true;
         }
 
@@ -359,6 +342,28 @@ namespace Flocks
             NewTarget(spot.Clone()); target.Y -= sink;
             departing = false;
             Persist();
+        }
+
+        // ------------------------------------------------------------------------------------------------ flight
+
+        /// <summary>
+        /// This bird and the rest of its group on the lake take off together, each a moment apart. Unless they are
+        /// departing for good, one search picks where the group comes down, and each bird gets its own spot there.
+        /// threat: what scared them (null = nothing in particular; the search then just avoids their own spot).
+        /// </summary>
+        private void TakeoffGroup(double away, Entity threat, bool depart, Vec3d threatAt = null, bool disturb = true)
+        {
+            var pos = entity.Pos;
+            double tx = threat?.Pos.X ?? threatAt?.X ?? pos.X, tz = threat?.Pos.Z ?? threatAt?.Z ?? pos.Z;
+            // every flush disturbs the flock (bold species less: WarinessFactor); disturbed often enough, it leaves this
+            // lake and rejoins the migration. A loafing flight is no disturbance.
+            if (!depart && disturb && FlockRegistry.Instance?.Disturb(FlockId, SpeciesData?.WarinessFactor ?? 1, pos.XYZ) == true) depart = true;
+            List<Vec3d> spots = depart ? null : FindSpots(pos.XYZ, tx, tz);
+            if (spots == null || spots.Count == 0) depart = true; // nowhere to land nearby: they rejoin the migration
+            Takeoff(away, Pick(spots), depart, tx, tz, 0);
+            foreach (var e in entity.World.GetEntitiesAround(pos.XYZ, 16, 8, e => e.Code == entity.Code && e.Alive && e != entity))
+                e.GetBehavior<EntityBehaviorWaterfowl>()?.Takeoff(away + (rand.NextDouble() - 0.5) * 0.6, Pick(spots), depart, tx, tz,
+                    (float)(0.08 + rand.NextDouble() * 0.5));
         }
 
         /// <summary>Go up for a loafing flight now (tests). False unless it is on the water and its species loafs.</summary>
@@ -762,6 +767,7 @@ namespace Flocks
 
         public override void OnEntityLoaded()
         {
+            base.OnEntityLoaded();
             if (entity.WatchedAttributes.HasAttribute(FlightKey)) entity.SimulationRange = FlightRange;
         }
 
@@ -799,20 +805,23 @@ namespace Flocks
             shoreHeading = ResidentGeese.ShoreDirection(ba, bp, ResidentGeese.ShoreDistanceCfg * 3, out double h) >= 0 ? h : double.NaN;
         }
 
-        /// <summary>Vertical motion that eases the bird to sit a little below the top of the water it is in.</summary>
+        /// <summary>The vertical motion that holds a floating bird at its depth: the top of the column of liquid it is in
+        /// (looking up to 6 blocks), less an eighth of a block and its sink. It closes 15% of the gap a tick, never more
+        /// than 0.03 blocks, so the bird settles instead of bobbing.</summary>
         private double SurfaceMotion()
         {
             var ba = entity.World.BlockAccessor;
-            var p = entity.Pos.AsBlockPos;
-            int y = p.Y, top = p.Y;
-            for (int i = 0; i < 6; i++, y++)
+            var at = entity.Pos.AsBlockPos;
+            var probe = new BlockPos(at.X, at.Y, at.Z);
+            int surface = at.Y;
+            for (int up = 0; up < 6; up++)
             {
-                var b = ba.GetBlock(new BlockPos(p.X, y, p.Z), BlockLayersAccess.Fluid);
-                if (b == null || !b.IsLiquid()) break;
-                top = y + 1;
+                probe.Y = at.Y + up;
+                if (ba.GetBlock(probe, BlockLayersAccess.Fluid)?.IsLiquid() != true) break;
+                surface = probe.Y + 1;
             }
-            double target = top - 0.125 - sink;
-            return GameMath.Clamp((target - entity.Pos.Y) * 0.15, -0.03, 0.03);
+            double gap = surface - 0.125 - sink - entity.Pos.Y;
+            return GameMath.Clamp(gap * 0.15, -0.03, 0.03);
         }
 
         /// <summary>Landing spots for this bird's habitat: open water, or water one block deep for waders.</summary>
@@ -970,33 +979,22 @@ namespace Flocks
 
         public override void OnEntityReceiveDamage(DamageSource source, ref float damage)
         {
-            if (entity.World.Side != EnumAppSide.Server || damage <= 0 || source == null) return;
-            var from = source.GetCauseEntity() ?? source.SourceEntity;
-            if (Dodges(source))
-            {
-                damage = 0;
-                double away = from != null ? Math.Atan2(entity.Pos.X - from.Pos.X, entity.Pos.Z - from.Pos.Z) : rand.NextDouble() * Math.PI * 2;
-                TakeoffGroup(away, from, false);
-                return;
-            }
+            if (damage <= 0 || source == null || !OnServer || PassageHit(source, ref damage)) return;
+            var from = AttackerAndAway(source, out double away);
+            if (Dodges(source)) { damage = 0; TakeoffGroup(away, from, false); return; }
+            // a real hit: the rest of the group flies off; this one too if it survives (health runs after us).
+            // AttackerAndAway blames the shooter, not the arrow, so they land well away from whoever is shooting.
             if (from != null)
-            {
-                // a real hit: the rest of the group flies off; this one too if it survives (health runs after us).
-                // The threat is the shooter, not the arrow, so they land well away from whoever is shooting.
-                var threat = source.GetCauseEntity() ?? from;
-                double away = Math.Atan2(entity.Pos.X - threat.Pos.X, entity.Pos.Z - threat.Pos.Z);
-                entity.World.RegisterCallback(_ => { if (entity.Alive) TakeoffGroup(away, threat, false); else ScareGroup(away, threat); }, 1);
-            }
+                entity.World.RegisterCallback(_ => { if (entity.Alive) TakeoffGroup(away, from, false); else ScareGroup(away, from); }, 1);
         }
 
         /// <summary>A goose was killed: the others on the water flush, using the same group search.</summary>
         private void ScareGroup(double away, Entity threat)
         {
-            foreach (var e in entity.World.GetEntitiesAround(entity.Pos.XYZ, 16, 8, e => e.Code == entity.Code && e.Alive && e != entity))
-            {
-                e.GetBehavior<EntityBehaviorWaterfowl>()?.TakeoffGroup(away, threat, false);
-                return; // TakeoffGroup brings the rest along
-            }
+            // one survivor of the group within 16 blocks is enough: TakeoffGroup brings the rest along
+            var others = entity.World.GetEntitiesAround(entity.Pos.XYZ, 16, 8, e => e != entity && e.Alive && e.Code == entity.Code
+                && e.GetBehavior<EntityBehaviorBird>()?.Passing != true);
+            if (others.Length > 0) others[0].GetBehavior<EntityBehaviorWaterfowl>()?.TakeoffGroup(away, threat, false);
         }
 
     }

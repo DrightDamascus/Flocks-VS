@@ -44,7 +44,7 @@
 			// before "health": it zeroes thrown spear damage before health applies it
 			{ code: "flocks.waterfowl", species: "goose", fleeRange: 14, takeoffRange: 7, lifeHours: 6, sink: 0.22, cruiseSpeedMin: 11, cruiseSpeedMax: 13.5,
 			  takeoffWingsChance: 0.6, takeoffCallChance: 0.4, idleGap: 15, flapSpeed: 2.6 },
-			{ code: "health", currenthealth: 4, maxhealth: 4 },
+			{ code: "health", currenthealth: 3, maxhealth: 3 },
 			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
 			{ code: "harvestable", drops: [
 				{ type: "item", code: "game:poultry-raw", quantity: { avg: 3.25, var: 0.5 } },

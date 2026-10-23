@@ -21,7 +21,7 @@ namespace Flocks
         /// <summary>The plural name in the current language: lang key flocks:species-&lt;code&gt;, else Name, else the code.</summary>
         [Newtonsoft.Json.JsonIgnore] public string DisplayName => Lang.HasTranslation("flocks:species-" + Code) ? Lang.Get("flocks:species-" + Code) : (Name ?? Code);
 
-        // ---- drawn flocks (client)
+        // ---- passing flocks (the server flies them, SkyFlocks; clients draw them)
         /// <summary>Shapes to try, in order, for the drawn flocks; the first that loads is used.</summary>
         public SkyShape[] Shapes;
         public class SkyShape
@@ -33,7 +33,9 @@ namespace Flocks
         /// <summary>Drawing scale, one fixed size at every distance (1 block = 1 m). Set directly, from Wingspan once the
         /// meshes are baked, or from SizeFromEntity's client size so drawn and real birds match.</summary>
         public float Scale = 1f;
-        /// <summary>Real wingspan in blocks; 0 = Scale is set directly.</summary>
+        /// <summary>Wingspan in blocks as drawn (and as the entity is, at its size). The server, which has no meshes,
+        /// spaces passing flocks' formations by it (tools/measure_spans.py measures it). A bird without SizeFromEntity is
+        /// also drawn at the scale that gives it this span (FitScale); 0 = Scale is set directly.</summary>
         public float Wingspan;
         public string SizeFromEntity;
         public double SpeedMin = 18, SpeedMax = 24;
@@ -41,12 +43,14 @@ namespace Flocks
         public float FlapSeconds = 0.8f, SoarSeconds = 1.6f, BlendSeconds = 0.4f;
         /// <summary>Each bird flaps FlapBeats (min..max inclusive) then glides SoarLoops, and repeats.</summary>
         public int FlapBeatsMin = 3, FlapBeatsMax = 7, SoarLoopsMin = 1, SoarLoopsMax = 3;
-        /// <summary>Cruising height above the player's ground, blocks (picked per flock).</summary>
+        /// <summary>How high a passing flock cruises over the ground below the player (blocks): each flock picks its
+        /// own height in this range (RandomAltitude).</summary>
         public double AltitudeMin = 60, AltitudeMax = 120;
+        public double RandomAltitude(Random r) => AltitudeMin + r.NextDouble() * (AltitudeMax - AltitudeMin);
         /// <summary>V formation, or a loose scattered group.</summary>
         public bool Loose;
-        /// <summary>Distant calls from the flying flock: sound path prefix in the flocks domain (variants 1..CallVariants),
-        /// and the gap between calls in seconds. Null = silent.</summary>
+        /// <summary>A passing flock's calls: the sound's path in the flocks domain without its number (the files are
+        /// numbered 1 to CallVariants), and how many seconds pass between calls. No CallSound: the flock is silent.</summary>
         public string CallSound; public int CallVariants;
         public float CallGapMin = 6, CallGapMax = 15;
 
@@ -57,9 +61,9 @@ namespace Flocks
         public float SpringWeight = 1f, AutumnWeight = 1f;
         /// <summary>Game hours they fly, as start/end pairs.</summary>
         public float[] Hours = { 7, 10, 15, 19 };
-        /// <summary>Drawn flocks on a peak migration day (fractions round randomly); fewer toward the edges of a window.</summary>
+        /// <summary>Passing flocks on a peak migration day (fractions round randomly); fewer toward the edges of a window.</summary>
         public float MaxFlocksPerDay = 2f;
-        /// <summary>Birds in a drawn (passing) flock.</summary>
+        /// <summary>Birds in a passing flock.</summary>
         public int CountMin = 7, CountMax = 25;
 
         // ---- landing (server)
@@ -109,8 +113,9 @@ namespace Flocks
         /// <summary>Baked meshes for the drawn flocks (client only; null on the server).</summary>
         [Newtonsoft.Json.JsonIgnore] public BirdMeshes Meshes;
 
-        /// <summary>True wingspan in blocks as drawn up close; formation spacing scales from it.</summary>
-        public double SpanBlocks => (Meshes != null && Meshes.Span > 0 ? Meshes.Span : 1) * Scale;
+        /// <summary>Wingspan in blocks; formation spacing scales from it. Wingspan when the species file gives it, so server
+        /// and client agree; else measured from the drawn mesh (client).</summary>
+        public double SpanBlocks => Wingspan > 0 ? Wingspan : (Meshes != null && Meshes.Span > 0 ? Meshes.Span : 1) * Scale;
 
         public void FitScale() { if (Wingspan > 0 && Meshes != null && Meshes.Span > 0) Scale = Wingspan / Meshes.Span; }
 

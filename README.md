@@ -5,9 +5,11 @@ lakes, can be hunted, and come and go with the year. Install on both server and 
 DESIGN.md. Version history: CHANGELOG.md.
 
 ## What it does
-- **Passing flocks** (drawn by each client, no entities): geese, mallards and now and then a heron cross
-  the sky on migration days in spring and autumn, at their own hours and heights, held back by storms, calling as they
-  pass. On the coast, loose groups of gulls pass at any time of year.
+- **Passing flocks**: geese, mallards and now and then a heron cross the sky on migration days in spring and autumn,
+  at their own hours and heights, held back by storms, calling as they pass. On the coast, loose groups of gulls pass
+  at any time of year, and crows go out from their roosts in the morning and back in the evening. Far off they are
+  drawn; within about 300 blocks of a player they are real birds, so they can be shot. A bird shot down falls and can be harvested like any kill; the rest scatter, climb a little and
+  fly on a bird short. Every player in a world sees the same flocks.
 - **Landing flocks** (real entities): on spring migration days a flock of greylag geese or mallards flies in from up
   to 320 blocks out and glides down onto a lake near you. Both also spawn naturally on lakes (mallards on ponds too)
   in their resident season.
@@ -43,10 +45,11 @@ DESIGN.md. Version history: CHANGELOG.md.
 - **Scarecrow**: its scarecrow and little scarecrow keep crows off like the straw dummy (the same radius).
 
 ## Commands
-`/flocks send [count] [species] [watch]` sends a passing flock over you (`watch`, admin: follow it). `/flocks schedule` shows today's migration plan, and
+`/flocks schedule` shows today's migration plan, the flocks in the sky near you, and
 for the waterbirds near you whether they stay or are leaving, how many days until that changes, and today's landing
 flocks.
-Admin (controlserver): `/flocks season spring|autumn [species] [days]` moves time forward to the first morning of that
+Admin (controlserver): `/flocks send [count] [species] [watch]` sends a passing flock over you (admin only, as its
+birds are real and can be hunted); `/flocks season spring|autumn [species] [days]` moves time forward to the first morning of that
 migration where you are (default goose); `/flocks depart [species] [watch]` sends the nearest group on the water off
 on migration now; `/flocks arrive [species] [watch]` sends a landing flock to a lake near you now. With `watch` you
 follow the flock as a spectator from above and behind until it is gone or down, then you are put back where you were
@@ -58,14 +61,16 @@ spawning, loaded birds, flocks and abandoned lakes; `/flocks lineup [stand|fly|c
 frozen row in front of you, for pictures.
 
 ## Settings
-`ModConfig/flocks.json` (client): automatic migration, flocks per day, storm thresholds, call volume, species on/off.
+`ModConfig/flocks.json`: the passing flocks (automatic migration, flocks per day, storm thresholds, species on/off),
+read by the server, so on a multiplayer server it is the server's copy that counts; each player's own copy sets only
+how loud the flocks call for them (`FlockCallVolume`).
 `ModConfig/flocks-server.json` (server): resident spawning, lake size and shore distance, crowding caps, lake wariness,
 crop raiding (on/off, how often) and the scarecrow's radius, every animal on or off (`Animals`), and whether eagles
 hunt chickens (`EaglesHuntChickens`, off by default). `CallRate` sets how often the birds call at rest (1 = default,
 0.5 = half, 0 = only when flushed); `Numbers` scales how many of the animals spawn (1 = default, 0.5 = half).
 
 ## Birds are data
-Each bird is a file in `assets/<domain>/config/flocks-species/` (any mod can add one): its drawn-flock shapes, size,
+Each bird is a file in `assets/<domain>/config/flocks-species/` (any mod can add one): its passing-flock shapes, size, wingspan,
 speed and wingbeat rhythm, migration windows and hours, flock sizes, calls, and, for birds that land, the entity it
 lands as. A landing bird's behaviour (flee and takeoff distances, cruise speed, takeoff and splash sounds) is in its
 entity file with the `flocks.waterfowl` behaviour, like vanilla animals. See `config/flocks-species/goose.json` and

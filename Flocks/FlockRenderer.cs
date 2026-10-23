@@ -6,236 +6,116 @@ using Vintagestory.API.MathTools;
 
 namespace Flocks
 {
-    public class Bird
-    {
-        public Vec3d Offset; // slot relative to the leader in the flock's own frame: X = along (+ ahead), Y = up, Z = across
-        public float Phase;  // animation phase offset (s)
-        public float YawJitter; // each bird weaves a few degrees off the flock heading
-        public int FlapBeats, SoarLoops; // wingbeats before gliding, soar loops before flapping again
-    }
-
-    public class Flock
-    {
-        public Species Species;
-        public Vec3d Pos;                             // leader position
-        public double BaseHeading, Heading, TurnRate; // radians, rad/s; dir = (sin, 0, cos)
-        public double Wander1, Wander2;               // phases of the slow heading drift
-        public double Speed, Travel, Length, Age;
-        public double CruiseY, TargetY, ClimbRate;
-        public double Tail, HalfWidth, Drop, Rise;    // formation extent: behind the leader, to either side, below and above the leader
-        public double NextSample;
-        public double NextCall;                       // flock age (s) of its next distant call
-        public List<Bird> Birds = new();
-    }
-
-    /// <summary>Client-only renderer: draws baked bird meshes at flock positions. No entities, nothing sent to the server.</summary>
+    /// <summary>
+    /// Client: draws the passing flocks the server reports (SkyFlocks) with baked bird meshes. Between the server's
+    /// updates (once a second) each flock flies on here as it does there (SkyFlight, without the terrain: the server's
+    /// target height stands in), and each update's difference is eased out over a second or two. A bird whose real
+    /// entity is loaded here isn't drawn: the game draws that one.
+    /// </summary>
     public class FlockRenderer : IRenderer
     {
         private readonly ICoreClientAPI capi;
+        private readonly Dictionary<string, Species> species;
         private readonly List<Flock> flocks = new();
+        private readonly Dictionary<long, (Vec3d error, double heard)> sync = new();
         private readonly Random rand = new();
         private readonly Matrixf mat = new();
+        private static readonly List<Flock> NoOthers = new();
 
-        /// <summary>The lowest bird keeps at least this far above the highest ground under or near the flock.</summary>
-        public double Clearance = 35;
-        /// <summary>
-        /// Air traffic: several flocks may be in the sky at once, kept apart in height. A new flock cruises at least
-        /// Separation blocks clear of every flock already up (its lowest bird over their highest, or the other way round),
-        /// and in flight, when two flocks come within ConflictRange of each other (plus their lengths) without that much
-        /// height between them, the newer one climbs over the older and comes back down to its cruise once clear.
-        /// </summary>
-        public double Separation = 15, ConflictRange = 120;
-        /// <summary>How far ahead (blocks) a flock looks for rising ground.</summary>
-        public double LookAhead = 320;
-        public double MaxClimb = 6, MaxSink = 1.5; // blocks/s
-        /// <summary>Slow course drift: two sines, ~12 deg over ~60 s and ~5 deg over ~23 s.</summary>
-        public double WanderBig = 12 * GameMath.DEG2RAD, WanderSmall = 5 * GameMath.DEG2RAD;
-
-        /// <summary>Volume of the flying flocks' distant calls (client config FlockCallVolume; 0 = silent).</summary>
-        public float CallVolume = 1f;
-        /// <summary>Calls fade out linearly over this many blocks from the calling bird.</summary>
+        /// <summary>How loud the passing flocks' calls are: the client config's FlockCallVolume, 0 for none.</summary>
+        public readonly float CallVolume;
+        /// <summary>A call is heard out to this many blocks from the bird, growing fainter the whole way.</summary>
         public float CallRange = 160;
+        /// <summary>A flock the server has said nothing of for this long (seconds) has gone out of range: dropped.</summary>
+        private const double Silence = 10;
 
         /// <summary>The landed goose entity's default size (entities/greylag.json client.size); the sky goose uses the
         /// loaded value, so the two always match.</summary>
         public const double EntityScale = 0.98;
 
-        public FlockRenderer(ICoreClientAPI capi) { this.capi = capi; }
+        public FlockRenderer(ICoreClientAPI capi, Dictionary<string, Species> species, float callVolume = 1f)
+        {
+            this.capi = capi; this.species = species;
+            CallVolume = Math.Max(0f, callVolume);
+        }
 
         public double RenderOrder => 0.45;
         public int RenderRange => 400;
         public int Count => flocks.Count;
 
-        /// <summary>heading: radians, dir = (sin, 0, cos), so 0 = south (+Z), pi = north. altitude: blocks above ground.</summary>
-        public Flock Send(Species sp, int count, double? heading = null, double? altitude = null)
-        {
-            var plr = capi.World.Player.Entity.Pos;
-            double ang = heading ?? rand.NextDouble() * Math.PI * 2;
-            var dir = new Vec3d(Math.Sin(ang), 0, Math.Cos(ang));
-            var perp = new Vec3d(dir.Z, 0, -dir.X);
-            int ground = capi.World.BlockAccessor.GetRainMapHeightAt((int)plr.X, (int)plr.Z);
-            double y = Math.Min(ground + (altitude ?? sp.AltitudeMin + rand.NextDouble() * (sp.AltitudeMax - sp.AltitudeMin)), capi.World.BlockAccessor.MapSizeY + 40);
-            double side = (rand.NextDouble() - 0.5) * 40; // pass slightly off-centre
-            double span = sp.SpanBlocks;
-            // enter and leave where a bird is ~2 px wide, so the flock shrinks to specks instead of popping in or out
-            double reach = VisibleRange(sp), alt = y - plr.Y;
-            double horiz = Math.Sqrt(Math.Max(reach * reach - alt * alt, 100 * 100));
-            var f = new Flock
-            {
-                Species = sp, Speed = sp.SpeedMin + rand.NextDouble() * (sp.SpeedMax - sp.SpeedMin),
-                BaseHeading = ang, Wander1 = rand.NextDouble() * Math.PI * 2, Wander2 = rand.NextDouble() * Math.PI * 2,
-                Pos = new Vec3d(plr.X - dir.X * horiz + perp.X * side, y, plr.Z - dir.Z * horiz + perp.Z * side),
-                CruiseY = y, TargetY = y,
-            };
-            f.Heading = WanderedHeading(f);
-            for (int i = 0; i < count; i++)
-            {
-                var slot = SlotFor(sp, i, count);
-                Extend(f, slot);
-                f.Birds.Add(NewBird(sp, slot));
-            }
-            f.Length = 2 * horiz + f.Tail + span;
-            // a cruising height clear of every flock already in the sky
-            for (int pass = 0; pass <= flocks.Count; pass++)
-            {
-                Flock clash = null;
-                foreach (var o in flocks) if (Overlap(f.CruiseY, f, o)) { clash = o; break; }
-                if (clash == null) break;
-                f.CruiseY = clash.Pos.Y + clash.Rise + Separation + f.Drop;
-            }
-            f.TargetY = f.Pos.Y = f.CruiseY;
-            // if it starts over known high ground, start already clear of it rather than climbing out of a hillside
-            SampleTerrain(f);
-            f.Pos.Y = Math.Max(f.Pos.Y, f.TargetY);
-            flocks.Add(f);
-            return f;
-        }
-
         /// <summary>Whether the flock is still in the sky (the flock camera follows it until it isn't).</summary>
         public bool Has(Flock f) => flocks.Contains(f);
+        public Flock Get(long id) => flocks.Find(f => f.Id == id);
+
+        /// <summary>The server's word on a flock: a new one is set up as it is there; a known one takes the new state
+        /// (formation, which birds are real) and is eased toward the reported position.</summary>
+        public void Apply(SkyFlockPacket pkt)
+        {
+            var f = Get(pkt.Id);
+            if (pkt.Gone) { if (f != null) { flocks.Remove(f); sync.Remove(f.Id); } return; }
+            if (!species.TryGetValue(pkt.Species ?? "", out var sp)) return;
+            var at = new Vec3d(pkt.X, pkt.Y, pkt.Z);
+            if (f == null)
+            {
+                f = new Flock { Id = pkt.Id, Seed = pkt.Seed, Species = sp, Pos = at };
+                flocks.Add(f);
+            }
+            f.BaseHeading = pkt.BaseHeading; f.Wander1 = pkt.Wander1; f.Wander2 = pkt.Wander2;
+            f.Speed = pkt.Speed; f.ClimbRate = pkt.ClimbRate; f.TargetY = pkt.TargetY;
+            f.Travel = pkt.Travel; f.Length = pkt.Length;
+            if (Math.Abs(f.Age - pkt.Age) > 0.5) f.Age = pkt.Age;
+            f.Heading = SkyFlight.WanderedHeading(f);
+            // the gap to where the server has it: small ones eased out, big ones (just heard of it) jumped
+            var error = at - f.Pos;
+            if (error.Length() > 40) { f.Pos = at; error = new Vec3d(); }
+            sync[f.Id] = (error, capi.World.ElapsedMilliseconds / 1000.0);
+            int n = (pkt.Slots?.Length ?? 0) / 3;
+            if (f.Birds.Count != n) { f.Birds.Clear(); for (int i = 0; i < n; i++) f.Birds.Add(new Bird()); }
+            f.Tail = f.HalfWidth = f.Drop = f.Rise = 0;
+            for (int i = 0; i < n; i++)
+            {
+                var b = f.Birds[i];
+                b.Offset = new Vec3d(pkt.Slots[i * 3], pkt.Slots[i * 3 + 1], pkt.Slots[i * 3 + 2]);
+                b.EntityId = pkt.Entities != null && i < pkt.Entities.Length ? pkt.Entities[i] : 0;
+                SkyFlight.Extend(f, b.Offset);
+            }
+            SkyFlight.Dress(f);
+        }
+
+        /// <summary>Leaving the world: the server will tell the next one afresh.</summary>
+        public void Clear() { flocks.Clear(); sync.Clear(); }
 
         /// <summary>
-        /// Formation slot i of count, relative to the leader (X along, Y up, Z across). V slots scale with wingspan:
-        /// each rank sits back by about half a span and out by most of one, so neighbouring wingtips stay just clear.
-        /// A loose group spreads uniformly over a disc one radius behind the leader, with some height spread.
+        /// Now and then one bird of the flock calls, from where it is in the formation: every CallGapMin to CallGapMax
+        /// seconds, the first a few seconds after the flock shows up. Calls are quiet and carry only CallRange blocks, so
+        /// a flock that is high up or far off is faint or not heard at all. Real birds call this way too (they make no
+        /// idle calls of their own while in a passing flock).
         /// </summary>
-        private Vec3d SlotFor(Species sp, int i, int count)
-        {
-            double span = sp.SpanBlocks;
-            if (sp.Loose)
-            {
-                double looseR = span * (1.5 + Math.Sqrt(count));
-                double r = looseR * Math.Sqrt(rand.NextDouble()), a = rand.NextDouble() * Math.PI * 2;
-                return new Vec3d(-looseR + r * Math.Cos(a), (rand.NextDouble() - 0.5) * span * 2, r * Math.Sin(a));
-            }
-            int rank = (i + 1) / 2; int side = i == 0 ? 0 : (i % 2 == 0 ? 1 : -1);
-            return new Vec3d(-rank * span * 0.55 + (rand.NextDouble() - 0.5) * span * 0.2, rank * 0.2 + (rand.NextDouble() - 0.5),
-                             side * rank * span * 0.8 + (rand.NextDouble() - 0.5) * span * 0.2);
-        }
-
-        private static void Extend(Flock f, Vec3d o)
-        {
-            f.Tail = Math.Max(f.Tail, -o.X); f.HalfWidth = Math.Max(f.HalfWidth, Math.Abs(o.Z));
-            f.Drop = Math.Max(f.Drop, -o.Y); f.Rise = Math.Max(f.Rise, o.Y);
-        }
-
-        /// <summary>Whether flock f at leader height y would come within Separation, in height, of flock o.</summary>
-        private bool Overlap(double y, Flock f, Flock o)
-            => y - f.Drop < o.Pos.Y + o.Rise + Separation && y + f.Rise > o.Pos.Y - o.Drop - Separation;
-
-        private Bird NewBird(Species sp, Vec3d offset) => new Bird
-        {
-            Offset = offset, Phase = (float)rand.NextDouble() * 3,
-            YawJitter = (float)((rand.NextDouble() * 2 - 1) * 3 * GameMath.DEG2RAD),
-            FlapBeats = rand.Next(sp.FlapBeatsMin, sp.FlapBeatsMax + 1), SoarLoops = rand.Next(sp.SoarLoopsMin, sp.SoarLoopsMax + 1)
-        };
-
-        /// <summary>Every CallGapMin-Max seconds one random bird calls, positioned at that bird, quiet and range-limited
-        /// so a flock high up and far off is faint or silent. The first call waits a few seconds after the flock appears.</summary>
         private void Call(Flock f)
         {
-            var sp = f.Species;
-            if (sp.CallSound == null || sp.CallVariants <= 0 || CallVolume <= 0) return;
-            if (f.NextCall == 0) f.NextCall = 3 + rand.NextDouble() * sp.CallGapMax;
-            if (f.Age < f.NextCall) return;
+            Species sp = f.Species;
+            bool silent = sp.CallSound == null || sp.CallVariants <= 0 || CallVolume <= 0 || f.Birds.Count == 0;
+            if (silent) return;
+            if (f.NextCall == 0) f.NextCall = f.Age + 3 + rand.NextDouble() * sp.CallGapMax;   // the first call
+            if (f.NextCall > f.Age) return;
             f.NextCall = f.Age + sp.CallGapMin + rand.NextDouble() * (sp.CallGapMax - sp.CallGapMin);
-            var b = f.Birds[rand.Next(f.Birds.Count)];
-            double dx = Math.Sin(f.Heading), dz = Math.Cos(f.Heading);
-            double x = f.Pos.X + dx * b.Offset.X + dz * b.Offset.Z, y = f.Pos.Y + b.Offset.Y, z = f.Pos.Z + dz * b.Offset.X - dx * b.Offset.Z;
-            var loc = new AssetLocation("flocks", sp.CallSound + (1 + rand.Next(sp.CallVariants)));
-            capi.World.PlaySoundAt(loc, x, y, z, null, true, CallRange, 0.6f * CallVolume);
-        }
-
-        private double WanderedHeading(Flock f)
-            => f.BaseHeading + WanderBig * Math.Sin(f.Age * 0.105 + f.Wander1) + WanderSmall * Math.Sin(f.Age * 0.27 + f.Wander2);
-
-        /// <summary>
-        /// Sets TargetY: cruising height, or higher where the ground ahead, under, behind (for the V's tail) or to either
-        /// side of the flock needs it. Ground further ahead counts for less by however much the flock can climb before
-        /// it gets there, so it starts climbing just early enough. Unloaded chunks read as height 0 and are skipped;
-        /// they are too far away to be drawn anyway.
-        /// </summary>
-        private void SampleTerrain(Flock f)
-        {
-            var ba = capi.World.BlockAccessor;
-            double dx = Math.Sin(f.Heading), dz = Math.Cos(f.Heading);
-            double climbPerBlock = MaxClimb * 0.6 / f.Speed;
-            double need = f.CruiseY;
-            for (double d = -f.Tail; d <= LookAhead; d += 16)
-            {
-                for (int s = -1; s <= 1; s++)
-                {
-                    double x = f.Pos.X + dx * d + dz * s * f.HalfWidth, z = f.Pos.Z + dz * d - dx * s * f.HalfWidth;
-                    int h = ba.GetRainMapHeightAt((int)x, (int)z);
-                    if (h <= 0) continue;
-                    need = Math.Max(need, h + Clearance + f.Drop - Math.Max(0, d) * climbPerBlock);
-                }
-            }
-            // keep clear of the flocks that were up before this one: over any that come near at about its height
-            foreach (var o in flocks)
-            {
-                if (o == f) break;
-                double hx = o.Pos.X - f.Pos.X, hz = o.Pos.Z - f.Pos.Z, near = ConflictRange + o.Tail + f.Tail;
-                if (hx * hx + hz * hz > near * near || !Overlap(need, f, o)) continue;
-                need = Math.Max(need, o.Pos.Y + o.Rise + Separation + f.Drop);
-            }
-            f.TargetY = Math.Min(need, ba.MapSizeY + 100);
-        }
-
-        private void Move(Flock f, float dt)
-        {
-            f.Age += dt;
-            double h = WanderedHeading(f);
-            f.TurnRate = (h - f.Heading) / dt;
-            f.Heading = h;
-            f.Pos.X += Math.Sin(h) * f.Speed * dt;
-            f.Pos.Z += Math.Cos(h) * f.Speed * dt;
-            f.Travel += f.Speed * dt;
-            if (f.Age >= f.NextSample) { SampleTerrain(f); f.NextSample = f.Age + 0.3; }
-            // ease toward the target height: climb briskly, sink back to cruise gently
-            double want = GameMath.Clamp((f.TargetY - f.Pos.Y) * 0.4, -MaxSink, MaxClimb);
-            f.ClimbRate += (want - f.ClimbRate) * Math.Min(1, dt * 1.5);
-            f.Pos.Y += f.ClimbRate * dt;
-        }
-
-        /// <summary>
-        /// Distance at which one bird covers about 2 pixels of screen height, from the species' wingspan as drawn,
-        /// window height and vertical FOV. Clamped to 300-1500 blocks (the game's far plane is 3000).
-        /// </summary>
-        public double VisibleRange(Species sp)
-        {
-            int fovDeg = capi.Settings.Int["fieldOfView"];
-            double fov = (fovDeg > 0 ? fovDeg : 70) * GameMath.DEG2RAD;
-            double pxPerBlockAtOne = capi.Render.FrameHeight / 2.0 / Math.Tan(fov / 2);
-            return GameMath.Clamp(sp.SpanBlocks * pxPerBlockAtOne / 2, 300, 1500);
+            Bird caller = f.Birds[rand.Next(f.Birds.Count)];
+            var real = caller.EntityId == 0 ? null : capi.World.GetEntityById(caller.EntityId);
+            Vec3d at = real?.Pos.XYZ ?? f.SlotInWorld(caller.Offset);
+            var sound = new AssetLocation("flocks", sp.CallSound + (1 + rand.Next(sp.CallVariants)));
+            capi.World.PlaySoundAt(sound, at.X, at.Y, at.Z, null, true, CallRange, 0.6f * CallVolume);
         }
 
         public void OnRenderFrame(float dt, EnumRenderStage stage)
         {
             if (flocks.Count == 0) return;
             bool paused = capi.IsGamePaused || dt <= 0; // render frames keep coming while paused; freeze the flock
-            var rapi = capi.Render; var cam = capi.World.Player.Entity.CameraPos;
-            var prog = rapi.PreparedStandardShader((int)cam.X, (int)cam.Y + 80, (int)cam.Z);
+            double now = capi.World.ElapsedMilliseconds / 1000.0;
+            IRenderAPI rapi = capi.Render;
+            Vec3d cam = capi.World.Player.Entity.CameraPos;
+            // lit as the open sky over the camera is (that is where the birds are), not as the ground under it
+            int skyY = (int)cam.Y + 80;
+            var prog = rapi.PreparedStandardShader((int)cam.X, skyY, (int)cam.Z);
             prog.ViewMatrix = rapi.CameraMatrixOriginf;
             prog.ProjectionMatrix = rapi.CurrentProjectionMatrix;
             // Like vanilla's entity pass: wings and tails are single planes that must show from both sides,
@@ -245,18 +125,30 @@ namespace Flocks
             for (int fi = flocks.Count - 1; fi >= 0; fi--)
             {
                 var f = flocks[fi]; var sp = f.Species;
-                if (!paused) { Move(f, dt); Call(f); }
-                if (f.Travel > f.Length || !sp.Meshes.Ok) { flocks.RemoveAt(fi); continue; }
+                sync.TryGetValue(f.Id, out var s);
+                if (now - s.heard > Silence || sp.Meshes?.Ok != true) { flocks.RemoveAt(fi); sync.Remove(f.Id); continue; }
+                if (!paused)
+                {
+                    SkyFlight.Move(f, dt, null, NoOthers);
+                    if (s.error != null)
+                    {
+                        double k = 1 - Math.Exp(-dt * 1.5);
+                        f.Pos.Add(s.error.X * k, s.error.Y * k, s.error.Z * k);
+                        s.error.Mul(1 - k);
+                    }
+                    Call(f);
+                }
                 double dx = Math.Sin(f.Heading), dz = Math.Cos(f.Heading);
                 // Bank into turns: heading increasing is a left turn, and +RotateX drops the left (+Z) wing.
                 // Lift the nose while climbing: +RotateZ drops the head (-X), so climbing gives a negative angle.
                 // Both are exaggerated a little so they read from the ground.
                 float roll = (float)GameMath.Clamp(f.TurnRate * 8, -0.3, 0.3);
                 float pitch = (float)GameMath.Clamp(-f.ClimbRate * 0.05, -0.25, 0.25);
-                for (int i = 0; i < f.Birds.Count; i++)
+                foreach (Bird b in f.Birds)
                 {
-                    var b = f.Birds[i];
-                    float t = (float)f.Age + b.Phase;
+                    // a real bird loaded here is drawn by the game itself
+                    if (b.EntityId != 0 && capi.World.GetEntityById(b.EntityId) != null) continue;
+                    float t = b.Phase + (float)f.Age;
                     var o = b.Offset;
                     double x = f.Pos.X + dx * o.X + dz * o.Z + Math.Sin(t * 0.7) * 0.4;
                     double y = f.Pos.Y + o.Y + Math.Sin(t * 0.9) * 0.3;

@@ -9,18 +9,21 @@ using Vintagestory.API.Server;
 
 namespace Flocks
 {
-    /// <summary>Server config, ModConfig/flocks-server.json. Written with defaults on first run.</summary>
+    /// <summary>The server's settings, in ModConfig/flocks-server.json; the file is created with these defaults the
+    /// first time the server runs, and rewritten (keeping its values) on each start so new settings show up.</summary>
     public class FlocksServerConfig
     {
-        /// <summary>Greylag geese spawn on lakes (vanilla runtime/worldgen spawning) during their resident season.</summary>
+        /// <summary>Master switch for resident birds: off, none of the mod's birds spawn on their own (worldgen or
+        /// runtime). The name is from when the goose was the only one.</summary>
         public bool ResidentGeese = true;
-        /// <summary>Smallest lake (fresh-water surface blocks around the spawn point) a goose spawn is allowed on.</summary>
+        /// <summary>How many surface blocks the water around a spawn must have for a waterbird to spawn there (a species
+        /// can ask for more or less with its own minLakeSize).</summary>
         public int MinLakeSize = 36;
         /// <summary>No goose spawn further than this from shore (a solid non-water block at or just above the water
         /// surface, looked for in 8 directions). Floating geese more than 1.5x this far out steer back toward land.</summary>
         public int ShoreDistance = 20;
-        /// <summary>Safety cap: no new goose spawn when this many geese are already within NearbyRadius of the spot.
-        /// Vanilla's own per-player limit (spawnconditions.runtime.maxQuantity) normally applies long before this.</summary>
+        /// <summary>A backstop for waterbirds: a spawn is refused once this many of the same bird are within NearbyRadius.
+        /// The game's own cap per player (spawnconditions.runtime.maxQuantity) normally stops them well before.</summary>
         public int MaxGeeseNearby = 30;
         public int NearbyRadius = 96;
 
@@ -71,7 +74,7 @@ namespace Flocks
     /// spawnconditions don't know seasons or lake size, so this vetoes spawns out of the species' resident season, on
     /// small ponds, far from shore, near an abandoned lake, or where they are already thick on the ground. Sea birds
     /// (habitat "sea") are judged the same way on salt water: near the shore, on enough sea.
-    /// The autumn departure is in EntityBehaviorWaterfowl.
+    /// Leaving again in autumn is up to the birds themselves (EntityBehaviorWaterfowl.SeasonOver).
     /// </summary>
     public class ResidentGeese
     {
@@ -101,47 +104,67 @@ namespace Flocks
             if (sp == null) return true;
             try
             {
-                if (!Cfg.ResidentGeese) { VetoOff++; return false; }
-                var bp = pos.AsBlockPos;
-                if (sp.Soars)
-                {
-                    // birds of prey: resident all year, no water; a territory each, so at most two within 192 blocks
-                    if (FlockRegistry.Instance?.IsAbandoned(pos.X, pos.Z) == true) { VetoAbandoned++; return false; }
-                    if (sapi.World.GetEntitiesAround(pos, 192, 96, e => e.Alive && e.Code.Equals(code)).Length >= 2) { VetoCrowded++; return false; }
-                    Allowed++;
-                    return true;
-                }
-                if (sp.Woodland)
-                {
-                    // owls: all year, a territory each (at most two within 96 blocks), and a tree to roost in nearby
-                    if (sapi.World.GetEntitiesAround(pos, 96, 64, e => e.Alive && e.Code.Equals(code)).Length >= 2) { VetoCrowded++; return false; }
-                    if (!EntityBehaviorOwl.HasRoostNear(ba, pos)) { VetoNoRoost++; return false; }
-                    Allowed++;
-                    return true;
-                }
-                if (sp.Ground)
-                {
-                    // land birds (crows): all year, on open ground; never where a scarecrow stands, and not too many
-                    if (FlockRegistry.Instance?.IsAbandoned(pos.X, pos.Z) == true) { VetoAbandoned++; return false; }
-                    if (!EntityBehaviorCorvid.OpenGround(ba, bp.X, bp.Z, out _)) { VetoGround++; return false; }
-                    if (Scarecrows.Protects(sapi.World, pos, Cfg.ScarecrowRadius)) { VetoScarecrow++; return false; }
-                    if (sapi.World.GetEntitiesAround(pos, Cfg.NearbyRadius, 32, e => e.Alive && e.Code.Equals(code)).Length >= Cfg.MaxCrowsNearby) { VetoCrowded++; return false; }
-                    Allowed++;
-                    return true;
-                }
-                if (!InSeason(sapi.World, bp, sp)) { VetoSeason++; return false; }
-                // a wading bird only where it can stand: water one block deep, the spawn on its bottom
-                if (sp.Wades && !(LakeSearch.IsWadeable(ba, bp.X, bp.Z, out int wy) && wy == bp.Y)) { VetoDepth++; return false; }
-                int minLake = sp.MinLake(Cfg.MinLakeSize);
-                if (LakeSize(ba, bp, minLake, sp.Liquid) < minLake) { VetoLake++; return false; }
-                if (ShoreDirection(ba, bp, ShoreDistanceCfg, out _) < 0) { VetoShore++; return false; }
-                if (FlockRegistry.Instance?.IsAbandoned(pos.X, pos.Z) == true) { VetoAbandoned++; return false; }
-                int near = sapi.World.GetEntitiesAround(pos, Cfg.NearbyRadius, 32, e => e.Alive && e.Code.Equals(code)).Length;
-                if (near >= Cfg.MaxGeeseNearby) { VetoCrowded++; return false; }
-                Allowed++;
-                return true;
+                bool ok = !Cfg.ResidentGeese ? Refuse(ref VetoOff)
+                    : sp.Soars ? RaptorMaySpawn(code, pos)
+                    : sp.Woodland ? OwlMaySpawn(ba, code, pos)
+                    : sp.Ground ? CrowMaySpawn(ba, code, pos)
+                    : WaterbirdMaySpawn(ba, sp, code, pos);
+                if (ok) Allowed++;
+                return ok;
             }
             catch (Exception ex) { sapi.Logger.Error("[Flocks] {0} spawn check failed: {1}", code, ex); return false; }
+        }
+
+        /// <summary>Counts a refused spawn under its reason (for /flocks residents) and refuses it.</summary>
+        private static bool Refuse(ref int reason) { reason++; return false; }
+
+        private int Around(Vec3d pos, double range, double height, AssetLocation code)
+            => sapi.World.GetEntitiesAround(pos, (float)range, (float)height, e => e.Alive && e.Code.Equals(code)
+                && e.GetBehavior<EntityBehaviorBird>()?.Passing != true).Length;   // not the birds of a flock passing over
+
+        private static bool Abandoned(Vec3d pos) => FlockRegistry.Instance?.IsAbandoned(pos.X, pos.Z) == true;
+
+        /// <summary>Birds of prey: resident all year, no water; a territory each, so at most two within 192 blocks.</summary>
+        private bool RaptorMaySpawn(AssetLocation code, Vec3d pos)
+        {
+            if (Abandoned(pos)) return Refuse(ref VetoAbandoned);
+            if (Around(pos, 192, 96, code) >= 2) return Refuse(ref VetoCrowded);
+            return true;
+        }
+
+        /// <summary>Owls: all year, a territory each (at most two within 96 blocks), and a tree to roost in nearby.</summary>
+        private bool OwlMaySpawn(IBlockAccessor ba, AssetLocation code, Vec3d pos)
+        {
+            if (Around(pos, 96, 64, code) >= 2) return Refuse(ref VetoCrowded);
+            if (!EntityBehaviorOwl.HasRoostNear(ba, pos)) return Refuse(ref VetoNoRoost);
+            return true;
+        }
+
+        /// <summary>Land birds (crows): all year, on open ground; never where a scarecrow stands, and not too many.</summary>
+        private bool CrowMaySpawn(IBlockAccessor ba, AssetLocation code, Vec3d pos)
+        {
+            if (Abandoned(pos)) return Refuse(ref VetoAbandoned);
+            BlockPos at = pos.AsBlockPos;
+            if (!EntityBehaviorCorvid.OpenGround(ba, at.X, at.Z, out _)) return Refuse(ref VetoGround);
+            if (Scarecrows.Protects(sapi.World, pos, Cfg.ScarecrowRadius)) return Refuse(ref VetoScarecrow);
+            if (Around(pos, Cfg.NearbyRadius, 32, code) >= Cfg.MaxCrowsNearby) return Refuse(ref VetoCrowded);
+            return true;
+        }
+
+        /// <summary>Waterbirds: in their season, on a big enough lake (or enough sea) within reach of the shore, not where
+        /// a flock was driven off, and not where there are already plenty. Waders only where they can stand.</summary>
+        private bool WaterbirdMaySpawn(IBlockAccessor ba, Species sp, AssetLocation code, Vec3d pos)
+        {
+            BlockPos at = pos.AsBlockPos;
+            if (!InSeason(sapi.World, at, sp)) return Refuse(ref VetoSeason);
+            // a wading bird only where it can stand: water one block deep, the spawn on its bottom
+            if (sp.Wades && !(LakeSearch.IsWadeable(ba, at.X, at.Z, out int bottom) && bottom == at.Y)) return Refuse(ref VetoDepth);
+            int minLake = sp.MinLake(Cfg.MinLakeSize);
+            if (LakeSize(ba, at, minLake, sp.Liquid) < minLake) return Refuse(ref VetoLake);
+            if (ShoreDirection(ba, at, ShoreDistanceCfg, out _) < 0) return Refuse(ref VetoShore);
+            if (Abandoned(pos)) return Refuse(ref VetoAbandoned);
+            if (Around(pos, Cfg.NearbyRadius, 32, code) >= Cfg.MaxGeeseNearby) return Refuse(ref VetoCrowded);
+            return true;
         }
 
         /// <summary>The landing species whose landed entity this is, or null.</summary>
@@ -155,27 +178,16 @@ namespace Flocks
         /// always, for a bird that stays all year.</summary>
         public static bool InSeason(IWorldAccessor world, BlockPos bp, Species sp)
         {
-            if (sp.YearRound) return true;
-            var cal = world.Calendar;
-            return MigrationScheduler.ResidentSeason(sp.SpringStart, sp.AutumnStart, cal.GetSeasonRel(bp), cal.OnGetLatitude(bp.Z));
+            return sp.YearRound || MigrationScheduler.ResidentSeason(sp.SpringStart, sp.AutumnStart,
+                world.Calendar.GetSeasonRel(bp), world.Calendar.OnGetLatitude(bp.Z));
         }
 
-        /// <summary>Surface blocks of the liquid (fresh water unless told otherwise) connected to bp's column at its water
-        /// level, counted up to <paramref name="enough"/>.</summary>
+        /// <summary>How big the lake (or stretch of sea) at bp's column is, in surface blocks of the liquid, counting no
+        /// further than <paramref name="enough"/>; 0 when the column isn't that liquid at all.</summary>
         public static int LakeSize(IBlockAccessor ba, BlockPos bp, int enough, string liquid = "water")
         {
-            int sx = bp.X, sz = bp.Z;
-            if (!Surface(ba, sx, sz, out int y, liquid)) return 0;
-            var seen = new System.Collections.Generic.HashSet<long> { ((long)sx << 32) ^ (uint)sz };
-            var q = new System.Collections.Generic.Queue<(int, int)>(); q.Enqueue((sx, sz));
-            int n = 0;
-            while (q.Count > 0 && n < enough)
-            {
-                var (x, z) = q.Dequeue(); n++;
-                foreach (var (nx, nz) in new[] { (x + 1, z), (x - 1, z), (x, z + 1), (x, z - 1) })
-                    if (seen.Add(((long)nx << 32) ^ (uint)nz) && Surface(ba, nx, nz, out int ny, liquid) && ny == y) q.Enqueue((nx, nz));
-            }
-            return n;
+            if (!LakeSearch.Surface(ba, bp.X, bp.Z, out int level, liquid)) return 0;
+            return LakeSearch.WalkSurface(ba, bp.X, bp.Z, level, enough, new HashSet<long>(), liquid, null);
         }
 
         /// <summary>
@@ -206,12 +218,8 @@ namespace Flocks
 
         /// <summary>The column's rain-map top is the liquid; null = fresh or salt water alike.</summary>
         private static bool Surface(IBlockAccessor ba, int x, int z, out int y, string liquid)
-        {
-            y = ba.GetRainMapHeightAt(x, z);
-            if (y <= 0) return false;
-            var b = ba.GetBlock(new BlockPos(x, y, z), BlockLayersAccess.Fluid);
-            return b != null && b.IsLiquid() && (liquid == null ? b.LiquidCode == "water" || b.LiquidCode == "saltwater" : b.LiquidCode == liquid);
-        }
+            => liquid != null ? LakeSearch.Surface(ba, x, z, out y, liquid)
+                : LakeSearch.Surface(ba, x, z, out y, "water") || LakeSearch.Surface(ba, x, z, out y, "saltwater");
 
         public string Report()
         {
@@ -222,12 +230,12 @@ namespace Flocks
                 var code = sp.LandedEntityCode;
                 var birds = sapi.World.LoadedEntities.Values.Where(e => e.Alive && e.Code.Equals(code)).ToList();
                 sb.Append($"\nLoaded {sp.Name ?? sp.Code}: {birds.Count}");
-                foreach (var p in sapi.World.AllOnlinePlayers)
+                foreach (var plr in sapi.World.AllOnlinePlayers.Where(p => p.Entity != null))
                 {
-                    if (p.Entity == null) continue;
-                    var bp = p.Entity.Pos.AsBlockPos;
-                    int near = birds.Count(e => e.Pos.HorDistanceTo(p.Entity.Pos.XYZ) <= Cfg.NearbyRadius);
-                    sb.Append($"\n  {p.PlayerName}: {near} within {Cfg.NearbyRadius} blocks, resident season here: {(InSeason(sapi.World, bp, sp) ? "yes" : "no")}");
+                    var where = plr.Entity.Pos;
+                    int near = birds.Count(e => e.Pos.HorDistanceTo(where.XYZ) <= Cfg.NearbyRadius);
+                    string season = InSeason(sapi.World, where.AsBlockPos, sp) ? "yes" : "no";
+                    sb.Append($"\n  {plr.PlayerName}: {near} within {Cfg.NearbyRadius} blocks, resident season here: {season}");
                 }
             }
             return sb.ToString();

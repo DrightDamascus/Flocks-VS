@@ -47,7 +47,7 @@
 			  huntRange: 18, perchSecondsMin: 60, perchSecondsMax: 180,
 			  // after a meal it doesn't hunt for 20 minutes, like vanilla's foxes, wolves and bears ("saturated")
 			  saturatedSeconds: 1200, preyCodes: ["flocks:mouse"] },
-			{ code: "health", currenthealth: 5, maxhealth: 5 },
+			{ code: "health", currenthealth: 2, maxhealth: 2 },
 			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
 			{ code: "harvestable", drops: [
 				{ type: "item", code: "game:poultry-raw", quantity: { avg: 1, var: 0 } },

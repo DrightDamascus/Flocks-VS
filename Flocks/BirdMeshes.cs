@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -32,24 +33,26 @@ namespace Flocks
             this.capi = capi; this.species = species; this.candidates = candidates;
         }
 
+        // ITexPositionSource, for the tesselator: where each of the shape's textures sits in the entity atlas, added the
+        // first time it is asked for. A code the shape doesn't define gets its first texture; with none, the game's
+        // "unknown" texture.
         public Size2i AtlasSize => capi.EntityTextureAtlas.Size;
 
         public TextureAtlasPosition this[string code]
         {
             get
             {
-                if (!textures.TryGetValue(code, out var loc)) foreach (var v in textures.Values) { loc = v; break; }
-                if (loc == null) return capi.EntityTextureAtlas.UnknownTexturePosition;
-                capi.EntityTextureAtlas.GetOrInsertTexture(loc, out _, out var pos);
-                return pos ?? capi.EntityTextureAtlas.UnknownTexturePosition;
+                ITextureAtlasAPI atlas = capi.EntityTextureAtlas;
+                AssetLocation tex = textures.TryGetValue(code, out var named) ? named : textures.Values.FirstOrDefault();
+                if (tex == null) return atlas.UnknownTexturePosition;
+                atlas.GetOrInsertTexture(tex, out _, out TextureAtlasPosition at);
+                return at ?? atlas.UnknownTexturePosition;
             }
         }
 
-        private AssetLocation shapeLoc;
         private Shape shape;
         private readonly Dictionary<string, ShapeElement> byName = new();
         private readonly Dictionary<string, Rot> baseRot = new();
-        public string Loaded { get; private set; }
         /// <summary>Largest width of any baked pose (wingspan, or body length if larger), in blocks before BirdScale.</summary>
         public float Span { get; private set; }
 
@@ -73,50 +76,49 @@ namespace Flocks
 
         private bool TryLoad(string name, AssetLocation path, string flapCode, string soarCode, string texOverride)
         {
-            shapeLoc = path;
-            Shape baseShape = Shape.TryGet(capi, shapeLoc);
-            if (baseShape == null) { capi.Logger.Warning("[Flocks] {0}: shape not found at {1}", name, shapeLoc); return false; }
+            Shape baseShape = Shape.TryGet(capi, path);
+            if (baseShape?.Textures == null || baseShape.Textures.Count == 0)
+            {
+                capi.Logger.Warning(baseShape == null ? "[Flocks] {0}: shape not found at {1}" : "[Flocks] {0}: shape at {1} has no textures", name, path);
+                return false;
+            }
             textures.Clear();
-            if (baseShape.Textures == null || baseShape.Textures.Count == 0) { capi.Logger.Warning("[Flocks] {0}: shape has no textures", name); return false; }
-            foreach (var kv in baseShape.Textures)
+            foreach (var (code, given) in baseShape.Textures)
             {
                 // the atlas adds "textures/" and ".png" itself, so keep the bare path for it and only check the full one
-                var loc = kv.Value.Clone();
+                var loc = given.Clone();
                 if (!capi.Assets.Exists(TexFile(loc)) && texOverride != null) loc = new AssetLocation("game", texOverride);
-                if (!capi.Assets.Exists(TexFile(loc))) { capi.Logger.Warning("[Flocks] {0}: texture '{1}' missing at {2}", name, kv.Key, TexFile(loc)); return false; }
-                textures[kv.Key] = loc;
+                if (!capi.Assets.Exists(TexFile(loc))) { capi.Logger.Warning("[Flocks] {0}: texture '{1}' missing at {2}", name, code, TexFile(loc)); return false; }
+                textures[code] = loc;
             }
             // one shape object for every pose: each bake sets absolute rotations (base + animation), so nothing accumulates
             shape = baseShape;
             byName.Clear(); baseRot.Clear(); Span = 0;
-            Index(shape.Elements, byName);
+            IndexElements(shape.Elements);
             foreach (var kv in byName) baseRot[kv.Key] = new Rot(kv.Value.RotationX, kv.Value.RotationY, kv.Value.RotationZ);
-            Animation flap = Find(baseShape, flapCode);
-            Animation soar = Find(baseShape, soarCode);
+            Animation flap = AnimationByCode(baseShape, flapCode), soar = AnimationByCode(baseShape, soarCode);
             Flap = BakeCycle(flap, FlapFrames);
             Soar = BakeCycle(soar, SoarFrames);
             var from = Pose(flap, 0); var to = Pose(soar, 0);
             Blend = new MultiTextureMeshRef[BlendFrames];
             for (int i = 0; i < BlendFrames; i++) Blend[i] = Bake(Mix(from, to, i / (float)(BlendFrames - 1)));
-            Loaded = name;
             capi.Logger.Notification("[Flocks] baked {0} meshes from {1}: {2} flap, {3} soar, {4} blend frames, flap anim {5}, soar anim {6}, textures {7}",
-                name, shapeLoc, FlapFrames, SoarFrames, BlendFrames, flap != null, soar != null, string.Join(",", textures.Values));
+                name, path, FlapFrames, SoarFrames, BlendFrames, flap != null, soar != null, string.Join(",", textures.Values));
             return true;
         }
 
         private static AssetLocation TexFile(AssetLocation loc) => loc.Clone().WithPathPrefixOnce("textures/").WithPathAppendixOnce(".png");
 
-        private static Animation Find(Shape s, string code)
-        {
-            if (s.Animations == null) return null;
-            foreach (var a in s.Animations) if (a.Code == code) return a;
-            return null;
-        }
+        /// <summary>The shape's animation with this code (the first, if it has several), or null.</summary>
+        private static Animation AnimationByCode(Shape s, string code) => s.Animations == null ? null : Array.Find(s.Animations, a => a.Code == code);
+
+        /// <summary>An animation's length in frames; 30 when it doesn't say (or there is none).</summary>
+        private static int FrameCount(Animation anim) => anim != null && anim.QuantityFrames > 0 ? anim.QuantityFrames : 30;
 
         private MultiTextureMeshRef[] BakeCycle(Animation anim, int frames)
         {
             var meshes = new MultiTextureMeshRef[frames];
-            int n = anim != null && anim.QuantityFrames > 0 ? anim.QuantityFrames : 30;
+            int n = FrameCount(anim);
             for (int i = 0; i < frames; i++) meshes[i] = Bake(Pose(anim, i * n / (float)frames));
             return meshes;
         }
@@ -126,8 +128,8 @@ namespace Flocks
         {
             var pose = new Dictionary<string, Rot>();
             if (anim?.KeyFrames == null || anim.KeyFrames.Length == 0) return pose;
-            foreach (var name in byName.Keys)
-                if (Sample(anim, name, frame, out var r)) pose[name] = r;
+            foreach (string element in byName.Keys)
+                if (Sample(anim, element, frame, out var r)) pose[element] = r;
             return pose;
         }
 
@@ -165,30 +167,38 @@ namespace Flocks
             return max > min ? max - min : 0;
         }
 
-        private static void Index(ShapeElement[] els, Dictionary<string, ShapeElement> d)
+        /// <summary>Every named element of the shape, children included, by name (a later one wins a clash of names).</summary>
+        private void IndexElements(ShapeElement[] level)
         {
-            if (els == null) return;
-            foreach (var e in els) { if (e.Name != null) d[e.Name] = e; Index(e.Children, d); }
+            foreach (ShapeElement el in level ?? Array.Empty<ShapeElement>())
+            {
+                if (el.Name != null) byName[el.Name] = el;
+                IndexElements(el.Children);
+            }
         }
 
         /// <summary>Cyclic Catmull-Rom through the keyframes that mention this element, so motion eases through each key.</summary>
         private static bool Sample(Animation anim, string name, float frame, out Rot r)
         {
             r = default;
-            var keys = new List<(float f, AnimationKeyFrameElement e)>();
+            // the keyframes that rotate this element, in frame order
+            var byFrame = new List<(float f, AnimationKeyFrameElement e)>();
             foreach (var kf in anim.KeyFrames)
-                if (kf.Elements != null && kf.Elements.TryGetValue(name, out var e) && e != null && (e.RotationX != null || e.RotationY != null || e.RotationZ != null))
-                    keys.Add((kf.Frame, e));
-            if (keys.Count == 0) return false;
-            keys.Sort((p, q) => p.f.CompareTo(q.f));
-            int n = anim.QuantityFrames > 0 ? anim.QuantityFrames : 30;
-            int c = keys.Count;
-            // segment i runs from keys[i] to keys[i+1] (wrapping); frames before the first key belong to the last segment
+            {
+                if (kf.Elements == null || !kf.Elements.TryGetValue(name, out var el) || el == null) continue;
+                if (el.RotationX == null && el.RotationY == null && el.RotationZ == null) continue;
+                byFrame.Add((kf.Frame, el));
+            }
+            if (byFrame.Count == 0) return false;
+            byFrame.Sort((p, q) => p.f.CompareTo(q.f));
+            int n = FrameCount(anim);
+            int c = byFrame.Count;
+            // segment i runs from byFrame[i] to byFrame[i+1] (wrapping); frames before the first key belong to the last segment
             int i = c - 1;
-            for (int k = 0; k < c; k++) if (keys[k].f <= frame) i = k;
-            var k0 = keys[(i - 1 + c) % c].e; var k1 = keys[i].e; var k2 = keys[(i + 1) % c].e; var k3 = keys[(i + 2) % c].e;
-            float span = keys[(i + 1) % c].f - keys[i].f; if (span <= 0) span += n;
-            float t = frame - keys[i].f; if (t < 0) t += n;
+            for (int k = 0; k < c; k++) if (byFrame[k].f <= frame) i = k;
+            var k0 = byFrame[(i - 1 + c) % c].e; var k1 = byFrame[i].e; var k2 = byFrame[(i + 1) % c].e; var k3 = byFrame[(i + 2) % c].e;
+            float span = byFrame[(i + 1) % c].f - byFrame[i].f; if (span <= 0) span += n;
+            float t = frame - byFrame[i].f; if (t < 0) t += n;
             float w = GameMath.Clamp(t / span, 0, 1);
             r = new Rot(Spline(k0.RotationX, k1.RotationX, k2.RotationX, k3.RotationX, w),
                         Spline(k0.RotationY, k1.RotationY, k2.RotationY, k3.RotationY, w),

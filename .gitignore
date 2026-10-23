@@ -4,3 +4,5 @@ dist/
 
 tools/greylag_preview.png
 __pycache__/
+.claude/settings.local.json
+transcripts/

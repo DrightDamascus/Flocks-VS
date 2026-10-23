@@ -9,6 +9,9 @@
 	],
 	// drawn at the landed entity's size (client.size 0.47: 0.9 blocks across)
 	sizeFromEntity: "flocks:mallard",
+	// across the wings in flight at that size, for the formation spacing (tools/measure_spans.py; rerun it after changing
+	// the size or the wings)
+	wingspan: 1.45,
 	// fast, low and loose: rapid shallow wingbeats with hardly any gliding
 	speedMin: 18, speedMax: 23,
 	flapSeconds: 0.22, soarSeconds: 0.6, blendSeconds: 0.2,

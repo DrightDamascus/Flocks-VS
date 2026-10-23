@@ -43,7 +43,7 @@
 			// "health": it zeroes thrown spear damage. Crows are wary: they walk off from 18 blocks and fly at 10.
 			{ code: "flocks.corvid", species: "crow", fleeRange: 18, takeoffRange: 10, flySpeed: 9, walkSpeed: 1.1,
 			  perchSecondsMin: 25, perchSecondsMax: 70, raidRange: 24, idleGap: 12, flapSpeed: 3 },
-			{ code: "health", currenthealth: 4, maxhealth: 4 },
+			{ code: "health", currenthealth: 1.5, maxhealth: 1.5 },
 			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
 			{ code: "harvestable", drops: [
 				{ type: "item", code: "game:poultry-raw", quantity: { avg: 1, var: 0 } },

@@ -92,7 +92,7 @@
 		"path": "/mediumCatchableEntities/-",
 		"value": {
 			"name": "heron",
-			"scale": 0.57
+			"scale": 0.58
 		},
 		"file": "animalcages:config/defaultconfig.json",
 		"dependsOn": [
@@ -106,7 +106,7 @@
 		"path": "/mediumCatchableEntities/-",
 		"value": {
 			"name": "eagle",
-			"scale": 0.89
+			"scale": 0.81
 		},
 		"file": "animalcages:config/defaultconfig.json",
 		"dependsOn": [

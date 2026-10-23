@@ -34,22 +34,22 @@
 	"behaviors": [],
 	"texturesByType": {
 		"deadbird-greylag-1-dead": {
-			"gull": {
-				"base": "flocks:entity/bird/gull"
+			"greylag": {
+				"base": "flocks:entity/bird/greylag"
 			}
 		},
 		"deadbird-greylag-1-bledout": {
-			"gull": {
-				"base": "flocks:entity/bird/gull"
+			"greylag": {
+				"base": "flocks:entity/bird/greylag"
 			}
 		},
 		"deadbird-greylag-1-skinned": {
-			"gull": {
+			"greylag": {
 				"base": "flocks:item/carcass/greylag-plucked"
 			}
 		},
 		"deadbird-greylag-1-rotten": {
-			"gull": {
+			"greylag": {
 				"base": "game:block/creature/rot/rot"
 			}
 		},
@@ -115,6 +115,26 @@
 		}
 	},
 	"attributesByType": {
+		"deadbird-greylag-1-skinned": {
+			"size": 0.5,
+			"mass": 0.02,
+			"bloodType": "butchering:bloodportion",
+			"butcheringWorkLoad": "small",
+			"handbookByType": {
+				"*-rotten": {
+					"exclude": false
+				},
+				"*": {
+					"exclude": true
+				}
+			},
+			"hangingShape": {
+				"base": "flocks:item/carcass/greylag-plucked-hanging"
+			},
+			"excludeRewards": [],
+			"butcheringRewards": [],
+			"skinningRewards": []
+		},
 		"deadbird-greylag-1-*": {
 			"size": 0.5,
 			"mass": 0.02,
@@ -130,6 +150,26 @@
 			},
 			"hangingShape": {
 				"base": "flocks:item/carcass/greylag-hanging"
+			},
+			"excludeRewards": [],
+			"butcheringRewards": [],
+			"skinningRewards": []
+		},
+		"deadbird-heron-1-skinned": {
+			"size": 0.5,
+			"mass": 0.01,
+			"bloodType": "butchering:bloodportion",
+			"butcheringWorkLoad": "small",
+			"handbookByType": {
+				"*-rotten": {
+					"exclude": false
+				},
+				"*": {
+					"exclude": true
+				}
+			},
+			"hangingShape": {
+				"base": "flocks:item/carcass/heron-plucked-hanging"
 			},
 			"excludeRewards": [],
 			"butcheringRewards": [],
@@ -155,6 +195,26 @@
 			"butcheringRewards": [],
 			"skinningRewards": []
 		},
+		"deadbird-eagle-1-skinned": {
+			"size": 0.5,
+			"mass": 0.02,
+			"bloodType": "butchering:bloodportion",
+			"butcheringWorkLoad": "small",
+			"handbookByType": {
+				"*-rotten": {
+					"exclude": false
+				},
+				"*": {
+					"exclude": true
+				}
+			},
+			"hangingShape": {
+				"base": "flocks:item/carcass/eagle-plucked-hanging"
+			},
+			"excludeRewards": [],
+			"butcheringRewards": [],
+			"skinningRewards": []
+		},
 		"deadbird-eagle-1-*": {
 			"size": 0.5,
 			"mass": 0.02,
@@ -170,6 +230,26 @@
 			},
 			"hangingShape": {
 				"base": "flocks:item/carcass/eagle-hanging"
+			},
+			"excludeRewards": [],
+			"butcheringRewards": [],
+			"skinningRewards": []
+		},
+		"deadbird-gull-1-skinned": {
+			"size": 0.5,
+			"mass": 0.01,
+			"bloodType": "butchering:bloodportion",
+			"butcheringWorkLoad": "small",
+			"handbookByType": {
+				"*-rotten": {
+					"exclude": false
+				},
+				"*": {
+					"exclude": true
+				}
+			},
+			"hangingShape": {
+				"base": "flocks:item/carcass/gull-plucked-hanging"
 			},
 			"excludeRewards": [],
 			"butcheringRewards": [],
@@ -197,14 +277,26 @@
 		}
 	},
 	"shapeByType": {
+		"deadbird-greylag-1-skinned": {
+			"base": "flocks:item/carcass/greylag-plucked-dead"
+		},
 		"deadbird-greylag-1-*": {
 			"base": "flocks:item/carcass/greylag-dead"
+		},
+		"deadbird-heron-1-skinned": {
+			"base": "flocks:item/carcass/heron-plucked-dead"
 		},
 		"deadbird-heron-1-*": {
 			"base": "flocks:item/carcass/heron-dead"
 		},
+		"deadbird-eagle-1-skinned": {
+			"base": "flocks:item/carcass/eagle-plucked-dead"
+		},
 		"deadbird-eagle-1-*": {
 			"base": "flocks:item/carcass/eagle-dead"
+		},
+		"deadbird-gull-1-skinned": {
+			"base": "flocks:item/carcass/gull-plucked-dead"
 		},
 		"deadbird-gull-1-*": {
 			"base": "flocks:item/carcass/gull-dead"

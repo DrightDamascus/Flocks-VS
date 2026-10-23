@@ -13,8 +13,8 @@ using Vintagestory.API.MathTools;
 namespace FlocksTest
 {
     /// <summary>
-    /// Lag and memory checks. Every Flocks server tick (the four bird behaviours' OnGameTick and the landing-flock
-    /// scheduler) is timed through Harmony, so the cost shows up as CPU time rather than hiding inside the server's 33 ms
+    /// Lag and memory checks. Every Flocks server tick (the four bird behaviours' OnGameTick, the landing-flock
+    /// scheduler, the passing flocks and their schedule) is timed through Harmony, so the cost shows up as CPU time rather than hiding inside the server's 33 ms
     /// tick budget; each step logs a [perf] line with the total, the cost per server tick and the worst single call.
     /// The server's own tick gaps are watched too (spikes from any source, world generation included). Then a load step
     /// (about 80 birds of four kinds, flushed every 10 s) and spawn / kill cycles that watch managed memory and the mod's
@@ -58,6 +58,8 @@ namespace FlocksTest
             var targets = new[] { typeof(EntityBehaviorWaterfowl), typeof(EntityBehaviorCorvid), typeof(EntityBehaviorRaptor), typeof(EntityBehaviorOwl) }
                 .Select(t => (MethodBase)t.GetMethod("OnGameTick", BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
                 .Append(AccessTools.Method(typeof(LandingFlocks), "Tick"))
+                .Append(AccessTools.Method(typeof(SkyFlocks), "Tick"))
+                .Append(AccessTools.Method(typeof(MigrationScheduler), "Tick"))
                 .Append(AccessTools.Method(typeof(ResidentGeese), "TrySpawn"))
                 .Concat(Inner.SelectMany(i => AccessTools.GetDeclaredMethods(i.type).Where(m => m.Name == i.method).Cast<MethodBase>().DefaultIfEmpty(null)))
                 .ToList();

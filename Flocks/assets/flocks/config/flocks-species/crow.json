@@ -9,6 +9,9 @@
 		{ name: "crow", shape: "flocks:shapes/entity/bird/crow.json", flap: "fly-flap", soar: "fly-soar" }
 	],
 	sizeFromEntity: "flocks:crow",
+	// across the wings in flight at that size, for the formation spacing (tools/measure_spans.py; rerun it after changing
+	// the size or the wings)
+	wingspan: 1.5,
 	// steady rowing wingbeats, hardly any gliding
 	speedMin: 9, speedMax: 12,
 	flapSeconds: 0.4, soarSeconds: 1.5, blendSeconds: 0.3,

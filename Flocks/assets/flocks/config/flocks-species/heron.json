@@ -9,6 +9,9 @@
 		{ name: "heron", shape: "flocks:shapes/entity/bird/heron.json", flap: "fly-flap", soar: "fly-soar" }
 	],
 	sizeFromEntity: "flocks:heron",
+	// across the wings in flight at that size, for the formation spacing (tools/measure_spans.py; rerun it after changing
+	// the size or the wings)
+	wingspan: 2.62,
 	// slow, deep beats with glides
 	speedMin: 9, speedMax: 12,
 	flapSeconds: 1.0, soarSeconds: 2.5, blendSeconds: 0.5,

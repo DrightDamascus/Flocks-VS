@@ -8,6 +8,9 @@
 	],
 	// drawn at the landed entity's size (client.size 0.65: 1.7 blocks across; a real greylag is 1.5-1.8 m)
 	sizeFromEntity: "flocks:greylag",
+	// across the wings in flight at that size, for the formation spacing (tools/measure_spans.py; rerun it after changing
+	// the size or the wings)
+	wingspan: 2.49,
 	// geese flap steadily with short glides
 	speedMin: 16, speedMax: 21,
 	flapSeconds: 0.5, soarSeconds: 2, blendSeconds: 0.35,

@@ -1,37 +1,32 @@
 # Handoff
 
 Where Flocks stands and what comes next, for whoever picks it up (a new session, or Dright after a break).
-0.21.3 (2026-10-20, branch release/0.21.3 from tag v0.21.2): a player found an eagle killed by a fall, so birds no
-longer take fall damage (fallDamageMultiplier 0 in every bird's entity file); plus the debug commands /flocks season,
-/flocks depart, /flocks journey, watch mode, V formation on departure, the double-alarm fix and floating-island
-flight (CHANGELOG). Tests at release: eagle steps only (FLOCKS_TEST_ONLY=eagle), 44 of 44 passed, including the new
-"eagle takes no fall damage" step (a real 50-block drop, unhurt). The same fix is in the main tree for 0.23.0.
+Last updated 2026-10-23. Committed through 0.22.0 (released 2026-10-23, tag v0.22.0, on top of v0.21.3): the art pass,
+the rewrite of the unrecorded code, passing flocks that are real birds near players (huntable; a player with a firearms
+mod asked), lower bird health in line with vanilla, and plucked Butchering carcasses. The full engine suite passed (223
+checks) before the health and carcass changes, which are data and generated models (not rerun, Dright's call).
+0.21.3 (2026-10-20): no fall damage for birds, migration debug tools. 0.21.2: quieter birds, CallRate and Numbers.
+0.21.1: Scarecrow mod support. 0.21.0 was the first public release. Earlier: 0.20.2 localisation, Butchering carcasses,
+meat by weight; 0.20.1 Biomes (Hydromancerx's patch); 0.19.1 and 0.20.0 the owl and mouse. DESIGN.md has the
+reasoning behind each piece; CHANGELOG.md has the per-version detail.
 
-Last updated 2026-10-17. Committed through 0.21.1 (on the ModDB): Scarecrow mod support, asked for by a player; its
-scarecrows keep crows off like the straw dummy, and its texts get our line about crows (checked in game by Dright).
-Before that, 0.21.0 was the first public release (on the ModDB; Dright's own page text).
-0.21.0 added: melee hits birds (only thrown spears miss), the waterbird spin-on-land fix, Animal Cages support (caged
-models, fresh start on release), per-animal switches and EaglesHuntChickens in flocks-server.json, /flocks lineup, and
-cranes switched off for now. Tests at commit: with Biomes, Butchering and Animal Cages loaded, 200 of 202 passed; the
-two failures were the new chickens step tripping over wild hares near the test spot (test-side; fixed to clear them
-first, but that fix had not been rerun). The run without other mods was still going when Dright chose to commit.
-Earlier: 0.20.2 localisation, Butchering carcasses, meat by weight; 0.20.1 Biomes (Hydromancerx's patch); 0.19.1 and
-0.20.0 the owl and mouse. DESIGN.md has the reasoning behind each piece; CHANGELOG.md has the per-version detail.
+Versions: one commit per release on master. Work in progress builds as the next version's release candidate
+(modinfo X.Y.Z-rc.N, bumped per build, and build_zip.ps1 names the zip after it), so the game always shows which build
+is loaded; patches to a released version branch from its tag.
+Sonya's Quality Fowl: not going ahead (we won't make her patch). The work is on branch
+archive/fowl-0.21.3-deprecated, not to be merged.
 
-On the ModDB, not committed: 0.21.2, quieter birds and fewer of them, after a player's report (so many
-birds, so loud, you can't hear the game; the recordings like a zoo). Every clip cleaned and about 10 dB quieter
-(tools/clean_sounds.py), nearby birds of a kind take turns calling (BirdCalls.cs), shorter ranges, spawn caps halved,
-CallRate and Numbers in the server config; and stronger, faster wingbeats in flight (flapSpeed per bird, a deeper
-fly-flap in every generator), after another player found the birds float rather than flap. CHANGELOG has the numbers.
-Its build is dist/flocks_0.21.2.zip in the main tree.
-
-This commit is 0.21.2 as released, reconstructed (2026-10-18): its code decompiles the same as the ModDB DLL, and
-its assets are the ModDB zip's. The model generators here (tools/make_*.py) are the art pass's, newer than these
-shapes and textures: don't rerun them for a 0.21.x patch.
-
-In progress: 0.22.0, young waterfowl (Dright's pick): goslings following their parents on the water and ashore,
-then ducklings. Plan in DESIGN.md ("Planned for 0.22.0"); so far only the gosling model (tools/make_gosling.py),
+Next, for 0.23.0 on a later Friday (not in 0.22.0; Dright spaces the releases out), young waterfowl (Dright's pick): goslings following their parents on the water and ashore,
+then ducklings. Plan in DESIGN.md ("Planned for 0.23.0"); so far only the gosling model (tools/make_gosling.py),
 not yet in an entity or seen in game.
+
+In 0.22.0 (2026-10-17): the code from the versions without a recorded session (0.1.0-0.2.3 and
+Grok's 0.4.2-0.8.0) was rewritten, with no change in behaviour, so every line of logic in Flocks comes from a recorded
+session. Shared helpers replace the copies: EntityBehaviorBird.OnServer / ReadAttr / AttackerAndAway / HeadingAwayFrom
+/ RandomHeading; LakeSearch.WalkSurface (the one lake walk, used by the landing search, /flocks land and the spawn
+checks); FlocksModSystem.ReadConfig<T> (both config files); ResidentGeese's spawn checks are one method per kind of
+bird. Left as they were: API signatures, declarations, config/JSON/save keys, the packet layout and the command chain.
+CHANGELOG's Authorship note says who made which versions; transcripts/ (gitignored) holds every session by day.
 
 Also next (Dright): handling what players report after the release. The ModDB page says the mod uses AI without naming the
 model or the method; keep it that way unless Dright says otherwise.
@@ -96,9 +91,13 @@ kill crops like hares do).
   the flock abandons the place for 2 days.
 - **Spawning**: vanilla spawn conditions in the entity file, plus vetoes in `Residents.cs` (season, lake size,
   crowding, abandoned lakes). Landing flocks come in on the migration schedule (`LandingFlocks.cs`).
-- **Sky** (`FlockRenderer.cs`, `Migration.cs`): flocks that only pass over are drawn by the client, at the same size
-  as the entity. Sea birds' groups are drawn only when there is sea within 96 blocks of the player. Several flocks can
-  be up at once, kept apart in height (FlockRenderer.Separation); only storms hold flocks back.
+- **Sky** (`SkyFlocks.cs`, `SkyFlight.cs`, `Migration.cs`, `FlockRenderer.cs`): the server plans each player's passing
+  flocks (MigrationScheduler, settings from flocks.json) and flies them (SkyFlocks); clients within 1700 blocks draw
+  them from its updates. Within 300 blocks of a player the birds are real entities, each flying its slot around the
+  flock (EntityBehaviorBird.Passage), huntable; beyond 360 they are drawn again. A kill leaves the flock for good; the
+  rest scatter and fly on. Sea birds' groups are sent only where there is sea within 96 blocks of the player. Several
+  flocks can be up at once, kept apart in height (SkyFlight.Separation); only storms hold flocks back. Spacing uses
+  each species' wingspan (tools/measure_spans.py). Players near each other share a sky.
 - **Handbook**: each creature item's page text is the lang key `flocks:item-handbooktext-flocks:creature-<bird>`,
   written out in full (a key with a colon is taken as it is). The "Birds" guide page is
   `assets/flocks/config/handbook/birds.json` with its text in `lang/en.json`. New birds get a paragraph and a link
@@ -183,27 +182,44 @@ The roster planned so far is done. Open ideas, none agreed with Dright yet:
 
 ## Compatibility
 
-- Biomes (modid biomes, server only; tested against 2.3.1, zip kept in %USERPROFILE%\agent-tools\vsmods):
+- Other mods' files (Dright, 2026-10-17): download another mod only when it is needed to write or test a patch for it,
+  use it for exactly that, and delete every local copy afterwards (the zip, anything unpacked, renders, and the test
+  server's Mods folder). Nothing of another mod is kept on disk or in memory between tasks. Read only what the patch
+  needs (entity codes, file paths), and never feed a mod into an AI session whose author hasn't agreed: Sonya
+  (Fowl mod) doesn't want her work used that way, nor her models animated or changed by anyone else. The test steps
+  for other mods skip themselves when the mod isn't loaded.
+- Biomes (modid biomes, server only; tested against 2.3.1):
   patches/biomes.json gives each animal its realms (Biomes itself then vets natural spawning), and BiomesCompat.cs
   makes landing flocks and drawn passing flocks follow them, through Biomes' public API (Biomes.Api.ExternalData,
-  EntityBiomeData) by reflection. Engine tests: `-ExtraMods <zip>` loads other mods; `FLOCKS_TEST_ONLY=biomes` runs
+  EntityBiomeData) by reflection. Engine tests: `-ExtraMods <zip>` loads other mods (downloaded for that run, then deleted: see the rule below); `FLOCKS_TEST_ONLY=biomes` runs
   the Biomes step. Not yet seen in game: the sky flocks staying away outside a species' realm.
-- Butchering (modid butchering; tested against 1.14.3, zip in the same folder): the goose, heron, eagle and gull are
+- Butchering (modid butchering; tested against 1.14.3): the goose, heron, eagle and gull are
   butcherable (patches/butchering.json adds Butchering's "butcherable" behaviour, pointing at the carcass item
   itemtypes/butchering/deadbird.json, which is disabled unless Butchering is installed: its item class only exists
   then). Both written by tools/make_carcasses.py. The other birds and the mouse keep vanilla's field harvest (Dright).
   The carcass shapes are our models posed (dead, hanging head down by the feet with the feet at y 10, like
-  Butchering's chicken) and a plucked texture each; the heron's has no legs. They work in game (Dright); not every
+  Butchering's chicken) and a plucked texture each; the heron's has no legs. Plucked ("skinned") carcasses have their
+  own shapes (<bird>-plucked-dead/-hanging: feather planes and the feathered wings without faces; two skin boxes per flank,
+  sized from the body, are the bare folded wing). They work in game (Dright); not every
   carcass has been looked at on the hook, and the held/slot/ground transforms are guesses (tune with .tfedit).
-- Animal Cages (modid animalcages; tested against 5.0.1, zip in the same folder): patches/animalcages.json adds our
+- Animal Cages (modid animalcages; tested against 5.0.1): patches/animalcages.json adds our
   animals to its default catch lists (players with their own cage config add them there). The cage draws the caught
   animal's model without animations; EntityBehaviorBird.OnEntityDespawn (reason PickedUp) points the cage in the
   catcher's hand at the bird's -caged model (tools/make_caged.py). Not yet seen in game: that swap, and the caged
   birds' look. Birds note their position every second (entity.Attributes, saved, not synced); one spawned more than
   4 blocks from it (let out of a cage) drops its saved state (Relocated) and starts afresh.
-- Scarecrow (Mandikor's, modid scarecrow; tested against 1.8.2, zip in the same folder): only Scarecrows.Codes; no
+- Scarecrow (Mandikor's, modid scarecrow; tested against 1.8.2): only Scarecrows.Codes; no
   patch. Chiappo's Vintage Scarecrows (modid vintagescarecrow, a remake for 1.21) is not supported: its entity codes
   were not checked.
+- Sonya's Quality Fowl (modid fowlmod, 1.0.1) and The Critters Pack 1.22 (modid thecritterpackcontinued, domain
+  thecritterpack, 1.4.4), asked about by a player. Both load alongside Flocks with no errors
+  or warnings, and all 201 engine checks pass (2026-10-17, on the 0.21.2 working tree). No code shared: their
+  predator patches add wildcards (`duck-*`, `mallard-*`, `*-crow-*`) that don't match our bare `flocks:mallard` and
+  `flocks:crow`, and our prey lists name domains. Overlap is only in kind: their mallards (Sonya's: wild mallard plus
+  Pekin and blue farm breeds, tameable, eggs, ducklings, no flight; vanilla task AI on its own `game:` duck shape with
+  separate wing parts) and Critters' crow and owl (ground animals like chickens). Critters disables its ducks when
+  Sonya's is present. Flying her wild mallards with Flocks (0.21.3, a guest mode joined by a patch in her mod) was
+  built and then dropped (2026-10-18: we won't make her patch); branch archive/fowl-0.21.3-deprecated.
 - JSON patches can't reach a file whose first token is a comment: keep comments inside the braces.
 
 ## Loose ends

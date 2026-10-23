@@ -48,7 +48,7 @@
 			{ code: "flocks.waterfowl", species: "mallard", fleeRange: 12, takeoffRange: 6, lifeHours: 6, sink: 0.16,
 			  cruiseSpeedMin: 15, cruiseSpeedMax: 18, takeoffRunSeconds: 0.15, takeoffRunSpeed: 4,
 			  takeoffWingsChance: 0.7, takeoffCallChance: 0.5, idleGap: 12, flapSpeed: 3.6 },
-			{ code: "health", currenthealth: 3, maxhealth: 3 },
+			{ code: "health", currenthealth: 2, maxhealth: 2 },
 			{ code: "deaddecay", hoursToDecay: 48, decayedBlock: "game:carcass-tiny" },
 			{ code: "harvestable", drops: [
 				{ type: "item", code: "game:poultry-raw", quantity: { avg: 1, var: 0 } },

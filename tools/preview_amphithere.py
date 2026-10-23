@@ -105,7 +105,7 @@ def main():
     out = sys.argv[1] if len(sys.argv) > 1 else "/workspace/out"
     os.makedirs(out, exist_ok=True)
     root = ma.shape(); mg.pack(root)
-    tex = np.array(Image.open(os.path.join(ma.OUT, "textures", "entity", "amphithere.png")).convert("RGBA"), float)
+    tex = np.array(Image.open(os.path.join(ma.ROOT, "textures", "entity", "amphithere.png")).convert("RGBA"), float)
     flap = ma.animations()[0]
     cells = [("front 3/4 (upstroke top)", 12, (-50, 30)), ("side", 0, (0, 0)), ("top", 0, (0, 90)),
              ("mid-flap 3/4 (downstroke)", 24, (-50, 30)), ("3/4 from below (bottom)", 36, (40, -35)),

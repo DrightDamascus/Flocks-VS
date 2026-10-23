@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
-using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
 
 namespace Flocks
 {
@@ -12,92 +13,110 @@ namespace Flocks
         public Species Species;
         public double Hour;      // game hour of day it sets off
         public int Count;
-        public double Heading;   // radians, FlockRenderer convention: dir = (sin, 0, cos), so pi = north (-Z)
+        public double Heading;   // radians, SkyFlight convention: dir = (sin, 0, cos), so pi = north (-Z)
         public double Altitude;  // blocks above the player's ground
         public string Status = "pending";
         public bool Finished;
     }
 
     /// <summary>
-    /// Plans each in-game day's flocks from the world seed and day number (so the plan is the same on every reload),
-    /// then sends each one when the clock reaches its hour, unless a storm is on. Several flocks can be up at once; the
-    /// renderer keeps them apart in height (FlockRenderer.Separation).
+    /// Plans each in-game day's passing flocks for each player (server), from the world seed and day number (so the plan
+    /// is the same on every reload) and the season and latitude where the player is, then sends each one over the player
+    /// when the clock reaches its hour (SkyFlocks), unless a storm is on. Several flocks can be up at once; they are kept
+    /// apart in height (SkyFlight.Separation). Players near each other share a sky: a flock isn't sent while another of
+    /// its kind is already passing near the player. The settings are flocks.json's (FlocksConfig), the server's copy.
     /// </summary>
     public class MigrationScheduler
     {
-        private readonly ICoreClientAPI capi;
-        private readonly FlockRenderer renderer;
+        private readonly ICoreServerAPI sapi;
+        private readonly SkyFlocks sky;
         private readonly Dictionary<string, Species> species;
         private readonly FlocksConfig cfg;
-        private int day = int.MinValue;
-        private readonly List<PlannedFlock> plan = new();
-        /// <summary>Species the server keeps out of this player's sky (SkyRealmsPacket): switched off in its config, or not
-        /// of the realm the player is in (the Biomes mod). Their flocks aren't drawn.</summary>
-        private HashSet<string> absent = new();
-        public void SetAbsent(string[] codes) => absent = new HashSet<string>(codes ?? Array.Empty<string>());
+        private readonly FlocksServerConfig serverCfg;
+        /// <summary>Each player's plan for the day (by player UID).</summary>
+        private readonly Dictionary<string, (int day, List<PlannedFlock> plan)> plans = new();
+        /// <summary>A flock isn't sent while one of its kind is passing within this of the player (another player's).</summary>
+        public const double SharedSky = 600;
 
-        public MigrationScheduler(ICoreClientAPI capi, FlockRenderer renderer, Dictionary<string, Species> species, FlocksConfig cfg)
+        public MigrationScheduler(ICoreServerAPI sapi, SkyFlocks sky, Dictionary<string, Species> species, FlocksConfig cfg, FlocksServerConfig serverCfg)
         {
-            this.capi = capi; this.renderer = renderer; this.species = species; this.cfg = cfg;
+            this.sapi = sapi; this.sky = sky; this.species = species; this.cfg = cfg; this.serverCfg = serverCfg;
+            sapi.Event.RegisterGameTickListener(Tick, 1000);
+            sapi.Event.PlayerDisconnect += plr => plans.Remove(plr.PlayerUID);
         }
 
-        public void Tick(float dt)
+        /// <summary>The player's plan for today, made when first needed.</summary>
+        private List<PlannedFlock> Today(IServerPlayer plr)
         {
-            var player = capi.World?.Player?.Entity;
-            if (player == null) return;
-            var cal = capi.World.Calendar;
-            int today = (int)cal.TotalDays;
-            if (today != day) { day = today; Plan(player.Pos.AsBlockPos); }
-            if (!cfg.AutoMigration) return;
+            int today = (int)sapi.World.Calendar.TotalDays;
+            if (!plans.TryGetValue(plr.PlayerUID, out var p) || p.day != today)
+                plans[plr.PlayerUID] = p = (today, Plan(plr.Entity.Pos.AsBlockPos, today, plr.PlayerName));
+            return p.plan;
+        }
 
-            double hour = cal.HourOfDay;
+        private void Tick(float dt)
+        {
+            foreach (IServerPlayer plr in sapi.World.AllOnlinePlayers)
+            {
+                if (plr.Entity == null || plr.ConnectionState != EnumClientState.Playing) continue;
+                if (FlockCamera.Instance?.Watching(plr) == true) continue;   // off following a flock (FlockCamera)
+                var plan = Today(plr);
+                if (cfg.AutoMigration) Run(plr, plan);
+            }
+        }
+
+        private void Run(IServerPlayer plr, List<PlannedFlock> plan)
+        {
+            int day = (int)sapi.World.Calendar.TotalDays;
+            double hour = sapi.World.Calendar.HourOfDay;
+            var at = plr.Entity.Pos.XYZ;
+            var pos = plr.Entity.Pos.AsBlockPos;
             foreach (var p in plan)
             {
                 if (p.Finished || hour < p.Hour) continue;
                 bool late = hour > p.Hour + cfg.MaxDelayHours;
-                if (p.Species.Meshes?.Ok != true) { Finish(p, "skipped: no meshes"); continue; }
-                if (absent.Contains(p.Species.Code)) { Finish(p, "skipped: off on this server, or not in this realm (Biomes)"); continue; }
+                if (!serverCfg.SpeciesEnabled(p.Species) || !BiomesCompat.Allows(sapi, p.Species, pos)) { Finish(p, day, "skipped: off on this server, or not in this realm (Biomes)"); continue; }
                 // sea birds pass along the coast: only where there is sea near the player
-                if (p.Species.Sea && !SeaNear(player.Pos.AsBlockPos)) { Finish(p, "skipped: no sea nearby"); continue; }
-                string hold = Stormy(player.Pos.AsBlockPos) ? "storm" : null;
+                if (p.Species.Sea && !SeaNear(pos)) { Finish(p, day, "skipped: no sea nearby"); continue; }
+                if (sky.Near(p.Species.Code, at, SharedSky) != null) { Finish(p, day, "skipped: some are passing here already"); continue; }
+                string hold = Stormy(pos) ? "storm" : null;
                 if (hold == null && !late)
                 {
-                    renderer.Send(p.Species, p.Count, p.Heading, p.Altitude);
-                    Finish(p, $"sent {HourText(hour)}");
+                    sky.Launch(p.Species, p.Count, at, p.Heading, p.Altitude);
+                    Finish(p, day, $"sent {HourText(hour)}");
                 }
-                else if (late) Finish(p, p.Status.StartsWith("held") ? $"skipped: {hold ?? "held too long"}" : "missed (time skipped past it)");
+                else if (late) Finish(p, day, p.Status.StartsWith("held") ? $"skipped: {hold ?? "held too long"}" : "missed (time skipped past it)");
                 else p.Status = "held: " + hold;
             }
         }
 
-        private void Finish(PlannedFlock p, string status)
+        private void Finish(PlannedFlock p, int day, string status)
         {
             p.Finished = true; p.Status = status;
-            if (cfg.LogSchedule) capi.Logger.Notification("[Flocks] day {0} {1} {2} x{3}: {4}", day, HourText(p.Hour), p.Species.Code, p.Count, status);
+            if (cfg.LogSchedule) sapi.Logger.Notification("[Flocks] day {0} {1} {2} x{3}: {4}", day, HourText(p.Hour), p.Species.Code, p.Count, status);
         }
 
         /// <summary>Storm-strength wind or a downpour at the player. Ordinary rain and breezes don't stop migration.</summary>
         public bool Stormy(BlockPos pos)
         {
-            var ba = capi.World.BlockAccessor;
+            var ba = sapi.World.BlockAccessor;
             double wind = ba.GetWindSpeedAt(pos)?.Length() ?? 0;
             var climate = ba.GetClimateAt(pos, EnumGetClimateMode.NowValues);
             return wind >= cfg.StormWind || (climate != null && climate.Rainfall >= cfg.StormPrecipitation);
         }
 
-        private void Plan(BlockPos pos)
+        private List<PlannedFlock> Plan(BlockPos pos, int day, string who)
         {
-            plan.Clear();
-            var cal = capi.World.Calendar;
+            var plan = new List<PlannedFlock>();
+            var cal = sapi.World.Calendar;
             float rel = cal.GetSeasonRel(pos);
             double lat = cal.OnGetLatitude(pos.Z);
-            foreach (var sp in species.Values)
+            foreach (var sp in species.Values.Where(s => cfg.SpeciesEnabled(s.Code)))
             {
-                if (!cfg.SpeciesEnabled(sp.Code)) continue;
                 double strength = Strength(sp, rel, lat, out bool spring);
                 if (cfg.ForceMigration) { strength = 1; spring = false; }
                 if (strength <= 0) continue;
-                var rnd = new Random(StableSeed(capi.World.Seed, day, sp.Code));
+                var rnd = new Random(StableSeed(sapi.World.Seed, day, sp.Code));
                 int n = (int)Math.Floor(sp.MaxFlocksPerDay * strength * cfg.FlocksPerDayMultiplier + rnd.NextDouble());
                 // spring heads poleward, autumn toward the equator; in VS north is -Z, which is heading pi here.
                 // Birds that stay all year go wherever they like.
@@ -109,7 +128,7 @@ namespace Flocks
                     {
                         Species = sp, Hour = PickHour(sp, rnd), Count = rnd.Next(sp.CountMin, sp.CountMax + 1),
                         Heading = sp.YearRound ? rnd.NextDouble() * Math.PI * 2 : baseHeading + (rnd.NextDouble() * 2 - 1) * 20 * GameMath.DEG2RAD,
-                        Altitude = sp.AltitudeMin + rnd.NextDouble() * (sp.AltitudeMax - sp.AltitudeMin),
+                        Altitude = sp.RandomAltitude(rnd),
                     });
                 }
             }
@@ -118,7 +137,8 @@ namespace Flocks
             double now = cal.HourOfDay;
             foreach (var p in plan) if (now > p.Hour + cfg.MaxDelayHours) { p.Finished = true; p.Status = "missed (before you arrived)"; }
             if (cfg.LogSchedule)
-                capi.Logger.Notification("[Flocks] day {0}: seasonRel={1:0.000} latitude={2:0.000} -> {3}", day, rel, lat, plan.Count == 0 ? "no flocks" : Describe());
+                sapi.Logger.Notification("[Flocks] day {0} for {1}: seasonRel={2:0.000} latitude={3:0.000} -> {4}", day, who, rel, lat, plan.Count == 0 ? "no flocks" : Describe(plan));
+            return plan;
         }
 
         /// <summary>
@@ -130,9 +150,8 @@ namespace Flocks
         {
             spring = false;
             if (sp.YearRound) return 1;     // no migration: about the same every day
-            double a = Math.Abs(lat);
-            if (a < 0.11) return 0;
-            float shift = (float)((a - 0.5) * 0.06);
+            if (Tropical(lat)) return 0;
+            float shift = LatitudeShift(lat);
             double s = Window(rel, sp.SpringStart + shift, sp.SpringEnd + shift) * sp.SpringWeight;
             double f = Window(rel, sp.AutumnStart - shift, sp.AutumnEnd - shift) * sp.AutumnWeight;
             spring = s >= f;
@@ -140,27 +159,25 @@ namespace Flocks
         }
 
         /// <summary>
-        /// Resident season: from the start of the spring window to the start of the autumn window, with the same
-        /// latitude shift as Strength(). Within ~10 deg of the equator (no migration) residents stay all year.
+        /// Whether birds that land are here at this point of the year (rel: seasonRel). They arrive as the spring
+        /// migration starts and leave as the autumn one starts, both moved by latitude exactly as in Strength(). In the
+        /// tropics (latitude under 0.11, about 10 deg) nothing migrates, so they never leave.
         /// </summary>
         public static bool ResidentSeason(float springStart, float autumnStart, float rel, double lat)
         {
-            double a = Math.Abs(lat);
-            if (a < 0.11) return true;
-            float shift = (float)((a - 0.5) * 0.06);
-            return rel >= springStart + shift && rel < autumnStart - shift;
+            if (Tropical(lat)) return true;
+            return springStart + LatitudeShift(lat) <= rel && rel < autumnStart - LatitudeShift(lat);
         }
 
         /// <summary>Within ~10 deg of the equator, where nothing migrates.</summary>
         public static bool Tropical(double lat) => Math.Abs(lat) < 0.11;
 
-        /// <summary>The seasonRel at which the species' spring (arrival) or autumn (departure) migration opens here, with
-        /// the same latitude shift as Strength().</summary>
+        /// <summary>How much later spring (and earlier autumn) comes at this latitude, as a share of the year.</summary>
+        public static float LatitudeShift(double lat) => (float)((Math.Abs(lat) - 0.5) * 0.06);
+
+        /// <summary>The seasonRel at which the species' spring (arrival) or autumn (departure) migration opens here.</summary>
         public static float SeasonStart(Species sp, bool spring, double lat)
-        {
-            float shift = (float)((Math.Abs(lat) - 0.5) * 0.06);
-            return spring ? sp.SpringStart + shift : sp.AutumnStart - shift;
-        }
+            => spring ? sp.SpringStart + LatitudeShift(lat) : sp.AutumnStart - LatitudeShift(lat);
 
         /// <summary>In-game days from seasonRel 'rel' forward to seasonRel 'target' (wrapping round the year).</summary>
         public static double DaysUntil(float target, float rel, int daysPerYear) => GameMath.Mod(target - rel, 1f) * daysPerYear;
@@ -168,7 +185,7 @@ namespace Flocks
         /// <summary>Sea (salt water at the surface) within 96 blocks of pos, sampled every 8 blocks in loaded chunks.</summary>
         private bool SeaNear(BlockPos pos)
         {
-            var ba = capi.World.BlockAccessor;
+            var ba = sapi.World.BlockAccessor;
             for (int dx = -96; dx <= 96; dx += 8)
                 for (int dz = -96; dz <= 96; dz += 8)
                     if (dx * dx + dz * dz <= 96 * 96 && LakeSearch.Surface(ba, pos.X + dx, pos.Z + dz, out _, "saltwater")) return true;
@@ -206,7 +223,7 @@ namespace Flocks
             }
         }
 
-        public string Describe()
+        private static string Describe(List<PlannedFlock> plan)
         {
             if (plan.Count == 0) return "no flocks";
             var sb = new StringBuilder();
@@ -218,30 +235,37 @@ namespace Flocks
             return sb.ToString();
         }
 
-        /// <summary>Today's plan and the conditions behind it, for /flocks schedule.</summary>
-        public string Report(string local = null)
+        /// <summary>Today's plan for the player and the conditions behind it, for /flocks schedule, with the flocks up
+        /// near them now. local: the part about landed flocks, appended.</summary>
+        public string Report(IServerPlayer plr, string local = null)
         {
-            var player = capi.World?.Player?.Entity;
+            var player = plr?.Entity;
             if (player == null) return "No player.";
             var pos = player.Pos.AsBlockPos;
-            var cal = capi.World.Calendar;
+            var cal = sapi.World.Calendar;
+            var plan = Today(plr);
             float rel = cal.GetSeasonRel(pos);
             double lat = cal.OnGetLatitude(pos.Z);
             var sb = new StringBuilder();
-            sb.Append($"Day {day}, {HourText(cal.HourOfDay)}, {cal.GetSeason(pos)} (seasonRel {rel:0.000}), latitude {lat:0.000}");
+            sb.Append($"Day {(int)cal.TotalDays}, {HourText(cal.HourOfDay)}, {cal.GetSeason(pos)} (seasonRel {rel:0.000}), latitude {lat:0.000}");
             if (!cfg.AutoMigration) sb.Append(", automatic migration OFF in flocks.json");
             if (cfg.ForceMigration) sb.Append(", ForceMigration ON (every day is peak autumn)");
             if (Stormy(pos)) sb.Append(", storm: flocks held");
-            if (absent.Count > 0) sb.Append($", not flying here (off on this server, or not in this realm): {string.Join(", ", absent)}");
             foreach (var sp in species.Values)
             {
                 double s = Strength(sp, rel, lat, out bool spring);
-                if (!cfg.SpeciesEnabled(sp.Code)) { sb.Append($"\n{sp.Code}: off in flocks.json"); continue; }
-                if (sp.YearRound) { sb.Append($"\n{sp.Code}: resident all year{(sp.Sea ? (SeaNear(pos) ? ", sea nearby" : ", no sea nearby") : "")}"); continue; }
-                sb.Append($"\n{sp.Code}: " + (s > 0 ? $"{(spring ? "spring" : "autumn")} migration, strength {s:0.00}" : "not migrating today"));
+                string state;
+                if (!cfg.SpeciesEnabled(sp.Code)) state = "off in flocks.json";
+                else if (!serverCfg.SpeciesEnabled(sp)) state = "off in flocks-server.json";
+                else if (!BiomesCompat.Allows(sapi, sp, pos)) state = "not of this realm (Biomes)";
+                else if (sp.YearRound) state = "resident all year" + (sp.Sea ? (SeaNear(pos) ? ", sea nearby" : ", no sea nearby") : "");
+                else state = s > 0 ? $"{(spring ? "spring" : "autumn")} migration, strength {s:0.00}" : "not migrating today";
+                sb.Append($"\n{sp.Code}: {state}");
             }
-            sb.Append("\nToday: " + (plan.Count == 0 ? "no flocks" : Describe().Replace("; ", "\n  ")));
-            if (!string.IsNullOrEmpty(local)) sb.Append("\n" + local);   // the server's part: landed flocks
+            sb.Append("\nToday: " + (plan.Count == 0 ? "no flocks" : Describe(plan).Replace("; ", "\n  ")));
+            var up = sky.Describe(player.Pos.XYZ);
+            sb.Append("\nIn the sky near you: " + (up.Count == 0 ? "none" : "\n  " + string.Join("\n  ", up)));
+            if (!string.IsNullOrEmpty(local)) sb.Append("\n" + local);
             return sb.ToString();
         }
 

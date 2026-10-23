@@ -1,7 +1,9 @@
 # Flocks - design (step 1)
 
 ## Behaviour
-- Purely visual, client-only. Birds never land, never collide, are not entities, cannot be hunted.
+- Purely visual, client-only. Birds never land, never collide, are not entities, cannot be hunted. (Superseded in
+  0.22.0: the server flies passing flocks, and near a player their birds are real; see "Passing flocks are real birds
+  near players" below.)
 - Flocks spawn out of view, cross the sky ~60-120 blocks above the player's ground level, and despawn out of view.
 - Species (real migrants): greylag goose, common crane -> V/echelon formations of 7-25, slow wingbeats, calls;
   barn swallow, common starling -> loose flocks of 20-80 (starlings may murmurate briefly in autumn dusk).
@@ -276,7 +278,36 @@ Decisions (Dright, 0.13.0), Phase 1 AI:
   for the bigger-than-life size (beats a second: goose and gull 2.6, mallard 3.6, heron 2, crow 3, owl 2.2, eagle 1.8;
   fly-flap is one beat of 30 frames, so flapSpeed is the animation speed), over a stroke of about 90 degrees. Takeoff
   stays the faster, deeper beat.
-- Planned for 0.22.0 (Dright: something new, young birds following their parents about on the water and on land):
+- Passing flocks are real birds near players (0.22.0, a player with a firearms mod shot at a flock and nothing
+  happened, then followed it as a spectator and found flat-looking drawn birds; Dright: they only need to be real
+  when the player sees them). Distant flocks can't be entities: the server only keeps entities in loaded chunks and
+  within a simulation range of a player, and a flock is in sight out to 1500 blocks. So each flock is real only near
+  someone:
+  - The server owns the passing flocks (SkyFlocks.cs, flying them with SkyFlight.cs, the old renderer's movement).
+    MigrationScheduler moved to the server: it plans each player's day as the client did (same seed, same windows)
+    and sends each flock over that player, unless one of its kind is already passing within 600 blocks (players near
+    each other share a sky; until now each client had its own). flocks.json is read by the server for this.
+  - Clients within 1700 blocks are told each flock's state once a second (and at once when it changes), and draw it
+    (FlockRenderer), flying it on between updates and easing out the difference.
+  - Within 300 blocks (horizontally) of a player, over loaded chunks, every bird becomes a real entity of its kind
+    (the crane has none and stays drawn) at its slot, already at the flock's speed. Each flies its own slot around the
+    flock, which the server keeps moving (EntityBehaviorBird.Passage), so turning back into drawn birds needs no
+    hand-over of a course: once every real bird is 360 blocks (FlockRegistry.DepartRange) from all players they are
+    removed and drawn again at their slots. A client hides a drawn bird whenever its real one is loaded there. At 300
+    blocks a goose is about 6 px across, so the swap is hard to catch.
+  - Shot at, hit or a bird killed: the real birds burst out ahead and to the sides for 2.5-4 s and close up again; the
+    flock climbs 10 blocks (at most three times) and keeps its way, so a hunter may get another chance. A bird killed
+    leaves the flock for good (the flock flies on a bird short, real or drawn) and falls as an ordinary carcass.
+    Thrown spears are dodged as everywhere else. Passing birds make no idle calls; the drawn flock's calls play from
+    the real birds' positions.
+  - The server runs physics only for entities some client tracks; an untracked passing bird (beyond a short view
+    distance) moves itself, so it never hangs while its flock flies on.
+  - Nothing of a passing flock is saved. A real bird loaded from a save after a restart is removed; one spawned
+    without a flock (let out of a cage) stays as an ordinary bird.
+  - /flocks send needs controlserver now: its birds are huntable meat.
+  - Formation spacing needs each bird's wingspan on the server, which has no meshes: the species files carry it
+    (measured by tools/measure_spans.py from the models, at the entity's size).
+- Planned for 0.23.0, a later Friday than 0.22.0 (Dright: something new, young birds following their parents about on the water and on land):
   goslings first, then ducklings on the same work. Not built yet beyond the gosling model; the plan:
   - Season: geese and mallards are resident from springStart to autumnStart, their breeding season. Some resident
     pairs bring a brood some days into it; the young grow up over the summer and are grown (adults, as vanilla's

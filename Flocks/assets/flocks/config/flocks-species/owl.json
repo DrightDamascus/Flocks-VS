@@ -8,6 +8,9 @@
 		{ name: "owl", shape: "flocks:shapes/entity/bird/owl.json", flap: "fly-flap", soar: "fly-soar" }
 	],
 	sizeFromEntity: "flocks:owl",
+	// across the wings in flight at that size, for the formation spacing (tools/measure_spans.py; rerun it after changing
+	// the size or the wings)
+	wingspan: 1.42,
 	speedMin: 7, speedMax: 9,
 	flapSeconds: 0.55, soarSeconds: 2, blendSeconds: 0.4,
 	flapBeatsMin: 3, flapBeatsMax: 6, soarLoopsMin: 1, soarLoopsMax: 1,
